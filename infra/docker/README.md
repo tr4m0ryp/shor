@@ -45,6 +45,7 @@ docker build \
   --build-arg SSRFMAP_SHA=69103b27f5898d9707630dc572798df63727b90f \
   --build-arg JWT_TOOL_SHA=3bc7407cf2222d6a821dcc19c776e5a1b1cb9a9b \
   --build-arg NOSQLI_SHA=6fce3ebc8c8127940221d9287b00493be43d7564 \
+  --build-arg PARAMSPIDER_SHA=c44bdaae54789b237028e309b603d1aa5ad52e5e \
   -t aegis-toolkit:latest \
   infra/docker
 ```
@@ -103,7 +104,7 @@ sandbox (see "Verification status" below for why) — author-validated only.
 | | gau | go-install | `lc/gau/v2/cmd/gau` |
 | | waybackurls | go-install | `tomnomnom/waybackurls` |
 | | ★arjun | pip | `arjun` |
-| | paramspider | pip | `paramspider` |
+| | paramspider | git-clone (pinned) + pip install . | `devanshbatham/ParamSpider` (NOT on PyPI) |
 | | wafw00f | pip | `wafw00f` |
 | Templated | ★nuclei | go-install | `projectdiscovery/nuclei/v3/cmd/nuclei` |
 | Static | ★semgrep | pip | `semgrep` |
@@ -126,6 +127,15 @@ DEFAULT-marked tools from ADR-025 that are NOT in this image (deferred,
 non-blocking, post-launch tunable): masscan, rustscan, amass, feroxbuster,
 gobuster, dirsearch, hydra, medusa, patator. The matrix marks these `(D)` /
 thin-evidence; the `★` primaries above cover every pipeline layer (§5.4).
+
+### Deviation from ADR-025 (build-driven)
+
+- **paramspider**: ADR-025 lists `pip install …`. A real `py-builder` build
+  proved **paramspider is not on PyPI** (`No matching distribution found`).
+  Reclassified to a **pinned git-clone + `pip install .`** from
+  `devanshbatham/ParamSpider` (its `setup.py` exposes the `paramspider` console
+  script on the venv PATH). This is exactly the kind of `(D)` thin-evidence pick
+  the spec flagged as tunable. Pin recorded in `tools.lock`.
 
 ### Verification status (this sandbox)
 

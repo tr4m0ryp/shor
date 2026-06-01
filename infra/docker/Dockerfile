@@ -105,10 +105,11 @@ RUN mkdir -p "$TOOLS_DIR"
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # --- PyPI tools (official glibc wheels) ---
+# NOTE: paramspider is NOT on PyPI (verified: `pip install paramspider` fails);
+# it installs from its git checkout below.
 RUN pip install --no-cache-dir \
     semgrep \
     arjun \
-    paramspider \
     wafw00f \
     playwright
 
@@ -121,6 +122,7 @@ ARG SSTIMAP_SHA
 ARG XSSTRIKE_SHA
 ARG SSRFMAP_SHA
 ARG JWT_TOOL_SHA
+ARG PARAMSPIDER_SHA
 
 # Generic pinned-clone helper kept inline (no shell helper in runtime stage).
 # sqlmap: pure-Python, runs in place; pip packaging lags upstream.
@@ -145,6 +147,11 @@ RUN git clone --filter=blob:none https://github.com/swisskyrepo/SSRFmap.git "$TO
 RUN git clone --filter=blob:none https://github.com/ticarpi/jwt_tool.git "$TOOLS_DIR/jwt_tool" && \
     git -C "$TOOLS_DIR/jwt_tool" checkout --detach "$JWT_TOOL_SHA" && \
     pip install --no-cache-dir -r "$TOOLS_DIR/jwt_tool/requirements.txt"
+# paramspider: NOT on PyPI; install from the pinned checkout (setup.py provides a
+# `paramspider` console script, so it lands on the venv PATH directly).
+RUN git clone --filter=blob:none https://github.com/devanshbatham/ParamSpider.git "$TOOLS_DIR/ParamSpider" && \
+    git -C "$TOOLS_DIR/ParamSpider" checkout --detach "$PARAMSPIDER_SHA" && \
+    pip install --no-cache-dir "$TOOLS_DIR/ParamSpider"
 
 # Strip the .git history from each clone to slim the layer and freeze the pin.
 RUN find "$TOOLS_DIR" -maxdepth 2 -name .git -type d -prune -exec rm -rf {} +

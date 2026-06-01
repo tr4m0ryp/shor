@@ -16,8 +16,9 @@
 #
 # ---------------------------------------------------------------------------
 # PINNED git-clone tools (LAUNCH-SPEC §5.3: nosqli, jwt_tool, XSStrike, sqlmap,
-# commix, SSTImap, ssrfmap). These SHAs are the only thing the build *pins*;
-# changing one is an intentional, reviewable supply-chain event.
+# commix, SSTImap, ssrfmap) + ParamSpider (reclassified from pip -> git-clone:
+# it is NOT on PyPI, proven by a real build). These SHAs are the only thing the
+# build *pins*; changing one is an intentional, reviewable supply-chain event.
 # ---------------------------------------------------------------------------
 
 [sqlmap]
@@ -89,6 +90,19 @@ branch  = main
 lang    = go
 build   = NOSQLI_SHA
 note    = ~4.5yr stale; no documented @latest, so `go install <module>@<SHA>` (pinned).
+
+[ParamSpider]
+kind    = git-clone
+repo    = https://github.com/devanshbatham/ParamSpider.git
+ref     = c44bdaae54789b237028e309b603d1aa5ad52e5e
+branch  = master
+lang    = python
+entry   = paramspider (console script)
+build   = PARAMSPIDER_SHA
+note    = NOT on PyPI (pip install paramspider fails); pip install . from the pinned
+          checkout — setup.py exposes the `paramspider` command on the venv PATH.
+          Reclassified from ADR-025's "pip install" (D) after a real build proved
+          no PyPI distribution exists.
 
 # ---------------------------------------------------------------------------
 # go-install tools (ADR-025). Version floats at @latest; the Go module proxy +
@@ -191,11 +205,6 @@ ref = @latest
 [arjun]
 kind = pip
 package = arjun
-ref = @latest
-
-[paramspider]
-kind = pip
-package = paramspider
 ref = @latest
 
 [wafw00f]
