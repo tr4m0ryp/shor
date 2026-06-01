@@ -1,0 +1,8 @@
+# Recommended pnpm config for Aegis. Copy to `.npmrc` locally:
+#   cp npmrc.recommended .npmrc
+# `.npmrc` itself is gitignored because it can carry registry auth tokens.
+
+auto-install-peers=true
+strict-peer-dependencies=false
+minimum-release-age=10080
+ignore-scripts=true
