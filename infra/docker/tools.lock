@@ -1,0 +1,217 @@
+# Aegis toolkit lockfile (ADR-027, LAUNCH-SPEC §5.2/§5.3).
+#
+# Source of truth for the pinned git-clone tools. Every git-clone tool is
+# pinned to a real commit SHA resolved with `git ls-remote <url> HEAD` on
+# 2026-06-02. The Dockerfile consumes these via --build-arg (see README), so a
+# rebuild is reproducible and supply-chain-auditable.
+#
+# Format: one record per tool.
+#   tool        canonical short name (matches the on-PATH command / wrapper)
+#   kind        git-clone | go-install | pip
+#   repo|module source URL (git-clone) or Go module path / PyPI name
+#   ref         pinned commit SHA (git-clone) or "@latest" (go/pip; floats)
+#   branch      upstream default branch the SHA was taken from (git-clone only)
+#   lang        runtime language
+#   entry       in-repo entrypoint (git-clone Python tools)
+#
+# ---------------------------------------------------------------------------
+# PINNED git-clone tools (LAUNCH-SPEC §5.3: nosqli, jwt_tool, XSStrike, sqlmap,
+# commix, SSTImap, ssrfmap). These SHAs are the only thing the build *pins*;
+# changing one is an intentional, reviewable supply-chain event.
+# ---------------------------------------------------------------------------
+
+[sqlmap]
+kind    = git-clone
+repo    = https://github.com/sqlmapproject/sqlmap.git
+ref     = e6595430483f0cf57ad36539ffc61fc4a6060df5
+branch  = master
+lang    = python
+entry   = sqlmap.py
+build   = SQLMAP_SHA
+note    = pure-Python; runs in place (python sqlmap.py). pip packaging lags upstream.
+
+[commix]
+kind    = git-clone
+repo    = https://github.com/commixproject/commix.git
+ref     = 20794529a2bb307056f12571027bb3fbe6afb48d
+branch  = master
+lang    = python
+entry   = commix.py
+build   = COMMIX_SHA
+note    = pure-Python stdlib; no requirements.txt; runs in place.
+
+[SSTImap]
+kind    = git-clone
+repo    = https://github.com/vladko312/SSTImap.git
+ref     = d4f09055b15967b0e2265f20eb348a7ec2f25a2c
+branch  = master
+lang    = python
+entry   = sstimap.py
+build   = SSTIMAP_SHA
+note    = py3 (replaces abandoned py2 tplmap); pip install -r requirements.txt into venv.
+
+[XSStrike]
+kind    = git-clone
+repo    = https://github.com/s0md3v/XSStrike.git
+ref     = ab27955d367432f944d8f29897e09c15356e76f7
+branch  = master
+lang    = python
+entry   = xsstrike.py
+build   = XSSTRIKE_SHA
+note    = py3; pip install -r requirements.txt into venv (let pip resolve glibc wheels).
+
+[SSRFmap]
+kind    = git-clone
+repo    = https://github.com/swisskyrepo/SSRFmap.git
+ref     = 69103b27f5898d9707630dc572798df63727b90f
+branch  = master
+lang    = python
+entry   = ssrfmap.py
+build   = SSRFMAP_SHA
+note    = pure-Python; runs in place; pip install -r requirements.txt into venv.
+
+[jwt_tool]
+kind    = git-clone
+repo    = https://github.com/ticarpi/jwt_tool.git
+ref     = 3bc7407cf2222d6a821dcc19c776e5a1b1cb9a9b
+branch  = master
+lang    = python
+entry   = jwt_tool.py
+build   = JWT_TOOL_SHA
+note    = pure-Python (pycryptodomex); ~13mo stale; pinned; requirements into venv.
+
+[nosqli]
+kind    = git-clone
+module  = github.com/Charlie-belmer/nosqli
+repo    = https://github.com/Charlie-belmer/nosqli.git
+ref     = 6fce3ebc8c8127940221d9287b00493be43d7564
+branch  = main
+lang    = go
+build   = NOSQLI_SHA
+note    = ~4.5yr stale; no documented @latest, so `go install <module>@<SHA>` (pinned).
+
+# ---------------------------------------------------------------------------
+# go-install tools (ADR-025). Version floats at @latest; the Go module proxy +
+# this Dockerfile make each build reproducible. Module paths are exact
+# (semantic-import-versioning suffixes verified against each repo's go.mod):
+#   - gau          -> /v2/cmd/gau     - osv-scanner -> /v2/cmd/osv-scanner
+#   - trufflehog   -> /v3             - gitleaks    -> /v8
+#   - dalfox       -> /v2 (@latest resolves to latest v2.x, NOT the v3 Rust rewrite)
+#   - kxss         -> github.com/Emoe/kxss (maintained go-install fork)
+# ---------------------------------------------------------------------------
+
+[httpx]
+kind = go-install
+module = github.com/projectdiscovery/httpx/cmd/httpx
+ref = @latest
+
+[subfinder]
+kind = go-install
+module = github.com/projectdiscovery/subfinder/v2/cmd/subfinder
+ref = @latest
+
+[nuclei]
+kind = go-install
+module = github.com/projectdiscovery/nuclei/v3/cmd/nuclei
+ref = @latest
+
+[dnsx]
+kind = go-install
+module = github.com/projectdiscovery/dnsx/cmd/dnsx
+ref = @latest
+
+[naabu]
+kind = go-install
+module = github.com/projectdiscovery/naabu/v2/cmd/naabu
+ref = @latest
+note = CGO_ENABLED=1; needs libpcap-dev (build) / libpcap (runtime).
+
+[katana]
+kind = go-install
+module = github.com/projectdiscovery/katana/cmd/katana
+ref = @latest
+note = built CGO_ENABLED=1 with gcc + Go 1.25+ for the headless path (ADR-025).
+
+[interactsh-client]
+kind = go-install
+module = github.com/projectdiscovery/interactsh/cmd/interactsh-client
+ref = @latest
+
+[ffuf]
+kind = go-install
+module = github.com/ffuf/ffuf/v2
+ref = @latest
+
+[dalfox]
+kind = go-install
+module = github.com/hahwul/dalfox/v2
+ref = @latest
+note = pure-Go; ignore prebuilt-binary claims; /v2@latest avoids the v3 Rust rewrite.
+
+[kxss]
+kind = go-install
+module = github.com/Emoe/kxss
+ref = @latest
+
+[gau]
+kind = go-install
+module = github.com/lc/gau/v2/cmd/gau
+ref = @latest
+
+[waybackurls]
+kind = go-install
+module = github.com/tomnomnom/waybackurls
+ref = @latest
+
+[gitleaks]
+kind = go-install
+module = github.com/gitleaks/gitleaks/v8
+ref = @latest
+
+[osv-scanner]
+kind = go-install
+module = github.com/google/osv-scanner/v2/cmd/osv-scanner
+ref = @latest
+
+[trufflehog]
+kind = go-install
+module = github.com/trufflesecurity/trufflehog/v3
+ref = @latest
+
+# ---------------------------------------------------------------------------
+# pip tools into the shared venv /opt/aegis/venv (ADR-026). Versions float to
+# the latest glibc wheel at build time (semgrep/playwright pin transitively).
+# ---------------------------------------------------------------------------
+
+[semgrep]
+kind = pip
+package = semgrep
+ref = @latest
+
+[arjun]
+kind = pip
+package = arjun
+ref = @latest
+
+[paramspider]
+kind = pip
+package = paramspider
+ref = @latest
+
+[wafw00f]
+kind = pip
+package = wafw00f
+ref = @latest
+
+[playwright]
+kind = pip
+package = playwright
+ref = @latest
+note = uses the apk-provided glibc chromium at runtime (PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH).
+
+# ---------------------------------------------------------------------------
+# apk (Wolfi glibc) packages — installed into the runtime closure, never copied
+# as musl binaries. Key entries: nmap, chromium, libpcap, and the chromium
+# glibc deps (nss, freetype, harfbuzz, X11 libs, fontconfig). Full list in the
+# Dockerfile runtime-staging stage.
+# ---------------------------------------------------------------------------
