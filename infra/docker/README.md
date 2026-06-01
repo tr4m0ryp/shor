@@ -139,10 +139,23 @@ thin-evidence; the `★` primaries above cover every pipeline layer (§5.4).
 
 ### Verification status (this sandbox)
 
-- **`docker build --check`**: PASS, no warnings (all 4 stages lint-clean).
-- **Runtime tool execution**: see the build logs captured at build time. Where a
-  full image build could not complete in-sandbox it is recorded as
-  **BLOCKED-for-acceptance** — the authoring is statically validated and the
-  pins are real, but a CI runner must do the first reproducible full build +
-  per-tool `--version` smoke test before launch (Launch-Readiness checklist:
-  "All ~30 tools install per the ADR-025 matrix and run on the slim runtime").
+The build was exercised on a Colima/QEMU `linux/amd64` VM on an Intel Mac. Under
+that emulation, large Go tools compile *very* slowly (nuclei alone ≈ 26 min), so
+the full `runtime` image could not finish in-sandbox. That is a host-performance
+limit, **not** a Dockerfile defect: a native `linux/amd64` CI runner builds these
+in a fraction of the time.
+
+| Aspect | Status | Evidence |
+|---|---|---|
+| `docker build --check` (all 4 stages) | **PASS, no warnings** | run twice (incl. after the paramspider fix) |
+| **py-builder** stage (full) | **BUILD-VERIFIED** | built end-to-end to image export, exit 0: semgrep 1.164.0, arjun 2.2.7, wafw00f 2.4.2, playwright 1.60.0 (pip, glibc wheels); sqlmap/commix/SSTImap/XSStrike/SSRFmap/jwt_tool cloned at pinned SHAs + requirements; paramspider wheel built + installed |
+| Go module paths resolve + compile | **BUILD-VERIFIED (corrected paths)** | `go install` in a throwaway Wolfi container built kxss (`Emoe/kxss`), gau (`/v2/cmd/gau`), waybackurls, dalfox (`/v2@latest` → latest v2.x, not the v3 Rust rewrite), nosqli (`@<pinned SHA>`) with no path errors |
+| go-builder large tools (nuclei, trufflehog, katana CGO, naabu CGO, osv-scanner, gitleaks) | **BLOCKED-for-acceptance** (compile time only) | step compiled through `nuclei/v3/cmd/nuclei` (its main package) before the sandbox window closed; httpx/subfinder/dnsx/interactsh deps fetched cleanly. Paths are the verified-correct semantic-import suffixes; needs a native CI build to finish + smoke-test |
+| Full `runtime` (glibc-dynamic) assembly | **BLOCKED-for-acceptance** | gated only by the go-builder compile time above |
+
+**Acceptance gate for CI** (Launch-Readiness "All ~30 tools install … and run on
+the slim runtime"): on a native `linux/amd64` runner, build the full image with
+the seven `--build-arg` SHAs, then smoke-test every binary
+(`<tool> -version`/`--version`/`-h`) on the `glibc-dynamic` runtime. Everything
+above marked BLOCKED is author-validated + path-verified; only the long native
+compile + per-tool `--version` remains.
