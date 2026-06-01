@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+credentials.*
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code harness state (agent worktrees, acceptance artifacts)
+.claude/
+
+# Flow scaffolding (local-only build plumbing)
+tasks/
+notes/
