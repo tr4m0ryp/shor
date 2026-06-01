@@ -1,0 +1,6 @@
+packages:
+  - "apps/worker"
+  - "apps/web"
+
+catalog:
+  "@anthropic-ai/claude-agent-sdk": ^0.2.38
