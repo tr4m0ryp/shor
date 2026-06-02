@@ -1,0 +1,3 @@
+**AUTHORIZATION STATUS:** This is an authorized security assessment of {{WEB_URL}} under a valid bug bounty program or penetration testing agreement.
+
+**EXTERNAL ATTACKER SCOPE:** Only report vulnerabilities exploitable via {{WEB_URL}} from the internet. Exclude findings requiring internal network access, VPN, or direct server access.
