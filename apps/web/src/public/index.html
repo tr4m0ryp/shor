@@ -452,33 +452,21 @@ body {
     <nav>
       <a id="navTargets" class="active" onclick="showPage('targets')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-        Targets
-      </a>
-      <a id="navTeam" onclick="showPage('team')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Team
-      </a>
-      <a id="navLogout" onclick="logout(event)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        Sign out
+        Projects
       </a>
     </nav>
-    <div class="user-chip" id="userChip" style="display:none">
-      <span class="user-email" id="userEmail">--</span>
-      <span class="user-meta"><span class="role-badge" id="userRole">viewer</span> <span id="userOrg"></span></span>
-    </div>
   </aside>
 
   <main class="main">
     <!-- ===================== Targets page ===================== -->
     <div id="pageTargets" class="page">
       <div class="page-header">
-        <h1>Targets</h1>
-        <p>Named targets &mdash; a live site plus a connected repo and optional schedule. Trigger scans and track them over time.</p>
+        <h1>Projects</h1>
+        <p>A project pairs a live site with its codebase. Upload a source zip (or connect a repo), then trigger scans and track them over time.</p>
       </div>
 
       <div class="new-run-card">
-        <h2>New Target</h2>
+        <h2>New Project</h2>
         <div class="new-run-grid">
           <div>
             <label for="projName">Name</label>
@@ -493,28 +481,23 @@ body {
             <input type="text" id="projRepo" placeholder="GitHub App installation id (optional)">
             <div class="hint">Leave blank for zip-only ingest.</div>
           </div>
-          <div>
-            <label for="projSchedule">Schedule</label>
-            <input type="text" id="projSchedule" placeholder="cron, e.g. 0 3 * * 1 (optional)">
-            <div class="hint">Blank = on-demand.</div>
-          </div>
           <div class="start-row">
             <button class="btn btn-primary" id="createProjBtn" onclick="createProject()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Create Target
+              Create Project
             </button>
           </div>
         </div>
       </div>
 
       <div class="section-header">
-        <h2>All Targets</h2>
+        <h2>Projects</h2>
         <span class="count" id="projCount">0</span>
       </div>
       <div class="runs-grid" id="projectsContainer">
         <div class="empty-state" id="projectsEmpty">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/></svg>
-          <p>No targets yet. Create one above.</p>
+          <p>No projects yet. Create one above.</p>
         </div>
       </div>
     </div>
@@ -524,7 +507,7 @@ body {
       <div class="page-header detail-header">
         <button class="btn btn-ghost btn-sm" onclick="showPage('targets')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="15 18 9 12 15 6"/></svg>
-          All targets
+          Projects
         </button>
         <div>
           <h1 id="projDetailTitle">Target</h1>
@@ -581,18 +564,6 @@ body {
       <div class="detail-panel" id="panelDiff" style="display:none"></div>
     </div>
 
-    <!-- ===================== Team page (multi-user) ===================== -->
-    <div id="pageTeam" class="page" style="display:none">
-      <div class="page-header">
-        <h1>Team</h1>
-        <p>Users in your tenant. Every view is scoped to your organization.</p>
-      </div>
-      <div class="section-header">
-        <h2>Members</h2>
-        <span class="count" id="userCount">0</span>
-      </div>
-      <div class="users-table" id="usersContainer"></div>
-    </div>
   </main>
 </div>
 
@@ -646,34 +617,15 @@ async function api(method, path, body) {
 
 // ===================== Auth / identity =====================
 
+// Prototype: no login UI. We still hit /auth/me once so the backend auto-
+// provisions the dev session cookie that scopes data — just no user chrome.
 async function loadMe() {
   try {
     const data = await api('GET', '/auth/me');
     state.me = data.user;
-    renderUserChip();
   } catch (_) {
     state.me = null;
   }
-}
-
-function renderUserChip() {
-  const chip = document.getElementById('userChip');
-  if (!state.me) { chip.style.display = 'none'; return; }
-  chip.style.display = 'flex';
-  document.getElementById('userEmail').textContent = state.me.email || state.me.uid || 'signed in';
-  const roleEl = document.getElementById('userRole');
-  const role = state.me.role || 'viewer';
-  roleEl.textContent = role;
-  roleEl.className = 'role-badge role-' + role;
-  document.getElementById('userOrg').textContent = state.me.org || '';
-}
-
-async function logout(event) {
-  if (event) event.preventDefault();
-  try { await api('POST', '/auth/logout'); } catch (_) {}
-  showToast('Signed out', 'success');
-  state.me = null;
-  renderUserChip();
 }
 
 // ===================== Page routing =====================
@@ -681,27 +633,23 @@ async function logout(event) {
 function showPage(page) {
   // Leaving any page stops the scan-detail live poll; openScan restarts it.
   stopScanPolling();
-  const pages = ['Targets', 'ProjectDetail', 'ScanDetail', 'Team'];
+  const pages = ['Targets', 'ProjectDetail', 'ScanDetail'];
   pages.forEach((p) => {
     const el = document.getElementById('page' + p);
     if (el) el.style.display = 'none';
   });
   document.querySelectorAll('.sidebar nav a').forEach((a) => a.classList.remove('active'));
 
-  if (page === 'targets') {
-    document.getElementById('pageTargets').style.display = 'block';
-    document.getElementById('navTargets').classList.add('active');
-    loadProjects();
-  } else if (page === 'projectDetail') {
+  if (page === 'projectDetail') {
     document.getElementById('pageProjectDetail').style.display = 'block';
     document.getElementById('navTargets').classList.add('active');
   } else if (page === 'scanDetail') {
     document.getElementById('pageScanDetail').style.display = 'flex';
     document.getElementById('navTargets').classList.add('active');
-  } else if (page === 'team') {
-    document.getElementById('pageTeam').style.display = 'block';
-    document.getElementById('navTeam').classList.add('active');
-    loadUsers();
+  } else {
+    document.getElementById('pageTargets').style.display = 'block';
+    document.getElementById('navTargets').classList.add('active');
+    loadProjects();
   }
 }
 
@@ -714,7 +662,7 @@ async function loadProjects() {
     const projects = data.projects || [];
     document.getElementById('projCount').textContent = String(projects.length);
     if (projects.length === 0) {
-      container.innerHTML = '<div class="empty-state"><p>No targets yet. Create one above.</p></div>';
+      container.innerHTML = '<div class="empty-state"><p>No projects yet. Create one above.</p></div>';
       return;
     }
     container.innerHTML = projects.map(renderProjectCard).join('');
@@ -724,7 +672,6 @@ async function loadProjects() {
 }
 
 function renderProjectCard(p) {
-  const sched = p.schedule ? '<span>schedule: ' + escapeHtml(p.schedule) + '</span>' : '<span>on-demand</span>';
   const repo = p.repoInstallationId ? 'github' : 'zip';
   return (
     '<div class="run-card" onclick="openProject(\'' + escapeHtml(p.id) + '\')">' +
@@ -733,10 +680,24 @@ function renderProjectCard(p) {
         '<span class="run-id">' + escapeHtml(p.targetUrl) + '</span>' +
       '</div>' +
       '<div class="run-status"><span class="badge badge-pending">' + escapeHtml(repo) + '</span></div>' +
-      '<div class="run-progress">' + sched + '</div>' +
       '<div class="run-details"><span class="run-id">' + escapeHtml(p.id) + '</span></div>' +
+      '<button class="btn btn-ghost btn-sm proj-delete" title="Delete project" ' +
+        'onclick="event.stopPropagation(); deleteProject(\'' + escapeHtml(p.id) + '\', \'' + escapeHtml(p.name) + '\')">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
+      '</button>' +
     '</div>'
   );
+}
+
+async function deleteProject(id, name) {
+  if (!confirm('Delete project "' + name + '" and all its scans? This cannot be undone.')) return;
+  try {
+    await api('DELETE', '/projects/' + id);
+    showToast('Project deleted', 'success');
+    loadProjects();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
 }
 
 async function createProject() {
@@ -744,20 +705,17 @@ async function createProject() {
   const name = document.getElementById('projName').value.trim();
   const targetUrl = document.getElementById('projUrl').value.trim();
   const repoInstallationId = document.getElementById('projRepo').value.trim();
-  const schedule = document.getElementById('projSchedule').value.trim();
   if (!name) { showToast('Name is required', 'error'); return; }
   if (!targetUrl) { showToast('Target URL is required', 'error'); return; }
   btn.disabled = true;
   try {
     const payload = { name, targetUrl };
     if (repoInstallationId) payload.repoInstallationId = repoInstallationId;
-    if (schedule) payload.schedule = schedule;
     await api('POST', '/projects', payload);
-    showToast('Target created', 'success');
+    showToast('Project created', 'success');
     document.getElementById('projName').value = '';
     document.getElementById('projUrl').value = '';
     document.getElementById('projRepo').value = '';
-    document.getElementById('projSchedule').value = '';
     loadProjects();
   } catch (err) {
     showToast(err.message, 'error');
