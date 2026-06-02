@@ -4,16 +4,22 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc && rm -rf dist/public && cp -R src/public dist/public",
+    "build": "tsc && (mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/) && rm -rf dist/public && (cp -R src/public dist/public 2>/dev/null || true)",
     "check": "tsc --noEmit",
     "clean": "rm -rf dist",
+    "migrate": "node dist/db/migrate.js",
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@temporalio/client": "^1.11.0"
+    "@google-cloud/secret-manager": "^6.1.2",
+    "@google-cloud/storage": "^7.19.0",
+    "@temporalio/client": "^1.11.0",
+    "google-auth-library": "^10.6.2",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
+    "@types/pg": "^8.11.0",
     "typescript": "^5.9.3"
   }
 }
