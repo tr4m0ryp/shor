@@ -11,6 +11,10 @@
 # Build: .acceptance/cloudbuild.yaml (passes BASE_IMAGE). Rebuild the base only
 # when tools.lock / system deps change; rebuild THIS on every worker code change.
 
+# Global ARG (declared before the first FROM so it is usable in the runtime
+# stage's FROM). Cloud Build overrides it; the default keeps local builds working.
+ARG BASE_IMAGE=us-central1-docker.pkg.dev/aegis-avelero-test/aegis/aegis-worker-base:latest
+
 # ---------------------------------------------------------------------------
 # Stage A: node-builder — build the Aegis worker (Node) + prune to prod deps.
 # ---------------------------------------------------------------------------
@@ -39,7 +43,6 @@ RUN rm -rf node_modules apps/worker/node_modules apps/web/node_modules && \
 # ---------------------------------------------------------------------------
 # Stage B: runtime — the toolkit base + the Node app on top.
 # ---------------------------------------------------------------------------
-ARG BASE_IMAGE=us-central1-docker.pkg.dev/aegis-avelero-test/aegis/aegis-worker-base:latest
 FROM ${BASE_IMAGE} AS runtime
 
 # The base ends as the nonroot user; switch to root to lay down the app, then
