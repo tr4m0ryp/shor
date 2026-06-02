@@ -32,6 +32,7 @@ export { migrate } from './db/migrate.js';
 export * as repositories from './db/repositories/index.js';
 export * from './domain/types.js';
 export { createDashboardServer, startDashboard } from './server/index.js';
+export * as secrets from './secrets/index.js';
 
 // Start the dashboard only when this module is the process entrypoint
 // (`node dist/index.js`), never on import.
