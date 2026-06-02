@@ -166,6 +166,15 @@ export interface GithubAppConfig {
 
 export interface AegisConfig {
   readonly env: 'development' | 'production' | 'test';
+  /**
+   * Env-gated dev login (`AEGIS_DEV_LOGIN`, default false).
+   *
+   * When true, `GET /auth/me` with no valid session provisions a seeded dev
+   * tenant/user, mints a session, and seeds one sample project — so the
+   * dashboard can log in and load data WITHOUT the Identity Platform browser
+   * flow. Strictly additive and flag-gated; MUST stay false in production.
+   */
+  readonly devLogin: boolean;
   readonly gcp: GcpConfig;
   readonly sql: CloudSqlConfig;
   readonly storage: StorageConfig;
@@ -195,6 +204,8 @@ export function getConfig(): AegisConfig {
 
   cached = {
     env: resolvedEnv,
+    // Env-gated dev login (default OFF). Never enable in production.
+    devLogin: envBool('AEGIS_DEV_LOGIN', false),
     gcp: { projectId, region },
     sql: {
       host: env('CLOUD_SQL_HOST'),

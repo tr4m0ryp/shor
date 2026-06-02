@@ -14,10 +14,12 @@
  */
 
 import { verifyIdToken } from '../cloud/identity.js';
+import { getConfig } from '../config.js';
 import { tenantRepo } from '../db/repositories/tenant.js';
 import { userRepo } from '../db/repositories/user.js';
 import type { Tenant, User } from '../domain/types.js';
-import { authenticate } from './middleware.js';
+import { ensureDevSession, seedDevProject } from './dev-session.js';
+import { authenticate, type Principal } from './middleware.js';
 import { buildClearCookie, buildSessionCookie, mintSession, type SessionClaims } from './session.js';
 
 /** Response envelope for an auth route — JSON body plus optional `Set-Cookie`. */
@@ -78,13 +80,49 @@ export function handleLogout(): AuthRouteResponse {
   return { status: 200, body: { ok: true }, setCookie: buildClearCookie() };
 }
 
-/** `GET /auth/me` — return the current principal, or `401` when unauthenticated. */
-export function handleMe(cookieHeader: string | undefined): AuthRouteResponse {
+/**
+ * `GET /auth/me` — return the current principal, or `401` when unauthenticated.
+ *
+ * When `AEGIS_DEV_LOGIN` is on AND there is no valid session, a seeded dev
+ * tenant/user/project is provisioned (idempotently), a session is minted, and
+ * the response carries the `Set-Cookie` so the dashboard proceeds without the
+ * Identity Platform browser flow. When the flag is off (prod default) this is
+ * untouched: no valid session still returns the normal 401.
+ */
+export async function handleMe(cookieHeader: string | undefined): Promise<AuthRouteResponse> {
   const auth = authenticate(cookieHeader);
-  if (!auth.ok) {
-    return { status: auth.status, body: { error: auth.error } };
+  if (auth.ok) {
+    return { status: 200, body: { user: principalBody(auth.principal) } };
   }
-  return { status: 200, body: { user: principalBody(auth.principal) } };
+  // Strictly flag-gated dev fallback — only when there is NO valid session.
+  if (getConfig().devLogin) {
+    return devLoginResponse();
+  }
+  return { status: auth.status, body: { error: auth.error } };
+}
+
+/**
+ * Dev-only `/auth/me` fallback: provision the seeded dev principal + sample
+ * project, mint a session, and return it with the session cookie. Errors fall
+ * back to a 500 so the normal (non-dev) path is never affected.
+ */
+async function devLoginResponse(): Promise<AuthRouteResponse> {
+  let principal: Principal;
+  try {
+    principal = await ensureDevSession();
+    await seedDevProject(principal.tenantId);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { status: 500, body: { error: msg } };
+  }
+  const claims: SessionClaims = {
+    uid: principal.uid,
+    tenantId: principal.tenantId,
+    role: principal.role,
+    org: principal.org,
+  };
+  const token = mintSession(claims);
+  return { status: 200, body: { user: principalBody(claims) }, setCookie: buildSessionCookie(token) };
 }
 
 /**
