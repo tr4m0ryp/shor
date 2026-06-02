@@ -29,6 +29,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@google-cloud/run':
+        specifier: ^3.2.1
+        version: 3.2.1
       '@google-cloud/secret-manager':
         specifier: ^6.1.2
         version: 6.1.2
@@ -41,7 +44,13 @@ importers:
       '@octokit/request':
         specifier: ^10.0.10
         version: 10.0.10
+      '@temporalio/activity':
+        specifier: ^1.11.0
+        version: 1.17.2
       '@temporalio/client':
+        specifier: ^1.11.0
+        version: 1.17.2
+      '@temporalio/workflow':
         specifier: ^1.11.0
         version: 1.17.2
       google-auth-library:
@@ -234,6 +243,10 @@ packages:
   '@google-cloud/promisify@4.0.0':
     resolution: {integrity: sha512-Orxzlfb9c67A15cq2JQEyVc7wEsmFBmHjZWZYQMUyJ1qivXyMwdyNOs9odi79hze+2zqdTtu1E19IM/FtqZ10g==}
     engines: {node: '>=14'}
+
+  '@google-cloud/run@3.2.1':
+    resolution: {integrity: sha512-k+zEjPuH0crTBlp1+GCyzVzKgsBitBoIg5x+GUFLU8Lo1IwoQOg3ikO8SkeJnNfrH5TQERP64SRZlAC0mKVWLQ==}
+    engines: {node: '>=18'}
 
   '@google-cloud/secret-manager@6.1.2':
     resolution: {integrity: sha512-X4GiHC1OsZU8LOcnM/hk7Q+W/orZLSJz6IAvBJrjaQCj1pSRHkTHJnU87A6E5G8/ubIJjL6vs1GJ8f17TkDzPw==}
@@ -1988,6 +2001,12 @@ snapshots:
   '@google-cloud/projectify@4.0.0': {}
 
   '@google-cloud/promisify@4.0.0': {}
+
+  '@google-cloud/run@3.2.1':
+    dependencies:
+      google-gax: 5.0.6
+    transitivePeerDependencies:
+      - supports-color
 
   '@google-cloud/secret-manager@6.1.2':
     dependencies:

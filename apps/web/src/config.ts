@@ -28,6 +28,11 @@ function envBool(name: string, fallback: boolean): boolean {
   return raw === '1' || raw.toLowerCase() === 'true';
 }
 
+/** Split a whitespace-separated command string into argv (drops empty tokens). */
+function splitCommand(raw: string): readonly string[] {
+  return raw.split(/\s+/).filter((t) => t.length > 0);
+}
+
 /** Core GCP project + region (ADR-021). */
 export interface GcpConfig {
   readonly projectId: string;
@@ -67,6 +72,43 @@ export interface TemporalConfig {
   readonly clientCertPath: string;
   readonly clientKeyPath: string;
   readonly apiKey: string;
+}
+
+/**
+ * Cloud Run Job-per-scan execution sandbox (ADR-018 / ADR-051).
+ *
+ * Each scan gets its own Cloud Run Job created with the per-run service identity
+ * and the scoped Secret Manager volume mount, then executed. Run-time overrides
+ * carry only env vars (the v2 API does not allow overriding identity or volumes
+ * at run time), so identity + secret mount are baked into the per-scan Job.
+ */
+export interface CloudRunConfig {
+  /** GCP project that hosts the Cloud Run Jobs. */
+  readonly projectId: string;
+  /** Region the per-scan Jobs are created/run in. */
+  readonly region: string;
+  /** Container image (the de-Tor'd worker engine) every scan Job runs. */
+  readonly workerImage: string;
+  /**
+   * Per-run service-identity email TEMPLATE. `{tenantId}` is substituted with
+   * the scan's tenant so `secretAccessor` is scoped to that tenant's secrets
+   * (ADR-018). When it contains no `{tenantId}`, it is used verbatim.
+   */
+  readonly runServiceAccount: string;
+  /** Optional Serverless VPC Access connector for per-tenant egress (ADR-041). */
+  readonly vpcConnector: string;
+  /** VPC egress setting: 'all-traffic' | 'private-ranges-only' (ADR-022). */
+  readonly vpcEgress: string;
+  /** Container entrypoint command run inside the Job (the job entry script). */
+  readonly jobCommand: readonly string[];
+  /** Per-task CPU request (e.g. '2'). */
+  readonly cpu: string;
+  /** Per-task memory request (e.g. '4Gi'). */
+  readonly memory: string;
+  /** Max wall-clock seconds for a single scan task before Cloud Run kills it. */
+  readonly taskTimeoutSeconds: number;
+  /** Optional CMEK key for per-tenant key custody (ADR-017); empty = Google-managed. */
+  readonly encryptionKey: string;
 }
 
 /** Google Cloud Identity Platform (ADR-016 / ADR-042 / ADR-043). */
@@ -128,6 +170,7 @@ export interface AegisConfig {
   readonly sql: CloudSqlConfig;
   readonly storage: StorageConfig;
   readonly temporal: TemporalConfig;
+  readonly cloudRun: CloudRunConfig;
   readonly identity: IdentityConfig;
   readonly session: SessionConfig;
   readonly secrets: SecretsConfig;
@@ -173,6 +216,19 @@ export function getConfig(): AegisConfig {
       clientCertPath: env('TEMPORAL_CLIENT_CERT_PATH'),
       clientKeyPath: env('TEMPORAL_CLIENT_KEY_PATH'),
       apiKey: env('TEMPORAL_API_KEY'),
+    },
+    cloudRun: {
+      projectId: env('CLOUD_RUN_PROJECT_ID', projectId),
+      region: env('CLOUD_RUN_REGION', region),
+      workerImage: env('CLOUD_RUN_WORKER_IMAGE', 'aegis-worker:latest'),
+      runServiceAccount: env('CLOUD_RUN_RUN_SERVICE_ACCOUNT', `aegis-scan-{tenantId}@${projectId}.iam.gserviceaccount.com`),
+      vpcConnector: env('CLOUD_RUN_VPC_CONNECTOR'),
+      vpcEgress: env('CLOUD_RUN_VPC_EGRESS', 'private-ranges-only'),
+      jobCommand: splitCommand(env('CLOUD_RUN_JOB_COMMAND', 'node dist/job-entry.js')),
+      cpu: env('CLOUD_RUN_CPU', '2'),
+      memory: env('CLOUD_RUN_MEMORY', '4Gi'),
+      taskTimeoutSeconds: envInt('CLOUD_RUN_TASK_TIMEOUT_SECONDS', 3600),
+      encryptionKey: env('CLOUD_RUN_ENCRYPTION_KEY'),
     },
     identity: {
       projectId: env('IDENTITY_PLATFORM_PROJECT_ID', projectId),
