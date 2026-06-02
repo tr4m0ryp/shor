@@ -74,6 +74,17 @@ export async function startScan(
     { name: 'AEGIS_SINK_TOKEN', value: cfg.sinkToken },
   ];
 
+  // When Sinas-mode is configured, forward the connection to the worker so the
+  // reporting step offloads finalization to the user's Sinas instance.
+  if (process.env.SINAS_ENABLED === '1') {
+    runEnv.push(
+      { name: 'SINAS_ENABLED', value: '1' },
+      { name: 'SINAS_URL', value: process.env.SINAS_URL ?? '' },
+      { name: 'SINAS_API_KEY', value: process.env.SINAS_API_KEY ?? '' },
+      { name: 'SINAS_NAMESPACE', value: process.env.SINAS_NAMESPACE ?? 'pentest' },
+    );
+  }
+
   const launch = await launchScanExecution(cfg.scanJobName, runEnv);
 
   await scanRepo.setStatus(manifest.tenantId, scan.id, 'running');

@@ -26,6 +26,7 @@ import { reportFindings } from "./job/findings/index.js";
 import { ConsoleActivityLogger } from "./job/logger.js";
 import { runScanPipeline } from "./job/pipeline.js";
 import { materializeRepo } from "./job/repo.js";
+import { finalizeViaSinas } from "./job/sinas-finalization.js";
 import { deliverablesDir } from "./paths.js";
 
 export { readScanJobParams } from "./job/env.js";
@@ -64,6 +65,15 @@ export async function runJob(): Promise<void> {
 			scanId: result.scanId,
 			agentCount: result.completedAgents.length,
 		});
+
+		// If the user has connected Sinas, offload report finalization to their
+		// instance (overwrites the local report; falls back to it on any failure).
+		await finalizeViaSinas(
+			deliverablesPath,
+			params.scanId,
+			params.targetUrl,
+			logger,
+		);
 
 		// Post findings + attack surface to the dashboard sink (best-effort; a
 		// failed POST is logged, never fatal).
