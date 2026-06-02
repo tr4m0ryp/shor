@@ -109,7 +109,7 @@ body {
   box-shadow: var(--shadow);
 }
 .new-run-card h2 { font-size: 15px; font-weight: 600; margin-bottom: 20px; color: var(--text); }
-.new-run-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: end; }
+.new-run-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 16px; align-items: start; }
 .new-run-grid .full { grid-column: 1 / -1; }
 .new-run-grid label {
   display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary);
@@ -236,7 +236,35 @@ body {
 .mode-toggle .mode-opt.active { background: var(--accent); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 .mode-toggle .mode-opt.active span { color: rgba(255,255,255,.82); }
 /* repo picker disabled (black-box) — keeps its grid cell so nothing shifts */
-.repo-disabled select { opacity: .45; pointer-events: none; }
+.repo-disabled .custom-select { opacity: .45; pointer-events: none; }
+/* Custom dropdown (dashboard-styled, replaces the native OS select) */
+.custom-select { position: relative; }
+.custom-select__trigger {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: #FAFAFA; color: var(--text); font-size: 14px; font-family: var(--font);
+  cursor: pointer; text-align: left; transition: border-color .15s, box-shadow .15s;
+}
+.custom-select__trigger:hover { border-color: var(--border-light); }
+.custom-select.open .custom-select__trigger { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(242,100,25,.12); }
+.custom-select__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custom-select__value.placeholder { color: var(--text-muted); }
+.custom-select__chev { width: 14px; height: 14px; color: var(--text-muted); flex: 0 0 auto; transition: transform .15s; }
+.custom-select.open .custom-select__chev { transform: rotate(180deg); }
+.custom-select__menu {
+  position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; right: 0;
+  max-height: 280px; overflow-y: auto; padding: 4px; display: none;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: 0 10px 30px rgba(0,0,0,.13);
+}
+.custom-select.open .custom-select__menu { display: block; }
+.custom-select__opt { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-radius: 5px; font-size: 13px; color: var(--text); cursor: pointer; }
+.custom-select__opt:hover { background: #FDEEE3; }
+.custom-select__opt.selected { background: var(--accent); color: #fff; }
+.custom-select__opt .tag { font-size: 10px; color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+.custom-select__opt.selected .tag { color: rgba(255,255,255,.82); }
+.custom-select__opt.muted { color: var(--text-muted); cursor: default; }
+.custom-select__opt.muted:hover { background: none; }
 /* white/black-box label */
 .mode-badge { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 9999px; white-space: nowrap; }
 .mode-badge.whitebox { color: var(--accent); background: #FDEEE3; }
@@ -538,8 +566,15 @@ body {
             </div>
           </div>
           <div id="projRepoWrap">
-            <label for="projRepo">GitHub repo</label>
-            <select id="projRepo"><option value="">— select a repo —</option></select>
+            <label>GitHub repo</label>
+            <div class="custom-select" id="projRepoSelect">
+              <button type="button" class="custom-select__trigger" id="projRepoTrigger" onclick="toggleRepoMenu(event)">
+                <span class="custom-select__value placeholder" id="projRepoLabel">— select a repo —</span>
+                <svg class="custom-select__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="custom-select__menu" id="projRepoMenu"></div>
+            </div>
+            <input type="hidden" id="projRepo" value="">
             <div class="hint" id="projRepoHint">Connect GitHub in Settings to list your repos.</div>
           </div>
           <div class="start-row">
@@ -855,11 +890,49 @@ async function disconnectGithub() {
   } catch (err) { showToast(err.message, 'error'); }
 }
 
-// Populate the New-Project repo dropdown from the connected account.
+// ----- Custom repo dropdown (dashboard-styled, replaces the native select) -----
+function toggleRepoMenu(e) {
+  if (e) e.stopPropagation();
+  const cs = document.getElementById('projRepoSelect');
+  if (!cs || document.getElementById('projRepoWrap').classList.contains('repo-disabled')) return;
+  cs.classList.toggle('open');
+}
+
+function selectRepo(value, label) {
+  document.getElementById('projRepo').value = value;
+  const lab = document.getElementById('projRepoLabel');
+  lab.textContent = label;
+  lab.classList.toggle('placeholder', !value);
+  document.getElementById('projRepoSelect').classList.remove('open');
+  renderRepoMenu(); // refresh the selected highlight
+}
+
+function renderRepoMenu() {
+  const menu = document.getElementById('projRepoMenu');
+  if (!menu) return;
+  const current = document.getElementById('projRepo').value;
+  if (ghState.repos.length === 0) {
+    menu.innerHTML = '<div class="custom-select__opt muted">— no repos —</div>';
+    return;
+  }
+  menu.innerHTML = ghState.repos.map(function (r) {
+    const tags = [r.private ? 'private' : '', r.fork ? 'fork' : '', r.stargazed ? 'starred' : ''].filter(Boolean).join(' · ');
+    const sel = r.fullName === current ? ' selected' : '';
+    return '<div class="custom-select__opt' + sel + '" onclick="selectRepo(\'' + escapeHtml(r.fullName) + '\', \'' + escapeHtml(r.fullName) + '\')">' +
+      '<span>' + escapeHtml(r.fullName) + '</span>' + (tags ? '<span class="tag">' + tags + '</span>' : '') +
+    '</div>';
+  }).join('');
+}
+
+// Close the dropdown on an outside click.
+document.addEventListener('click', function (e) {
+  const cs = document.getElementById('projRepoSelect');
+  if (cs && !cs.contains(e.target)) cs.classList.remove('open');
+});
+
+// Populate the New-Dashboard repo dropdown from the connected account.
 async function loadReposIntoPicker() {
-  const sel = document.getElementById('projRepo');
   const hint = document.getElementById('projRepoHint');
-  if (!sel) return;
   try {
     const data = await api('GET', '/github/repos');
     ghState.repos = data.repos || [];
@@ -867,18 +940,11 @@ async function loadReposIntoPicker() {
   } catch (_) {
     ghState.repos = [];
   }
+  renderRepoMenu();
   if (ghState.repos.length === 0) {
-    sel.innerHTML = '<option value="">— no repos —</option>';
     if (hint) hint.innerHTML = 'Connect GitHub in <a onclick="showPage(\'settings\')" style="cursor:pointer;color:var(--accent)">Settings</a> to list your repos.';
     return;
   }
-  const opts = ['<option value="">— select a repo —</option>'].concat(
-    ghState.repos.map(function (r) {
-      const tags = [r.private ? 'private' : '', r.fork ? 'fork' : '', r.stargazed ? 'starred' : ''].filter(Boolean).join(', ');
-      return '<option value="' + escapeHtml(r.fullName) + '">' + escapeHtml(r.fullName) + (tags ? ' (' + tags + ')' : '') + '</option>';
-    })
-  );
-  sel.innerHTML = opts.join('');
   if (hint) hint.textContent = ghState.repos.length + ' repos from your GitHub account.';
 }
 
@@ -889,11 +955,10 @@ function setProjMode(mode) {
   // Keep the repo field in place (no layout shift) — just disable + dim it and
   // reword the hint for black-box.
   const wrap = document.getElementById('projRepoWrap');
-  const sel = document.getElementById('projRepo');
   const hint = document.getElementById('projRepoHint');
   const black = mode === 'blackbox';
   wrap.classList.toggle('repo-disabled', black);
-  sel.disabled = black;
+  if (black) document.getElementById('projRepoSelect').classList.remove('open');
   if (black) {
     if (hint) hint.textContent = 'Not used for a black-box (URL-only) scan.';
   } else if (hint) {
@@ -976,7 +1041,7 @@ async function createProject() {
     showToast('Dashboard created', 'success');
     document.getElementById('projName').value = '';
     document.getElementById('projUrl').value = '';
-    document.getElementById('projRepo').value = '';
+    selectRepo('', '— select a repo —');
     loadProjects();
   } catch (err) {
     showToast(err.message, 'error');
