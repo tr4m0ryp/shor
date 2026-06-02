@@ -81,6 +81,22 @@ export interface IdentityConfig {
   readonly sessionTtlSeconds: number;
 }
 
+/**
+ * Server-minted session cookie config (ADR-043).
+ *
+ * The dashboard verifies the Identity Platform ID token, then mints its own
+ * HMAC-signed HTTP-only cookie. `signingSecret` keys that HMAC and MUST be set
+ * to a strong random value in any non-local deployment.
+ */
+export interface SessionConfig {
+  /** Name of the server-minted HTTP-only session cookie. */
+  readonly cookieName: string;
+  /** Session cookie lifetime in seconds. */
+  readonly ttlSeconds: number;
+  /** HMAC signing secret for the session cookie (`SESSION_SIGNING_SECRET`). */
+  readonly signingSecret: string;
+}
+
 /** Secret Manager wrapper config (ADR-017 / ADR-045). */
 export interface SecretsConfig {
   /** Project that owns the per-(tenant,user,provider) secrets. */
@@ -96,6 +112,7 @@ export interface AegisConfig {
   readonly storage: StorageConfig;
   readonly temporal: TemporalConfig;
   readonly identity: IdentityConfig;
+  readonly session: SessionConfig;
   readonly secrets: SecretsConfig;
 }
 
@@ -144,6 +161,13 @@ export function getConfig(): AegisConfig {
       defaultTenantId: env('IDENTITY_PLATFORM_TENANT_ID'),
       sessionCookieName: env('SESSION_COOKIE_NAME', 'aegis_session'),
       sessionTtlSeconds: envInt('SESSION_TTL_SECONDS', 3600),
+    },
+    session: {
+      cookieName: env('SESSION_COOKIE_NAME', 'aegis_session'),
+      ttlSeconds: envInt('SESSION_TTL_SECONDS', 3600),
+      // Local default keeps `tsc`/dev working with no secret set; production
+      // MUST override with a strong random value.
+      signingSecret: env('SESSION_SIGNING_SECRET', 'aegis-local-dev-session-secret'),
     },
     secrets: {
       projectId: env('SECRET_MANAGER_PROJECT_ID', projectId),

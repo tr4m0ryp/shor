@@ -1,0 +1,64 @@
+/**
+ * HTTP API router (mirrors storron's `apps/web/src/api/router.ts` shape).
+ *
+ * A pure function: `(method, url, body, cookieHeader) -> ApiResponse`. The
+ * server entry parses the request, calls this, and writes the result. Phase 3
+ * wires the `/auth/*` routes; later phases add their resources to the switch.
+ *
+ * Every non-auth route is expected to authenticate + tenant-scope via the
+ * `auth` middleware before touching a repository (ADR-044).
+ */
+
+import { handleLogout, handleMe, handleSessionLogin } from '../auth/routes.js';
+
+/** Standard response envelope: HTTP status, JSON body, optional `Set-Cookie`. */
+export interface ApiResponse {
+  readonly status: number;
+  readonly body: Record<string, unknown>;
+  readonly setCookie?: string;
+}
+
+const METHOD_NOT_ALLOWED: ApiResponse = { status: 405, body: { error: 'Method not allowed' } };
+const NOT_FOUND: ApiResponse = { status: 404, body: { error: 'Not found' } };
+
+export async function apiRouter(
+  method: string,
+  url: string,
+  body: Record<string, unknown>,
+  cookieHeader: string | undefined,
+): Promise<ApiResponse> {
+  const parsed = new URL(url, 'http://localhost');
+  const parts = parsed.pathname.split('/').filter(Boolean);
+  // Accept both the spec paths (`/auth/*`) and an `/api`-prefixed form.
+  const segments = parts[0] === 'api' ? parts.slice(1) : parts;
+
+  const resource = segments[0];
+  const action = segments[1];
+
+  if (resource === 'auth') {
+    return routeAuth(method, action, body, cookieHeader);
+  }
+
+  return NOT_FOUND;
+}
+
+async function routeAuth(
+  method: string,
+  action: string | undefined,
+  body: Record<string, unknown>,
+  cookieHeader: string | undefined,
+): Promise<ApiResponse> {
+  switch (action) {
+    case 'session':
+      if (method === 'POST') return handleSessionLogin(body);
+      return METHOD_NOT_ALLOWED;
+    case 'logout':
+      if (method === 'POST') return handleLogout();
+      return METHOD_NOT_ALLOWED;
+    case 'me':
+      if (method === 'GET') return handleMe(cookieHeader);
+      return METHOD_NOT_ALLOWED;
+    default:
+      return NOT_FOUND;
+  }
+}
