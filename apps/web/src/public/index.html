@@ -220,22 +220,24 @@ body {
 .detail-summary { margin-bottom: 16px; padding: 20px 24px; }
 .detail-status-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
 .detail-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-.scan-zip { display: flex; flex-direction: column; gap: 2px; }
-.scan-zip input[type=file] {
-  font-size: 12px; color: var(--text-secondary); font-family: var(--font);
-  max-width: 220px;
+/* New-project mode toggle */
+.mode-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.mode-toggle .mode-opt {
+  border: none; background: var(--card); color: var(--text-secondary);
+  padding: 7px 12px; font-size: 13px; font-family: var(--font); cursor: pointer;
 }
-.scan-zip input[type=file]::-webkit-file-upload-button,
-.scan-zip input[type=file]::file-selector-button {
-  padding: 6px 12px; margin-right: 8px;
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: #FAFAFA; color: var(--text);
-  font-size: 12px; font-family: var(--font); cursor: pointer;
-  transition: border-color .15s;
-}
-.scan-zip input[type=file]::-webkit-file-upload-button:hover,
-.scan-zip input[type=file]::file-selector-button:hover { border-color: var(--accent); }
-.scan-zip .hint { font-size: 11px; color: var(--text-muted); }
+.mode-toggle .mode-opt span { color: var(--text-muted); font-size: 11px; }
+.mode-toggle .mode-opt + .mode-opt { border-left: 1px solid var(--border); }
+.mode-toggle .mode-opt.active { background: var(--accent); color: #fff; }
+.mode-toggle .mode-opt.active span { color: rgba(255,255,255,.8); }
+/* white/black-box label */
+.mode-badge { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 9999px; white-space: nowrap; }
+.mode-badge.whitebox { color: var(--accent); background: #F3ECF8; }
+.mode-badge.blackbox { color: var(--text-secondary); background: var(--card-hover); border: 1px solid var(--border-light); }
+/* GitHub settings */
+.gh-connect-row { display: flex; gap: 8px; align-items: center; }
+.gh-connect-row input { flex: 1; }
+.gh-status { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .detail-grid { display: grid; grid-template-columns: 200px 1fr; gap: 8px 16px; font-size: 13px; }
 .detail-grid dt { color: var(--text-muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; align-self: center; }
 .detail-grid dd { color: var(--text); word-break: break-all; }
@@ -460,6 +462,10 @@ body {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
         Projects
       </a>
+      <a id="navSettings" onclick="showPage('settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </a>
     </nav>
   </aside>
 
@@ -468,7 +474,7 @@ body {
     <div id="pageTargets" class="page">
       <div class="page-header">
         <h1>Projects</h1>
-        <p>A project pairs a live site with its codebase. Upload a source zip (or connect a repo), then trigger scans and track them over time.</p>
+        <p>A project pairs a live site with an optional codebase. Pick a GitHub repo for a white-box scan, or leave it blank for a black-box (URL-only) run.</p>
       </div>
 
       <div class="new-run-card">
@@ -483,9 +489,16 @@ body {
             <input type="url" id="projUrl" placeholder="https://example.com">
           </div>
           <div>
-            <label for="projRepo">Repo installation id</label>
-            <input type="text" id="projRepo" placeholder="GitHub App installation id (optional)">
-            <div class="hint">Leave blank for zip-only ingest.</div>
+            <label for="projMode">Scan mode</label>
+            <div class="mode-toggle" id="projMode">
+              <button type="button" class="mode-opt active" data-mode="whitebox" onclick="setProjMode('whitebox')">White-box <span>(with code)</span></button>
+              <button type="button" class="mode-opt" data-mode="blackbox" onclick="setProjMode('blackbox')">Black-box <span>(URL only)</span></button>
+            </div>
+          </div>
+          <div id="projRepoWrap">
+            <label for="projRepo">GitHub repo</label>
+            <select id="projRepo"><option value="">— select a repo —</option></select>
+            <div class="hint" id="projRepoHint">Connect GitHub in Settings to list your repos.</div>
           </div>
           <div class="start-row">
             <button class="btn btn-primary" id="createProjBtn" onclick="createProject()">
@@ -516,14 +529,11 @@ body {
           Projects
         </button>
         <div>
-          <h1 id="projDetailTitle">Target</h1>
+          <h1 id="projDetailTitle">Project</h1>
           <p id="projDetailSubtitle" class="run-id"></p>
         </div>
         <div class="detail-actions">
-          <div class="scan-zip">
-            <input type="file" id="scanZip" accept=".zip,application/zip" onchange="onScanZipPick()">
-            <span class="hint" id="scanZipHint">Attach source .zip (for projects with no connected repo)</span>
-          </div>
+          <span class="mode-badge" id="projModeBadge"></span>
           <button class="btn btn-primary btn-sm" id="triggerScanBtn" onclick="triggerScan()">Run scan</button>
         </div>
       </div>
@@ -568,6 +578,33 @@ body {
       <div class="detail-panel" id="panelFindings" style="display:none"></div>
       <div class="detail-panel" id="panelAttackSurface" style="display:none"></div>
       <div class="detail-panel" id="panelDiff" style="display:none"></div>
+    </div>
+
+    <!-- ===================== Settings page ===================== -->
+    <div id="pageSettings" class="page" style="display:none">
+      <div class="page-header">
+        <h1>Settings</h1>
+        <p>Connect your GitHub account so projects can scan your repos (private, starred, and forked included).</p>
+      </div>
+      <div class="new-run-card">
+        <h2>GitHub</h2>
+        <div id="ghDisconnected">
+          <p class="hint" style="margin-bottom:10px">Paste a GitHub Personal Access Token (classic with <code>repo</code> scope, or a fine-grained token with read access to the repos you want to scan). Stored encrypted; used only to list and clone your repos.</p>
+          <div class="gh-connect-row">
+            <input type="password" id="ghToken" placeholder="ghp_… or github_pat_…" autocomplete="off">
+            <button class="btn btn-primary" id="ghConnectBtn" onclick="connectGithub()">Connect</button>
+          </div>
+          <div class="hint" style="margin-top:6px">Create one at <span class="mono">github.com/settings/tokens</span>.</div>
+        </div>
+        <div id="ghConnected" style="display:none">
+          <div class="gh-status">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M20 6L9 17l-5-5"/></svg>
+            <span>Connected as <b id="ghLogin">—</b></span>
+            <button class="btn btn-ghost btn-sm" onclick="disconnectGithub()" style="margin-left:auto">Disconnect</button>
+          </div>
+          <div class="hint" id="ghRepoCount" style="margin-top:8px"></div>
+        </div>
+      </div>
     </div>
 
   </main>
@@ -639,7 +676,7 @@ async function loadMe() {
 function showPage(page) {
   // Leaving any page stops the scan-detail live poll; openScan restarts it.
   stopScanPolling();
-  const pages = ['Targets', 'ProjectDetail', 'ScanDetail'];
+  const pages = ['Targets', 'ProjectDetail', 'ScanDetail', 'Settings'];
   pages.forEach((p) => {
     const el = document.getElementById('page' + p);
     if (el) el.style.display = 'none';
@@ -652,11 +689,111 @@ function showPage(page) {
   } else if (page === 'scanDetail') {
     document.getElementById('pageScanDetail').style.display = 'flex';
     document.getElementById('navTargets').classList.add('active');
+  } else if (page === 'settings') {
+    document.getElementById('pageSettings').style.display = 'block';
+    document.getElementById('navSettings').classList.add('active');
+    loadGithubSettings();
   } else {
     document.getElementById('pageTargets').style.display = 'block';
     document.getElementById('navTargets').classList.add('active');
     loadProjects();
+    loadReposIntoPicker();
   }
+}
+
+// ===================== Settings / GitHub =====================
+
+var ghState = { connected: false, login: null, repos: [] };
+
+async function loadGithubSettings() {
+  try {
+    const s = await api('GET', '/settings/github');
+    ghState.connected = !!s.connected;
+    ghState.login = s.login || null;
+  } catch (_) { ghState.connected = false; }
+  renderGithubSettings();
+}
+
+function renderGithubSettings() {
+  const disc = document.getElementById('ghDisconnected');
+  const conn = document.getElementById('ghConnected');
+  if (!disc || !conn) return;
+  if (ghState.connected) {
+    disc.style.display = 'none';
+    conn.style.display = 'block';
+    document.getElementById('ghLogin').textContent = ghState.login || 'github user';
+    const n = ghState.repos.length;
+    document.getElementById('ghRepoCount').textContent = n ? n + ' repos available to scan.' : '';
+  } else {
+    disc.style.display = 'block';
+    conn.style.display = 'none';
+  }
+}
+
+async function connectGithub() {
+  const token = document.getElementById('ghToken').value.trim();
+  if (!token) { showToast('Paste a token first', 'error'); return; }
+  const btn = document.getElementById('ghConnectBtn');
+  btn.disabled = true;
+  try {
+    const s = await api('POST', '/settings/github', { token });
+    ghState.connected = true; ghState.login = s.login || null;
+    document.getElementById('ghToken').value = '';
+    showToast('GitHub connected', 'success');
+    await loadReposIntoPicker();
+    renderGithubSettings();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally { btn.disabled = false; }
+}
+
+async function disconnectGithub() {
+  try {
+    await api('DELETE', '/settings/github');
+    ghState.connected = false; ghState.login = null; ghState.repos = [];
+    showToast('GitHub disconnected', 'success');
+    renderGithubSettings();
+    loadReposIntoPicker();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// Populate the New-Project repo dropdown from the connected account.
+async function loadReposIntoPicker() {
+  const sel = document.getElementById('projRepo');
+  const hint = document.getElementById('projRepoHint');
+  if (!sel) return;
+  try {
+    const data = await api('GET', '/github/repos');
+    ghState.repos = data.repos || [];
+    ghState.connected = true;
+  } catch (_) {
+    ghState.repos = [];
+  }
+  if (ghState.repos.length === 0) {
+    sel.innerHTML = '<option value="">— no repos —</option>';
+    if (hint) hint.innerHTML = 'Connect GitHub in <a onclick="showPage(\'settings\')" style="cursor:pointer;color:var(--accent)">Settings</a> to list your repos.';
+    return;
+  }
+  const opts = ['<option value="">— select a repo —</option>'].concat(
+    ghState.repos.map(function (r) {
+      const tags = [r.private ? 'private' : '', r.fork ? 'fork' : '', r.stargazed ? 'starred' : ''].filter(Boolean).join(', ');
+      return '<option value="' + escapeHtml(r.fullName) + '">' + escapeHtml(r.fullName) + (tags ? ' (' + tags + ')' : '') + '</option>';
+    })
+  );
+  sel.innerHTML = opts.join('');
+  if (hint) hint.textContent = ghState.repos.length + ' repos from your GitHub account.';
+}
+
+function setProjMode(mode) {
+  document.querySelectorAll('#projMode .mode-opt').forEach(function (b) {
+    b.classList.toggle('active', b.getAttribute('data-mode') === mode);
+  });
+  document.getElementById('projRepoWrap').style.display = mode === 'whitebox' ? 'block' : 'none';
+}
+
+function selectedProjMode() {
+  const active = document.querySelector('#projMode .mode-opt.active');
+  return active ? active.getAttribute('data-mode') : 'whitebox';
 }
 
 // ===================== Targets (projects) =====================
@@ -677,16 +814,22 @@ async function loadProjects() {
   }
 }
 
+function modeLabel(p) {
+  const mode = p.mode || (p.repoFullName ? 'whitebox' : 'blackbox');
+  const text = mode === 'whitebox' ? 'White-box' : 'Black-box';
+  return '<span class="mode-badge ' + mode + '">' + text + '</span>';
+}
+
 function renderProjectCard(p) {
-  const repo = p.repoInstallationId ? 'github' : 'zip';
+  const repoLine = p.repoFullName ? '<span class="run-id">' + escapeHtml(p.repoFullName) + '</span>' : '';
   return (
     '<div class="run-card" onclick="openProject(\'' + escapeHtml(p.id) + '\')">' +
       '<div class="run-meta">' +
         '<span class="run-target">' + escapeHtml(p.name) + '</span>' +
         '<span class="run-id">' + escapeHtml(p.targetUrl) + '</span>' +
       '</div>' +
-      '<div class="run-status"><span class="badge badge-pending">' + escapeHtml(repo) + '</span></div>' +
-      '<div class="run-details"><span class="run-id">' + escapeHtml(p.id) + '</span></div>' +
+      '<div class="run-status">' + modeLabel(p) + '</div>' +
+      '<div class="run-details">' + repoLine + '</div>' +
       '<button class="btn btn-ghost btn-sm proj-delete" title="Delete project" ' +
         'onclick="event.stopPropagation(); deleteProject(\'' + escapeHtml(p.id) + '\', \'' + escapeHtml(p.name) + '\')">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
@@ -710,13 +853,15 @@ async function createProject() {
   const btn = document.getElementById('createProjBtn');
   const name = document.getElementById('projName').value.trim();
   const targetUrl = document.getElementById('projUrl').value.trim();
-  const repoInstallationId = document.getElementById('projRepo').value.trim();
+  const mode = selectedProjMode();
+  const repoFullName = document.getElementById('projRepo').value;
   if (!name) { showToast('Name is required', 'error'); return; }
   if (!targetUrl) { showToast('Target URL is required', 'error'); return; }
+  if (mode === 'whitebox' && !repoFullName) { showToast('Pick a GitHub repo for a white-box scan (or switch to black-box)', 'error'); return; }
   btn.disabled = true;
   try {
-    const payload = { name, targetUrl };
-    if (repoInstallationId) payload.repoInstallationId = repoInstallationId;
+    const payload = { name, targetUrl, mode };
+    if (mode === 'whitebox' && repoFullName) payload.repoFullName = repoFullName;
     await api('POST', '/projects', payload);
     showToast('Project created', 'success');
     document.getElementById('projName').value = '';
@@ -735,7 +880,12 @@ async function openProject(id) {
     const data = await api('GET', '/projects/' + id);
     state.currentProject = data.project;
     document.getElementById('projDetailTitle').textContent = data.project.name;
-    document.getElementById('projDetailSubtitle').textContent = data.project.targetUrl + '  ·  ' + data.project.id;
+    const repoPart = data.project.repoFullName ? '  ·  ' + data.project.repoFullName : '';
+    document.getElementById('projDetailSubtitle').textContent = data.project.targetUrl + repoPart + '  ·  ' + data.project.id;
+    const pmode = data.project.mode || (data.project.repoFullName ? 'whitebox' : 'blackbox');
+    const pbadge = document.getElementById('projModeBadge');
+    pbadge.className = 'mode-badge ' + pmode;
+    pbadge.textContent = pmode === 'whitebox' ? 'White-box' : 'Black-box';
     showPage('projectDetail');
     loadScans(id);
   } catch (err) {
@@ -773,55 +923,17 @@ function renderScanCard(s) {
   );
 }
 
-// Read a File as base64 (strips the `data:...;base64,` prefix the API does not want).
-function onScanZipPick() {
-  const input = document.getElementById('scanZip');
-  const hint = document.getElementById('scanZipHint');
-  if (!input || !hint) return;
-  const file = input.files && input.files[0];
-  if (!file) {
-    hint.textContent = 'Attach source .zip (for projects with no connected repo)';
-    hint.style.color = '';
-    return;
-  }
-  const kb = file.size < 1024 * 1024
-    ? Math.round(file.size / 1024) + ' KB'
-    : (file.size / (1024 * 1024)).toFixed(1) + ' MB';
-  hint.textContent = 'Attached: ' + file.name + ' (' + kb + ')';
-  hint.style.color = 'var(--accent)';
-}
-
-function readFileAsBase64(file) {
-  return new Promise(function (resolve, reject) {
-    const reader = new FileReader();
-    reader.onload = function () {
-      const result = reader.result || '';
-      const comma = result.indexOf(',');
-      resolve(comma >= 0 ? result.slice(comma + 1) : result);
-    };
-    reader.onerror = function () { reject(reader.error || new Error('Failed to read file')); };
-    reader.readAsDataURL(file);
-  });
-}
-
 async function triggerScan() {
   if (!state.currentProject) return;
   const btn = document.getElementById('triggerScanBtn');
-  const zipInput = document.getElementById('scanZip');
-  const file = zipInput && zipInput.files && zipInput.files[0];
   const label = btn.textContent;
   btn.disabled = true;
+  btn.textContent = 'Starting…';
   try {
-    let body = {};
-    if (file) {
-      btn.textContent = 'Uploading…';
-      const zip = await readFileAsBase64(file);
-      body = { zip: zip, zipFilename: file.name };
-    }
-    await api('POST', '/projects/' + state.currentProject.id + '/scan', body);
-    showToast(file ? 'Scan triggered with ' + file.name : 'Scan triggered', 'success');
-    if (zipInput) zipInput.value = '';
-    onScanZipPick();
+    // White-box clones the project's connected repo via the user's PAT;
+    // black-box runs URL-only. The mode lives on the project — no per-run input.
+    await api('POST', '/projects/' + state.currentProject.id + '/scan', {});
+    showToast('Scan triggered', 'success');
     loadScans(state.currentProject.id);
   } catch (err) {
     showToast(err.message, 'error');

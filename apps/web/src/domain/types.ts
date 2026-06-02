@@ -68,6 +68,9 @@ export interface ProviderKey {
 
 // ──────────────────────────────── project ─────────────────────────────────
 
+/** Scan mode: white-box clones the connected repo, black-box runs URL-only. */
+export type ProjectMode = 'whitebox' | 'blackbox';
+
 /** A named target = live site + connected repo + optional schedule (ADR-015). */
 export interface Project {
   readonly id: ProjectId;
@@ -76,6 +79,10 @@ export interface Project {
   readonly targetUrl: string;
   /** GitHub App installation id for the connected repo (ADR-039); null for zip-only. */
   readonly repoInstallationId: string | null;
+  /** Selected repo `owner/name` cloned via the user's PAT; null = black-box. */
+  readonly repoFullName: string | null;
+  /** White-box (clone repo) vs black-box (URL-only) scan mode. */
+  readonly mode: ProjectMode;
   /** Cron-style schedule string, or null for on-demand. */
   readonly schedule: string | null;
   /** Target auth config (login flow, headers, ROE) — opaque JSON blob. */
@@ -85,6 +92,7 @@ export interface Project {
 
 // ─────────────────────────── codebase version ─────────────────────────────
 
+/** Effectively just 'github' now (zip uploads removed); kept for compatibility. */
 export type CodebaseSourceKind = 'github' | 'zip';
 
 /** Immutable snapshot minted per ingest (ADR-015). */
@@ -135,7 +143,8 @@ export interface ScanProgress {
 export interface Scan {
   readonly id: ScanId;
   readonly projectId: ProjectId;
-  readonly codebaseVersionId: CodebaseVersionId;
+  /** Scanned codebase version; null for black-box scans (no repo). */
+  readonly codebaseVersionId: CodebaseVersionId | null;
   /** Temporal workflow id (`aegis-<random>`); cancel = kill switch (ADR-019). */
   readonly temporalWorkflowId: string | null;
   readonly status: ScanStatus;
@@ -238,7 +247,8 @@ export interface AttackSurface {
 export type NewTenant = Omit<Tenant, 'id' | 'createdAt'> & Partial<Pick<Tenant, 'plan'>>;
 export type NewUser = Omit<User, 'id' | 'createdAt'>;
 export type NewProviderKey = Omit<ProviderKey, 'id' | 'createdAt'>;
-export type NewProject = Omit<Project, 'id' | 'createdAt'>;
+export type NewProject = Omit<Project, 'id' | 'createdAt' | 'repoFullName' | 'mode'> &
+  Partial<Pick<Project, 'repoFullName' | 'mode'>>;
 export type NewCodebaseVersion = Omit<CodebaseVersion, 'id' | 'createdAt'>;
 export type NewScan = Omit<Scan, 'id' | 'startedAt' | 'finishedAt' | 'progress'> &
   Partial<Pick<Scan, 'startedAt' | 'finishedAt'>>;

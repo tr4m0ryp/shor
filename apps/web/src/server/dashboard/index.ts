@@ -18,6 +18,10 @@
  *   GET    /scans/:id/attack-surface  scan's attack-surface doc (fix prompts)
  *   GET    /scans/:id/diff            scan-to-scan diff (new/open/fixed/regressed)
  *   GET    /users                     tenant users (multi-user view)
+ *   GET    /settings/github           GitHub connection status { connected, login? }
+ *   POST   /settings/github           connect a PAT { token } → { connected, login }
+ *   DELETE /settings/github           disconnect (delete the PAT)
+ *   GET    /github/repos              list the caller's selectable repos
  */
 
 import { getScanProgress } from '../../scan-progress/index.js';
@@ -25,6 +29,7 @@ import type { ApiResponse } from '../router.js';
 import { methodNotAllowed, notFound } from './auth-util.js';
 import { createProject, deleteProject, getProject, listProjectScans, listProjects, updateProject } from './projects.js';
 import { getScan, getScanAttackSurface, getScanDiff, listScanFindings } from './scans.js';
+import { connectGithub, disconnectGithub, getGithubSettings, listGithubRepos } from './settings.js';
 import { triggerScan } from './trigger.js';
 import { listUsers } from './users.js';
 
@@ -56,6 +61,19 @@ export async function routeDashboard(
 
   if (resource === 'scans' && id) {
     return routeScans(method, id, sub, cookieHeader);
+  }
+
+  // GitHub connection settings: /settings/github
+  if (resource === 'settings' && id === 'github' && segments.length === 2) {
+    if (method === 'GET') return getGithubSettings(cookieHeader);
+    if (method === 'POST') return connectGithub(body, cookieHeader);
+    if (method === 'DELETE') return disconnectGithub(cookieHeader);
+    return methodNotAllowed;
+  }
+
+  // Selectable repos for the connected PAT: /github/repos
+  if (resource === 'github' && id === 'repos' && segments.length === 2) {
+    return method === 'GET' ? listGithubRepos(cookieHeader) : methodNotAllowed;
   }
 
   return null;

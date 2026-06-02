@@ -10,9 +10,19 @@
  */
 
 import { projectRepo, scanRepo } from '../../db/repositories/index.js';
-import type { NewProject, ProjectId } from '../../domain/types.js';
+import type { NewProject, ProjectId, ProjectMode } from '../../domain/types.js';
 import type { ApiResponse } from '../router.js';
 import { badRequest, created, gate, notFound, ok, serverError } from './auth-util.js';
+
+/** Parse a request `mode` field to a valid `ProjectMode`, or undefined. */
+function parseMode(value: unknown): ProjectMode | undefined {
+  return value === 'whitebox' || value === 'blackbox' ? value : undefined;
+}
+
+/** Normalize a request `repoFullName` to a trimmed `owner/name`, or null. */
+function parseRepoFullName(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
 
 /** `GET /projects` — list the caller-tenant's projects (Targets view). */
 export async function listProjects(cookieHeader: string | undefined): Promise<ApiResponse> {
@@ -28,7 +38,8 @@ export async function listProjects(cookieHeader: string | undefined): Promise<Ap
 
 /**
  * `POST /projects` — create a project (Targets view). Body:
- * `{ name, targetUrl, repoInstallationId?, schedule?, authConfig? }`.
+ * `{ name, targetUrl, repoFullName?, mode?, repoInstallationId?, schedule?, authConfig? }`.
+ * A selected `repoFullName` defaults `mode` to white-box; otherwise black-box.
  */
 export async function createProject(
   body: Record<string, unknown>,
@@ -57,7 +68,19 @@ export async function createProject(
       ? (body.authConfig as Record<string, unknown>)
       : null;
 
-  const input: NewProject = { tenantId: g.tenantId, name, targetUrl, repoInstallationId, schedule, authConfig };
+  const repoFullName = parseRepoFullName(body.repoFullName);
+  const mode = parseMode(body.mode) ?? (repoFullName ? 'whitebox' : 'blackbox');
+
+  const input: NewProject = {
+    tenantId: g.tenantId,
+    name,
+    targetUrl,
+    repoInstallationId,
+    repoFullName,
+    mode,
+    schedule,
+    authConfig,
+  };
   try {
     const project = await projectRepo.create(input);
     return created({ project });
@@ -80,7 +103,8 @@ export async function getProject(id: ProjectId, cookieHeader: string | undefined
 
 /**
  * `PUT /projects/:id` — patch mutable project fields (name / targetUrl /
- * repoInstallationId / schedule / authConfig). Only provided keys are changed.
+ * repoFullName / mode / repoInstallationId / schedule / authConfig). Only
+ * provided keys are changed; setting `repoFullName` re-derives `mode`.
  */
 export async function updateProject(
   id: ProjectId,
@@ -107,6 +131,13 @@ export async function updateProject(
         ? body.repoInstallationId.trim()
         : null;
   }
+  // A present `repoFullName` (incl. explicit null/"" → black-box) re-derives mode
+  // unless an explicit `mode` is also supplied.
+  if ('repoFullName' in body) {
+    patch.repoFullName = parseRepoFullName(body.repoFullName);
+  }
+  const mode = parseMode(body.mode);
+  if (mode) patch.mode = mode;
   if ('schedule' in body) {
     patch.schedule = typeof body.schedule === 'string' && body.schedule.trim() ? body.schedule.trim() : null;
   }

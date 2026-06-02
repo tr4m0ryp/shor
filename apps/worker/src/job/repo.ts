@@ -78,6 +78,13 @@ export async function materializeRepo(
 ): Promise<void> {
 	const { repoPath } = params;
 
+	if (!params.repoGcsUri) {
+		logger.info("Black-box scan: no repo to materialize; running target-only", {
+			scanId: params.scanId,
+		});
+		return;
+	}
+
 	if (isPopulatedDir(repoPath)) {
 		logger.info("Repo already populated; using mounted path as-is", {
 			scanId: params.scanId,

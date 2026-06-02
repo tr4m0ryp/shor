@@ -52,27 +52,28 @@ function buildRoe(targetUrl: string): Roe {
 export async function startScan(
   scan: Scan,
   project: Project,
-  codebaseVersion: CodebaseVersion,
+  codebaseVersion: CodebaseVersion | null,
   manifest: InjectionManifest,
 ): Promise<Scan> {
   const cfg = getConfig();
-
-  // Use the version's STORED staging prefix — ingest stages the source under a
-  // freshly-minted UUID kept in `gcsPrefix`, which is NOT the DB row `id`.
-  // Recomputing from `id` points at an empty prefix and the worker materializes
-  // nothing.
-  const repoGcsUri = gsUri(codebaseVersion.gcsPrefix);
 
   // Per-run env applied as the run-time override on the worker Job execution.
   const runEnv: JobEnvVar[] = [
     { name: 'AEGIS_SCAN_ID', value: scan.id },
     { name: 'AEGIS_TARGET_URL', value: project.targetUrl },
-    { name: 'AEGIS_REPO_GCS_URI', value: repoGcsUri },
     { name: 'AEGIS_ROE', value: JSON.stringify(buildRoe(project.targetUrl)) },
     { name: 'AEGIS_REPO_PATH', value: REPO_PATH },
     { name: 'AEGIS_FINDINGS_SINK_URL', value: cfg.publicUrl },
     { name: 'AEGIS_SINK_TOKEN', value: cfg.sinkToken },
   ];
+
+  // White-box only: point the worker at the staged repo. Use the version's
+  // STORED staging prefix — ingest stages the source under a freshly-minted UUID
+  // kept in `gcsPrefix`, which is NOT the DB row `id`. Black-box scans
+  // (codebaseVersion === null) omit this so the worker materializes no code.
+  if (codebaseVersion) {
+    runEnv.push({ name: 'AEGIS_REPO_GCS_URI', value: gsUri(codebaseVersion.gcsPrefix) });
+  }
 
   // When Sinas-mode is configured, forward the connection to the worker so the
   // reporting step offloads finalization to the user's Sinas instance.

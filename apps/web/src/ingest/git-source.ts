@@ -1,18 +1,16 @@
 /**
- * GitHub source ingest (LAUNCH-SPEC §4.2, ADR-039/040/041).
+ * GitHub source ingest via a per-user Personal Access Token (LAUNCH-SPEC §4.2).
  *
- * Ports storron's `uploads/git.ts` clone pattern, TIGHTENED for multi-tenant:
- *   - No arbitrary-host clone. The only repos that can be cloned are those in
- *     the App-installation allowlist (`assertInstallationRepo`) — the open
- *     `cloneRepo(gitUrl)` SSRF surface is removed (ADR-041).
- *   - Auth via a short-lived installation token injected into the HTTPS clone
- *     URL, never a PAT or a long-lived credential (ADR-039).
- *   - `--depth 1` default (ADR-040).
+ * White-box scans clone the project's selected repo (`owner/name`) with the
+ * scanning user's PAT — there is no GitHub App installation or allowlist. The
+ * PAT is injected into the HTTPS clone URL as userinfo
+ * (`x-access-token:<pat>@github.com/<owner/name>.git`), the standard GitHub
+ * token-clone idiom; it is never logged and the temp checkout is removed in
+ * `finally`, so the token never lingers on disk.
  *
- * Flow: mint installation token → clone the allowlisted repo to a temp dir →
- * resolve the git SHA → tar the working tree → `putObject` to GCS under
- * `objectPrefix(tenant, project, version)` → mint an immutable `CodebaseVersion`
- * (source `github`, `git_sha` recorded) via `codebaseVersionRepo`.
+ * Flow: clone the selected repo to a temp dir → resolve the git SHA → tar the
+ * working tree → `putObject` to GCS under `objectPrefix(tenant, project, version)`
+ * → mint an immutable `CodebaseVersion` (source `github`, `git_sha` recorded).
  */
 
 import { execFileSync } from 'node:child_process';
@@ -24,31 +22,28 @@ import { getConfig } from '../config.js';
 import { objectPrefix, putObject } from '../cloud/storage.js';
 import { codebaseVersionRepo } from '../db/repositories/index.js';
 import type { CodebaseVersion, Project, TenantId } from '../domain/types.js';
-import { assertInstallationRepo } from './git-url.js';
-import { type InstallationRepo, installationRepos, installationToken } from './github-app.js';
 
-/** Inputs for a github ingest of one allowlisted repo. */
+/** Inputs for a github ingest of one selected repo via a user PAT. */
 export interface GithubIngestInput {
   readonly tenantId: TenantId;
   readonly project: Project;
-  /** Installation that owns the App grant for this repo. */
-  readonly installationId: number;
-  /** `owner/name` of the repo to pull. Defaults to the installation's sole repo. */
-  readonly repoFullName?: string;
+  /** Selected repo `owner/name` to clone. */
+  readonly repoFullName: string;
+  /** The scanning user's GitHub PAT used to clone (private repos included). */
+  readonly pat: string;
   /** Branch/ref to pull; defaults to the repo's default branch. */
   readonly ref?: string;
 }
 
 /**
- * Ingest a GitHub repo into an immutable CodebaseVersion.
+ * Ingest a GitHub repo into an immutable CodebaseVersion using the user's PAT.
  *
- * Clone egress is constrained to the installation allowlist; a non-allowlisted
- * repo throws before any `git` process is spawned.
+ * Clones `owner/name` over HTTPS with the PAT, tars the working tree, stages it
+ * in GCS, and mints the version row. When no `ref` is given, the default branch
+ * is cloned via `--branch HEAD`-equivalent (git resolves the remote HEAD).
  */
 export async function ingestGithub(input: GithubIngestInput): Promise<CodebaseVersion> {
-  const allowlist = await installationRepos(input.installationId);
-  const repo = resolveRepo(input, allowlist);
-  const ref = input.ref ?? repo.defaultBranch;
+  const fullName = assertFullName(input.repoFullName);
 
   const versionId = randomUUID();
   const prefix = objectPrefix(input.tenantId, input.project.id, versionId);
@@ -56,13 +51,12 @@ export async function ingestGithub(input: GithubIngestInput): Promise<CodebaseVe
   const checkout = join(workdir, 'repo');
 
   try {
-    const { token } = await installationToken(input.installationId);
-    cloneAllowlisted(repo, ref, token, checkout);
+    cloneRepo(fullName, input.ref, input.pat, checkout);
     const gitSha = resolveSha(checkout);
     const archive = tarWorkingTree(checkout);
 
     await putObject(`${prefix}source.tar`, archive, 'application/x-tar');
-    await putObject(`${prefix}metadata.json`, sourceMetadata(repo, ref, gitSha), 'application/json');
+    await putObject(`${prefix}metadata.json`, sourceMetadata(fullName, input.ref, gitSha), 'application/json');
 
     return codebaseVersionRepo.create({
       projectId: input.project.id,
@@ -76,37 +70,31 @@ export async function ingestGithub(input: GithubIngestInput): Promise<CodebaseVe
   }
 }
 
-/** Pick the target repo: explicit `owner/name`, else the installation's sole repo. */
-function resolveRepo(input: GithubIngestInput, allowlist: InstallationRepo[]): InstallationRepo {
-  if (input.repoFullName) {
-    return assertInstallationRepo(input.repoFullName, allowlist);
+/** Validate the `owner/name` shape before constructing a clone URL. */
+function assertFullName(fullName: string): string {
+  if (!/^[^/\s]+\/[^/\s]+$/.test(fullName)) {
+    throw new Error(`github ingest: repoFullName must be "owner/name", got "${fullName}"`);
   }
-  if (allowlist.length === 1) {
-    return allowlist[0] as InstallationRepo;
-  }
-  throw new Error(
-    'github ingest requires repoFullName when the installation grants access to multiple repos',
-  );
+  return fullName;
 }
 
 /**
- * Clone exactly one allowlisted repo over HTTPS using the short-lived token.
+ * Clone the selected repo over HTTPS using the user's PAT.
  *
- * The token is injected as the URL userinfo (`x-access-token:<token>@…`) — the
- * standard GitHub App clone idiom. We pass it via the URL rather than env to
- * keep the surface small; the temp dir is removed in the caller's `finally`, so
- * the token never lingers on disk beyond the clone. The token is NEVER logged.
+ * The PAT is injected as the URL userinfo (`x-access-token:<pat>@github.com/…`).
+ * `--single-branch` + an explicit `--branch <ref>` are used only when a ref is
+ * given; otherwise git clones the remote default branch. `--depth`/`--no-tags`
+ * keep the snapshot shallow. The PAT is NEVER logged.
  */
-function cloneAllowlisted(repo: InstallationRepo, ref: string, token: string, dest: string): void {
+function cloneRepo(fullName: string, ref: string | undefined, pat: string, dest: string): void {
   const depth = getConfig().github.cloneDepth;
-  const authedUrl = withToken(repo.cloneUrl, token);
+  const authedUrl = withToken(`https://github.com/${fullName}.git`, pat);
   const args = [
     'clone',
     '--depth',
     String(depth),
     '--single-branch',
-    '--branch',
-    ref,
+    ...(ref ? ['--branch', ref] : []),
     '--no-tags',
     authedUrl,
     dest,
@@ -114,13 +102,13 @@ function cloneAllowlisted(repo: InstallationRepo, ref: string, token: string, de
   try {
     execFileSync('git', args, { stdio: 'pipe' });
   } catch (err) {
-    // Scrub the token out of any surfaced git error (it embeds the clone URL).
-    const msg = sanitize(err instanceof Error ? err.message : String(err), token);
-    throw new Error(`git clone failed for ${repo.fullName}@${ref}: ${msg}`);
+    // Scrub the PAT out of any surfaced git error (it embeds the clone URL).
+    const msg = sanitize(err instanceof Error ? err.message : String(err), pat);
+    throw new Error(`git clone failed for ${fullName}${ref ? `@${ref}` : ''}: ${msg}`);
   }
 }
 
-/** Inject the installation token into an HTTPS clone URL as userinfo. */
+/** Inject the PAT into an HTTPS clone URL as userinfo. */
 function withToken(cloneUrl: string, token: string): string {
   const u = new URL(cloneUrl);
   u.username = 'x-access-token';
@@ -144,12 +132,8 @@ function tarWorkingTree(checkout: string): Buffer {
 }
 
 /** Provenance sidecar stored next to the archive (no secrets). */
-function sourceMetadata(repo: InstallationRepo, ref: string, gitSha: string): string {
-  return JSON.stringify(
-    { sourceKind: 'github', repo: repo.fullName, ref, gitSha, private: repo.private },
-    null,
-    2,
-  );
+function sourceMetadata(fullName: string, ref: string | undefined, gitSha: string): string {
+  return JSON.stringify({ sourceKind: 'github', repo: fullName, ref: ref ?? null, gitSha }, null, 2);
 }
 
 /** Replace every occurrence of the token in a string with a redaction marker. */

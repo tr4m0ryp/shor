@@ -97,6 +97,8 @@ export interface ProjectRow {
   name: string;
   target_url: string;
   repo_installation_id: string | null;
+  repo_full_name: string | null;
+  mode: string;
   schedule: string | null;
   auth_config: Record<string, unknown> | null;
   created_at: unknown;
@@ -109,6 +111,8 @@ export function toProject(r: ProjectRow): Project {
     name: r.name,
     targetUrl: r.target_url,
     repoInstallationId: r.repo_installation_id,
+    repoFullName: r.repo_full_name,
+    mode: r.mode === 'whitebox' ? 'whitebox' : 'blackbox',
     schedule: r.schedule,
     authConfig: r.auth_config,
     createdAt: ts(r.created_at),
@@ -138,7 +142,7 @@ export function toCodebaseVersion(r: CodebaseVersionRow): CodebaseVersion {
 export interface ScanRow {
   id: string;
   project_id: string;
-  codebase_ver_id: string;
+  codebase_ver_id: string | null;
   temporal_workflow_id: string | null;
   status: string;
   started_at: unknown;

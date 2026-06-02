@@ -1,82 +1,74 @@
 /**
  * Ingest orchestration (LAUNCH-SPEC §4.1/4.2, ADR-015/039).
  *
- * `ingestForScan(project)` mints (or reuses) the immutable `CodebaseVersion` a
- * scan runs against:
- *   - source already staged in GCS  → reuse the latest existing
- *     `CodebaseVersion` for the project (seeded/test projects need no pull or
- *     zip). Pass `forceFresh: true` to skip reuse and ingest anew.
- *   - `project.repoInstallationId` set  → GitHub pull of the default branch via
- *     the App installation (egress constrained to the installation allowlist).
- *   - otherwise                         → require a zip upload (callers pass the
- *     archive bytes through the options).
+ * `ingestForScan(project, options)` resolves the immutable `CodebaseVersion` a
+ * scan runs against, or `null` for black-box scans:
+ *   - black-box (`project.mode === 'blackbox'` or no `repoFullName`) → `null`:
+ *     the pipeline runs against just the target URL, no code is staged.
+ *   - white-box → clone `project.repoFullName` with the SCANNING USER's GitHub
+ *     PAT and mint a `CodebaseVersion`. Source already staged in GCS is reused
+ *     unless `forceFresh` is set.
  *
- * Each path returns a `CodebaseVersion`. Connecting a repo and choosing
- * github-vs-zip is a project property, so the dispatch lives here rather than in
- * the caller.
+ * Choosing white-box-vs-black-box is a project property, so the dispatch lives
+ * here rather than in the caller.
  */
 
 import { codebaseVersionRepo } from '../db/repositories/index.js';
-import type { CodebaseVersion, Project, TenantId } from '../domain/types.js';
+import type { CodebaseVersion, Project, TenantId, UserId } from '../domain/types.js';
+import { getGithubToken } from '../github/index.js';
 import { ingestGithub } from './git-source.js';
-import { ingestZip } from './zip-source.js';
 
 /** Per-scan ingest options. */
 export interface IngestForScanOptions {
   /** Tenant that owns `project`. Required for the GCS prefix + version scoping. */
   readonly tenantId: TenantId;
-  /** Explicit `owner/name` for multi-repo installations; default branch is used. */
-  readonly repoFullName?: string;
-  /** Git ref to pull; defaults to the repo's default branch (github path only). */
+  /** The scanning user whose stored GitHub PAT clones the selected repo. */
+  readonly userId: UserId;
+  /** Git ref to pull; defaults to the repo's default branch (white-box only). */
   readonly ref?: string;
-  /** Uploaded zip bytes — required when the project has no connected repo. */
-  readonly zip?: { readonly archive: Buffer; readonly filename?: string; readonly maxBytes?: number };
   /**
    * Skip GCS reuse and always ingest a fresh snapshot. Default false — when a
    * version already exists for the project (source already staged in GCS), it is
-   * reused so seeded/test projects need no GitHub pull or zip upload.
+   * reused so seeded/test projects need no GitHub pull.
    */
   readonly forceFresh?: boolean;
 }
 
 /**
- * Mint (or reuse) the CodebaseVersion to scan for `project`.
+ * Resolve the CodebaseVersion to scan for `project`, or `null` for black-box.
  *
- * Reuse first: unless `forceFresh`, an already-staged latest version is returned
- * so seeded/test projects scan without a GitHub pull or zip. Otherwise dispatches
- * on whether a GitHub App installation is connected. A project with no
- * installation MUST supply `options.zip`; a project with an installation ignores
- * any supplied zip and pulls from the repo (the connected repo is the source of
- * truth).
+ * Black-box projects (no selected repo) return `null` — the scan carries no
+ * codebase version. White-box projects clone the selected repo via the scanning
+ * user's PAT; unless `forceFresh`, an already-staged latest version is reused so
+ * seeded/test projects scan without a GitHub pull. A white-box project whose
+ * owner has no stored PAT throws (the caller surfaces a 4xx/5xx).
  */
-export async function ingestForScan(project: Project, options: IngestForScanOptions): Promise<CodebaseVersion> {
+export async function ingestForScan(
+  project: Project,
+  options: IngestForScanOptions,
+): Promise<CodebaseVersion | null> {
+  // Black-box: no repo selected → no codebase version.
+  if (project.mode === 'blackbox' || !project.repoFullName) {
+    return null;
+  }
+
   if (!options.forceFresh) {
     const existing = await codebaseVersionRepo.latestForProject(options.tenantId, project.id);
     if (existing) return existing;
   }
 
-  if (project.repoInstallationId) {
-    const installationId = Number.parseInt(project.repoInstallationId, 10);
-    if (!Number.isFinite(installationId)) {
-      throw new Error(`project ${project.id} has a non-numeric repoInstallationId`);
-    }
-    return ingestGithub({
-      tenantId: options.tenantId,
-      project,
-      installationId,
-      ...(options.repoFullName !== undefined ? { repoFullName: options.repoFullName } : {}),
-      ...(options.ref !== undefined ? { ref: options.ref } : {}),
-    });
+  const pat = await getGithubToken(options.tenantId, options.userId);
+  if (!pat) {
+    throw new Error(
+      `white-box scan requires a connected GitHub token; none stored for user ${options.userId}`,
+    );
   }
 
-  if (!options.zip) {
-    throw new Error(`project ${project.id} has no connected repo; a zip upload is required to ingest`);
-  }
-  return ingestZip({
+  return ingestGithub({
     tenantId: options.tenantId,
     project,
-    archive: options.zip.archive,
-    ...(options.zip.filename !== undefined ? { filename: options.zip.filename } : {}),
-    ...(options.zip.maxBytes !== undefined ? { maxBytes: options.zip.maxBytes } : {}),
+    repoFullName: project.repoFullName,
+    pat,
+    ...(options.ref !== undefined ? { ref: options.ref } : {}),
   });
 }

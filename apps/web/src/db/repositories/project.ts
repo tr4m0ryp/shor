@@ -11,12 +11,25 @@ import { type ProjectRow, toProject } from './rows.js';
 
 export const projectRepo = {
   async create(input: NewProject): Promise<Project> {
+    // Default the mode from whether a repo is selected: a chosen repo → white-box
+    // (clone it), otherwise black-box (URL-only). An explicit `mode` wins.
+    const repoFullName = input.repoFullName ?? null;
+    const mode = input.mode ?? (repoFullName ? 'whitebox' : 'blackbox');
     const { rows } = await query<ProjectRow>(
       `INSERT INTO project
-			   (tenant_id, name, target_url, repo_installation_id, schedule, auth_config)
-			 VALUES ($1, $2, $3, $4, $5, $6)
+			   (tenant_id, name, target_url, repo_installation_id, repo_full_name, mode, schedule, auth_config)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			 RETURNING *`,
-      [input.tenantId, input.name, input.targetUrl, input.repoInstallationId, input.schedule, input.authConfig],
+      [
+        input.tenantId,
+        input.name,
+        input.targetUrl,
+        input.repoInstallationId,
+        repoFullName,
+        mode,
+        input.schedule,
+        input.authConfig,
+      ],
     );
     return toProject(rows[0] as ProjectRow);
   },
@@ -33,19 +46,35 @@ export const projectRepo = {
     return rows.map(toProject);
   },
 
-  /** Patch mutable project fields; tenant-scoped. Returns the updated row. */
+  /**
+   * Patch mutable project fields; tenant-scoped. Returns the updated row.
+   *
+   * `repoFullName` and `mode` use a sentinel pass-through: when a key is present
+   * in `patch` it is written verbatim (including an explicit `null` to switch a
+   * project to black-box), otherwise the existing value is kept. When
+   * `repoFullName` changes without an explicit `mode`, the mode is re-derived
+   * (selected repo → white-box, none → black-box).
+   */
   async update(
     tenantId: TenantId,
     id: ProjectId,
-    patch: Partial<Pick<Project, 'name' | 'targetUrl' | 'repoInstallationId' | 'schedule' | 'authConfig'>>,
+    patch: Partial<
+      Pick<Project, 'name' | 'targetUrl' | 'repoInstallationId' | 'repoFullName' | 'mode' | 'schedule' | 'authConfig'>
+    >,
   ): Promise<Project | null> {
+    const repoTouched = 'repoFullName' in patch;
+    const repoFullName = repoTouched ? (patch.repoFullName ?? null) : null;
+    const mode =
+      patch.mode ?? (repoTouched ? (repoFullName ? 'whitebox' : 'blackbox') : null);
     const { rows } = await query<ProjectRow>(
       `UPDATE project SET
 			   name = COALESCE($3, name),
 			   target_url = COALESCE($4, target_url),
 			   repo_installation_id = COALESCE($5, repo_installation_id),
-			   schedule = COALESCE($6, schedule),
-			   auth_config = COALESCE($7, auth_config)
+			   repo_full_name = CASE WHEN $6 THEN $7 ELSE repo_full_name END,
+			   mode = COALESCE($8, mode),
+			   schedule = COALESCE($9, schedule),
+			   auth_config = COALESCE($10, auth_config)
 			 WHERE tenant_id = $1 AND id = $2
 			 RETURNING *`,
       [
@@ -54,6 +83,9 @@ export const projectRepo = {
         patch.name ?? null,
         patch.targetUrl ?? null,
         patch.repoInstallationId ?? null,
+        repoTouched,
+        repoFullName,
+        mode,
         patch.schedule ?? null,
         patch.authConfig ?? null,
       ],

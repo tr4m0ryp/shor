@@ -17,8 +17,8 @@
 export interface ScanJobParams {
 	scanId: string;
 	targetUrl: string;
-	/** GCS URI of the repo snapshot to scan (`gs://…`). */
-	repoGcsUri: string;
+	/** GCS URI of the repo snapshot to scan (`gs://…`); absent for black-box runs. */
+	repoGcsUri?: string;
 	/**
 	 * Local filesystem path to the prepared repo. Defaults to AEGIS_REPO_PATH or
 	 * a workdir; the GCS snapshot is materialized here by ingest (Phase 4).
@@ -50,7 +50,9 @@ function optional(name: string): string | undefined {
 export function readScanJobParams(): ScanJobParams {
 	const scanId = required("AEGIS_SCAN_ID");
 	const targetUrl = required("AEGIS_TARGET_URL");
-	const repoGcsUri = required("AEGIS_REPO_GCS_URI");
+	// Optional: black-box scans carry no repo. materializeRepo degrades to an
+	// empty working tree and the pipeline runs against the target URL only.
+	const repoGcsUri = optional("AEGIS_REPO_GCS_URI");
 	// AEGIS_REPO_PATH is the prepared repo location. On the Cloud Run Job it is
 	// `/work/repo` (the writable target into which the GCS snapshot at `/gcs` is
 	// materialized — see job/repo.ts). Absent/empty falls back to that default.
@@ -59,8 +61,8 @@ export function readScanJobParams(): ScanJobParams {
 	const params: ScanJobParams = {
 		scanId,
 		targetUrl,
-		repoGcsUri,
 		repoPath,
+		...(repoGcsUri ? { repoGcsUri } : {}),
 	};
 	const configPath = optional("AEGIS_CONFIG_PATH");
 	if (configPath) params.configPath = configPath;
