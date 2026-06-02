@@ -11,12 +11,14 @@
     "./pipeline": "./dist/temporal/pipeline.js",
     "./activities": "./dist/temporal/activities.js",
     "./services": "./dist/services/index.js",
-    "./config": "./dist/config-parser.js"
+    "./config": "./dist/config-parser.js",
+    "./job-entry": "./dist/job-entry.js"
   },
   "scripts": {
     "build": "tsc",
     "check": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "job": "node dist/job-entry.js"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "catalog:",

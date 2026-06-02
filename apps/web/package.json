@@ -11,9 +11,12 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@google-cloud/run": "^3.2.1",
     "@google-cloud/secret-manager": "^6.1.2",
     "@google-cloud/storage": "^7.19.0",
+    "@temporalio/activity": "^1.11.0",
     "@temporalio/client": "^1.11.0",
+    "@temporalio/workflow": "^1.11.0",
     "google-auth-library": "^10.6.2",
     "pg": "^8.13.0"
   },
