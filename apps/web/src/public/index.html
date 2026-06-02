@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aegis</title>
-<meta name="description" content="Aegis -- multi-tenant AI pentest platform. Targets, scans, findings, attack surface, and scan-to-scan diffs.">
+<title>Shor</title>
+<meta name="description" content="Shor -- AI web-pentest platform. Projects, scans, findings, attack surface, and scan-to-scan diffs.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
@@ -99,6 +99,7 @@ body {
 .page-header { margin-bottom: 32px; }
 .page-header h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
 .page-header p { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+.page-header p.tagline { font-style: italic; color: var(--text-muted); }
 
 /* === New / form card === */
 .new-run-card {
@@ -477,7 +478,7 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="#7D4698" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
       </svg>
-      <span class="wordmark">Ae<span class="accent">gis</span></span>
+      <span class="wordmark">Sh<span class="accent">or</span></span>
     </div>
     <nav>
       <a id="navTargets" class="active" onclick="showPage('targets')">
@@ -496,7 +497,7 @@ body {
     <div id="pageTargets" class="page">
       <div class="page-header">
         <h1>Projects</h1>
-        <p>A project pairs a live site with an optional codebase. Pick a GitHub repo for a white-box scan, or leave it blank for a black-box (URL-only) run.</p>
+        <p class="tagline">Every secret rests on a problem assumed hard.</p>
       </div>
 
       <div class="new-run-card">
