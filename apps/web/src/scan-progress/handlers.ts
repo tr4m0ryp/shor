@@ -36,7 +36,26 @@ function asCompleted(v: unknown): AgentProgress[] {
     if (!agent) continue;
     const status = r.status === 'failed' ? 'failed' : 'completed';
     const durationMs = typeof r.durationMs === 'number' && Number.isFinite(r.durationMs) ? r.durationMs : 0;
-    out.push({ agent, status, durationMs });
+    const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+    const startedAt = num(r.startedAt);
+    const finishedAt = num(r.finishedAt);
+    out.push({
+      agent,
+      status,
+      durationMs,
+      ...(startedAt !== undefined ? { startedAt } : {}),
+      ...(finishedAt !== undefined ? { finishedAt } : {}),
+    });
+  }
+  return out;
+}
+
+/** Coerce the posted `starts` map (agent → epoch ms). */
+function asStarts(v: unknown): Record<string, number> {
+  if (typeof v !== 'object' || v === null) return {};
+  const out: Record<string, number> = {};
+  for (const [agent, ms] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof ms === 'number' && Number.isFinite(ms)) out[agent] = ms;
   }
   return out;
 }
@@ -74,6 +93,7 @@ export async function handleIngestProgress(
     runningAgents: Array.isArray(body.runningAgents)
       ? body.runningAgents.filter((a): a is string => typeof a === 'string' && a.length > 0)
       : [],
+    starts: asStarts(body.starts),
     completedAgents: asCompleted(body.completedAgents),
     skills: asSkills(body.skills),
     updatedAt: new Date().toISOString(),

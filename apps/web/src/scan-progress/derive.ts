@@ -9,7 +9,7 @@
  */
 
 import type { Scan, ScanProgress } from '../domain/types.js';
-import { PIPELINE_PLAN, TOTAL_AGENTS } from './taxonomy.js';
+import { PIPELINE_PLAN, SKILL_CATEGORY, type SkillCategory, TOTAL_AGENTS } from './taxonomy.js';
 
 /** Per-agent render status (mirrors storron's pending pill states). */
 export type StepStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
@@ -19,6 +19,9 @@ export interface AgentView {
   readonly label: string;
   readonly status: StepStatus;
   readonly durationMs: number | null;
+  /** Epoch-ms start/end for the timeline (finishedAt null while running). */
+  readonly startedAt: number | null;
+  readonly finishedAt: number | null;
   /** Named sub-tasks the agent runs internally (static plan; drill-down). */
   readonly subtasks: readonly string[];
   /** Skills the agent has actually used so far (live). */
@@ -44,7 +47,18 @@ export interface ProgressView {
   readonly total: number;
   readonly percent: number;
   readonly updatedAt: string | null;
+  /** Timeline axis bounds (epoch ms) across all agents that have a start. */
+  readonly runStart: number | null;
+  readonly runEnd: number | null;
+  /** Distinct offensive tools that fired this run + who used them (arsenal grid). */
+  readonly arsenal: readonly ArsenalEntry[];
   readonly phases: readonly PhaseView[];
+}
+
+export interface ArsenalEntry {
+  readonly skill: string;
+  readonly category: SkillCategory;
+  readonly agents: readonly string[];
 }
 
 /** Phase rollup precedence: a worse child status wins (storron's order). */
@@ -57,20 +71,31 @@ function rollup(children: readonly StepStatus[]): StepStatus {
   return 'pending';
 }
 
-function agentStatus(
-  name: string,
-  progress: ScanProgress,
-  scanClosed: boolean,
-): { status: StepStatus; durationMs: number | null } {
+interface AgentTiming {
+  status: StepStatus;
+  durationMs: number | null;
+  startedAt: number | null;
+  finishedAt: number | null;
+}
+
+function agentStatus(name: string, progress: ScanProgress, scanClosed: boolean): AgentTiming {
+  const started = progress.starts?.[name] ?? null;
   const done = progress.completedAgents.find((a) => a.agent === name);
-  if (done) return { status: done.status, durationMs: done.durationMs };
-  if (progress.failedAgent === name) return { status: 'failed', durationMs: null };
+  if (done) {
+    return {
+      status: done.status,
+      durationMs: done.durationMs,
+      startedAt: done.startedAt ?? started,
+      finishedAt: done.finishedAt ?? null,
+    };
+  }
+  if (progress.failedAgent === name) return { status: 'failed', durationMs: null, startedAt: started, finishedAt: null };
   // Concurrency: any agent in the running set is in progress (currentAgent is
   // just one representative for the banner).
   const running = progress.runningAgents ?? (progress.currentAgent ? [progress.currentAgent] : []);
-  if (running.includes(name)) return { status: 'in_progress', durationMs: null };
+  if (running.includes(name)) return { status: 'in_progress', durationMs: null, startedAt: started, finishedAt: null };
   // A closed scan that never reached this agent skipped it; otherwise it is queued.
-  return { status: scanClosed ? 'skipped' : 'pending', durationMs: null };
+  return { status: scanClosed ? 'skipped' : 'pending', durationMs: null, startedAt: null, finishedAt: null };
 }
 
 /**
@@ -91,15 +116,21 @@ export function deriveProgressView(scan: Scan): ProgressView {
 
   const skillsByAgent = progress.skills ?? {};
   let completed = 0;
+  let runStart: number | null = null;
+  let runEnd: number | null = null;
   const phases: PhaseView[] = PIPELINE_PLAN.map((phase) => {
     const agents: AgentView[] = phase.agents.map((a) => {
-      const { status, durationMs } = agentStatus(a.name, progress, scanClosed);
-      if (status === 'completed') completed += 1;
+      const t = agentStatus(a.name, progress, scanClosed);
+      if (t.status === 'completed') completed += 1;
+      if (t.startedAt != null) runStart = runStart == null ? t.startedAt : Math.min(runStart, t.startedAt);
+      if (t.finishedAt != null) runEnd = runEnd == null ? t.finishedAt : Math.max(runEnd, t.finishedAt);
       return {
         name: a.name,
         label: a.label,
-        status,
-        durationMs,
+        status: t.status,
+        durationMs: t.durationMs,
+        startedAt: t.startedAt,
+        finishedAt: t.finishedAt,
         subtasks: a.subtasks ?? [],
         skills: skillsByAgent[a.name] ?? [],
       };
@@ -124,6 +155,23 @@ export function deriveProgressView(scan: Scan): ProgressView {
         ? 0
         : Math.round((completed / TOTAL_AGENTS) * 100);
   const runningAgents = progress.runningAgents ?? (progress.currentAgent ? [progress.currentAgent] : []);
+  // Running agents have no finish yet — extend the axis to "now" so their bars render.
+  if (runningAgents.length > 0 && runStart != null) runEnd = Math.max(runEnd ?? runStart, Date.now());
+
+  // Tool arsenal: distinct skills that fired + which agents (by label) used each.
+  const labelOf = new Map<string, string>();
+  for (const ph of PIPELINE_PLAN) for (const a of ph.agents) labelOf.set(a.name, a.label);
+  const arsenalMap = new Map<string, Set<string>>();
+  for (const [agentName, list] of Object.entries(skillsByAgent)) {
+    for (const skill of list) {
+      if (!arsenalMap.has(skill)) arsenalMap.set(skill, new Set());
+      arsenalMap.get(skill)?.add(labelOf.get(agentName) ?? agentName);
+    }
+  }
+  const arsenal: ArsenalEntry[] = [...arsenalMap.entries()]
+    .map(([skill, agents]) => ({ skill, category: SKILL_CATEGORY[skill] ?? ('exploit' as SkillCategory), agents: [...agents] }))
+    .sort((a, b) => a.category.localeCompare(b.category) || a.skill.localeCompare(b.skill));
+
   return {
     status: scan.status,
     currentPhase: progress.currentPhase,
@@ -133,6 +181,9 @@ export function deriveProgressView(scan: Scan): ProgressView {
     total: TOTAL_AGENTS,
     percent,
     updatedAt: progress.updatedAt || null,
+    runStart,
+    runEnd,
+    arsenal,
     phases,
   };
 }

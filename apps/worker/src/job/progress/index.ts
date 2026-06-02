@@ -29,6 +29,9 @@ interface AgentProgress {
 	agent: string;
 	status: "completed" | "failed";
 	durationMs: number;
+	/** Epoch ms — drives the run timeline (Gantt). */
+	startedAt: number;
+	finishedAt: number;
 }
 
 interface ProgressSnapshot {
@@ -39,6 +42,8 @@ interface ProgressSnapshot {
 	/** All agents running RIGHT NOW (≥1 under concurrency). */
 	runningAgents: string[];
 	completedAgents: AgentProgress[];
+	/** agent → epoch-ms it started (covers still-running agents for the timeline). */
+	starts: Record<string, number>;
 	/** agent → skills it has used so far (live, from the skill tracker). */
 	skills: Record<string, string[]>;
 }
@@ -71,6 +76,7 @@ export class ProgressEmitter {
 	private readonly config: SinkConfig | undefined;
 	private readonly completed: AgentProgress[] = [];
 	private readonly running = new Set<AgentName>();
+	private readonly starts: Record<string, number> = {};
 	private lastFailed: AgentName | null = null;
 	private lastSkillEmit = 0;
 
@@ -108,6 +114,7 @@ export class ProgressEmitter {
 				failedAgent: this.lastFailed,
 				runningAgents: [...this.running],
 				completedAgents: this.completed,
+				starts: this.starts,
 				skills: skillTracker.all(),
 			},
 			this.logger,
@@ -117,13 +124,15 @@ export class ProgressEmitter {
 	/** Announce an agent is now running (≥1 may run concurrently). */
 	async started(agent: AgentName): Promise<void> {
 		this.running.add(agent);
+		this.starts[agent] = Date.now();
 		await this.emit();
 	}
 
 	/** Record an agent finished successfully and push the updated snapshot. */
 	async completed_(agent: AgentName, durationMs: number): Promise<void> {
 		this.running.delete(agent);
-		this.completed.push({ agent, status: "completed", durationMs });
+		const startedAt = this.starts[agent] ?? Date.now() - durationMs;
+		this.completed.push({ agent, status: "completed", durationMs, startedAt, finishedAt: Date.now() });
 		await this.emit();
 	}
 
@@ -131,7 +140,8 @@ export class ProgressEmitter {
 	async failed(agent: AgentName, durationMs: number): Promise<void> {
 		this.running.delete(agent);
 		this.lastFailed = agent;
-		this.completed.push({ agent, status: "failed", durationMs });
+		const startedAt = this.starts[agent] ?? Date.now() - durationMs;
+		this.completed.push({ agent, status: "failed", durationMs, startedAt, finishedAt: Date.now() });
 		await this.emit();
 	}
 }

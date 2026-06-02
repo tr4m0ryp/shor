@@ -120,3 +120,15 @@ export const PIPELINE_PLAN: readonly PhaseSpec[] = [
 
 /** Total agent count across all phases — the denominator for percent-complete. */
 export const TOTAL_AGENTS: number = PIPELINE_PLAN.reduce((n, p) => n + p.agents.length, 0);
+
+/** Skill → category (mirrors the repo `skills/<category>/` dirs). For the tool-arsenal grid. */
+export type SkillCategory = 'recon' | 'exploit' | 'static-analysis';
+export const SKILL_CATEGORY: Readonly<Record<string, SkillCategory>> = {
+  arjun: 'recon', dnsx: 'recon', ffuf: 'recon', gau: 'recon', httpx: 'recon', katana: 'recon',
+  kxss: 'recon', naabu: 'recon', nmap: 'recon', nuclei: 'recon', paramspider: 'recon',
+  subfinder: 'recon', wafw00f: 'recon', waybackurls: 'recon',
+  'authz-recipe': 'exploit', commix: 'exploit', dalfox: 'exploit', 'generate-totp': 'exploit',
+  hydra: 'exploit', 'interactsh-client': 'exploit', jwt_tool: 'exploit', nosqli: 'exploit',
+  playwright: 'exploit', sqlmap: 'exploit', ssrfmap: 'exploit', sstimap: 'exploit', xsstrike: 'exploit',
+  gitleaks: 'static-analysis', 'osv-scanner': 'static-analysis', semgrep: 'static-analysis', trufflehog: 'static-analysis',
+};

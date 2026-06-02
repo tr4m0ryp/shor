@@ -403,6 +403,30 @@ body {
 .pending-status-pill--skipped { color: var(--text-muted); background: var(--card-hover); }
 @keyframes pendingPulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
 
+/* Run timeline (Gantt) + tool arsenal */
+.run-section { margin: 4px 0 18px; }
+.run-section__title { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin-bottom: 10px; }
+.gantt { display: flex; flex-direction: column; gap: 5px; }
+.gantt-row { display: grid; grid-template-columns: 132px 1fr; align-items: center; gap: 10px; }
+.gantt-row__label { font-size: 12px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gantt-row__track { position: relative; height: 18px; background: var(--card-hover); border-radius: 4px; }
+.gantt-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; min-width: 4px; transition: width .4s ease, left .4s ease; }
+.gantt-bar.completed { background: var(--green); }
+.gantt-bar.failed { background: var(--red); }
+.gantt-bar.in_progress {
+  background: var(--accent);
+  background-image: linear-gradient(45deg, rgba(255,255,255,.28) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.28) 50%, rgba(255,255,255,.28) 75%, transparent 75%, transparent);
+  background-size: 14px 14px; animation: progressStripe 1s linear infinite;
+}
+.gantt-bar__dur { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); font-size: 9px; color: rgba(255,255,255,.92); font-variant-numeric: tabular-nums; }
+.arsenal { display: flex; flex-wrap: wrap; gap: 6px; }
+.arsenal-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-family: 'SF Mono', 'Fira Code', monospace; padding: 4px 10px; border-radius: 9999px; border: 1px solid var(--border-light); background: var(--card); color: var(--text); }
+.arsenal-chip .dot { width: 7px; height: 7px; border-radius: 9999px; flex: 0 0 auto; }
+.arsenal-chip.recon .dot { background: #1A56DB; }
+.arsenal-chip.exploit .dot { background: var(--accent); }
+.arsenal-chip.static-analysis .dot { background: var(--green); }
+.arsenal-empty { font-size: 12px; color: var(--text-muted); }
+
 /* === Findings tab === */
 .findings-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .findings-filter-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; align-self: center; }
@@ -1284,9 +1308,44 @@ function renderProgress(view) {
   lastProgressView = view;
   renderProgressBar(view);
   const banner = renderProgressBanner(view);
+  const timeline = renderTimeline(view);
+  const arsenal = renderArsenal(view);
   const phases = (view.phases || []).map(renderProgressPhase).join('');
   document.getElementById('panelActivity').innerHTML =
-    banner + '<div class="pending-grid">' + phases + '</div>';
+    banner + timeline + arsenal + '<div class="pending-grid">' + phases + '</div>';
+}
+
+// Gantt timeline: one bar per agent positioned on the run's time axis. Parallel
+// agents overlap, so the 2-wide vuln/exploit phases are visible.
+function renderTimeline(view) {
+  if (!view.runStart || !view.runEnd || view.runEnd <= view.runStart) return '';
+  const span = view.runEnd - view.runStart;
+  const agents = (view.phases || []).reduce(function (acc, p) { return acc.concat(p.agents); }, [])
+    .filter(function (a) { return a.startedAt != null; });
+  if (agents.length === 0) return '';
+  const rows = agents.map(function (a) {
+    const start = a.startedAt;
+    const end = a.finishedAt != null ? a.finishedAt : view.runEnd;
+    const left = Math.max(0, (start - view.runStart) / span * 100);
+    const width = Math.min(100 - left, Math.max(1.2, (end - start) / span * 100));
+    const dur = fmtDur(a.durationMs != null ? a.durationMs : end - start);
+    return '<div class="gantt-row"><div class="gantt-row__label">' + escapeHtml(a.label) + '</div>' +
+      '<div class="gantt-row__track"><div class="gantt-bar ' + a.status + '" style="left:' + left.toFixed(1) + '%;width:' + width.toFixed(1) + '%">' +
+        (width > 9 && dur ? '<span class="gantt-bar__dur">' + dur + '</span>' : '') +
+      '</div></div></div>';
+  }).join('');
+  return '<div class="run-section"><div class="run-section__title">Run timeline · ' + fmtDur(span) + ' total</div><div class="gantt">' + rows + '</div></div>';
+}
+
+// Tool arsenal: the offensive tools that actually fired this run, by category.
+function renderArsenal(view) {
+  const arsenal = view.arsenal || [];
+  if (arsenal.length === 0) return '';
+  const chips = arsenal.map(function (t) {
+    return '<span class="arsenal-chip ' + t.category + '" title="' + escapeHtml((t.agents || []).join(', ')) + '">' +
+      '<span class="dot"></span>' + escapeHtml(t.skill) + '</span>';
+  }).join('');
+  return '<div class="run-section"><div class="run-section__title">Tools fired · ' + arsenal.length + '</div><div class="arsenal">' + chips + '</div></div>';
 }
 
 function toggleAgentDetail(name) {

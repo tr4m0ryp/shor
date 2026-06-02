@@ -118,6 +118,9 @@ export interface AgentProgress {
   readonly agent: string;
   readonly status: 'completed' | 'failed';
   readonly durationMs: number;
+  /** Epoch ms — drives the run timeline (Gantt). */
+  readonly startedAt?: number;
+  readonly finishedAt?: number;
 }
 
 /**
@@ -133,6 +136,8 @@ export interface ScanProgress {
   readonly failedAgent: string | null;
   /** Agents running concurrently right now (≥1 under 2-wide parallelism). */
   readonly runningAgents?: readonly string[];
+  /** agent → epoch-ms it started (covers still-running agents for the timeline). */
+  readonly starts?: Readonly<Record<string, number>>;
   readonly completedAgents: readonly AgentProgress[];
   /** agent name → skills it has used so far (live, worker-pushed). */
   readonly skills?: Readonly<Record<string, readonly string[]>>;
