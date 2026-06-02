@@ -209,7 +209,6 @@ RUN apk update && apk add --no-cache \
     findutils \
     # packaged scanner
     nmap \
-    nmap-scripts \
     # interpreter for the venv (matches py-builder's python-3.13)
     python-3.13 \
     # naabu/pcap runtime
@@ -220,7 +219,6 @@ RUN apk update && apk add --no-cache \
     freetype \
     harfbuzz \
     fontconfig \
-    font-dejavu \
     libx11 \
     libxcomposite \
     libxdamage \
