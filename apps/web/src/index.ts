@@ -24,3 +24,4 @@ export { getConfig, resetConfig } from './config.js';
 export { migrate } from './db/migrate.js';
 export * as repositories from './db/repositories/index.js';
 export * from './domain/types.js';
+export * as secrets from './secrets/index.js';
