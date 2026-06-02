@@ -26,7 +26,7 @@ import type {
   TenantId,
 } from '../domain/types.js';
 import { withFingerprints } from './fingerprint.js';
-import { assertValidFindings } from './validate.js';
+import { validateFinding } from './validate.js';
 
 /** Response envelope shared with the router (mirrors `ApiResponse`). */
 export interface SinkResponse {
@@ -39,6 +39,8 @@ export interface IngestResult {
   readonly scanId: ScanId;
   readonly persisted: number;
   readonly fingerprints: string[];
+  /** Count of malformed findings skipped (only present when > 0). */
+  readonly skipped?: number;
 }
 
 /** Coerce a validated candidate (already §6.1-shaped) into a `FindingRecord`. */
@@ -66,10 +68,18 @@ export async function ingestFindings(
     throw new SinkScanNotFoundError(scanId);
   }
 
-  assertValidFindings(findings);
+  // Resilient ingest: keep the structurally-valid findings, skip (don't reject
+  // the whole batch over) malformed ones. A single bad record must never discard
+  // a run's other findings — partial results beat none.
+  const valid: unknown[] = [];
+  let skipped = 0;
+  findings.forEach((candidate, index) => {
+    if (validateFinding(candidate, index).length === 0) valid.push(candidate);
+    else skipped += 1;
+  });
 
   const fingerprints: string[] = [];
-  for (const candidate of findings) {
+  for (const candidate of valid) {
     const record = withFingerprints(asFindingRecord(candidate));
     const persisted = await upsertFinding(tenantId, scanId, record);
     fingerprints.push(persisted.fingerprint);
@@ -82,7 +92,7 @@ export async function ingestFindings(
     }
   }
 
-  return { scanId, persisted: fingerprints.length, fingerprints };
+  return { scanId, persisted: fingerprints.length, fingerprints, ...(skipped > 0 && { skipped }) };
 }
 
 /** Raised when the target scan does not exist for the caller's tenant. */

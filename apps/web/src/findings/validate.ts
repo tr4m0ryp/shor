@@ -53,19 +53,23 @@ export function validateFinding(candidate: unknown, index: number): FindingValid
     return [{ index, field: '<root>', message: 'finding must be an object' }];
   }
 
-  const requiredStrings: readonly (keyof FindingRecord)[] = [
-    'id',
-    'category',
-    'cwe',
-    'owasp_category',
-    'evidence',
-    'safe_poc',
-    'missing_defense',
-    'remediation',
-  ];
+  // Identity fields the worker always produces — these stay required so a
+  // record is at least addressable + categorizable.
+  const requiredStrings: readonly (keyof FindingRecord)[] = ['id', 'category', 'cwe', 'owasp_category'];
   for (const key of requiredStrings) {
     if (typeof candidate[key] !== 'string' || (candidate[key] as string).length === 0) {
       push(String(key), 'required non-empty string');
+    }
+  }
+
+  // Descriptive fields are OPTIONAL (partial findings beat none — the worker's
+  // best-effort mapping leaves some empty, e.g. a live-only finding with no code
+  // location, or remediation that lives in the report deliverable). Validate the
+  // TYPE only when present; never reject a finding for an empty narrative field.
+  const optionalStrings: readonly (keyof FindingRecord)[] = ['evidence', 'safe_poc', 'missing_defense', 'remediation'];
+  for (const key of optionalStrings) {
+    if (candidate[key] !== undefined && typeof candidate[key] !== 'string') {
+      push(String(key), 'must be a string when present');
     }
   }
 
@@ -79,20 +83,15 @@ export function validateFinding(candidate: unknown, index: number): FindingValid
     push('confidence', `must be one of ${CONFIDENCES.join('|')}`);
   }
 
-  if (!isStringArray(candidate.repro_steps)) {
-    push('repro_steps', 'must be an array of strings');
+  if (candidate.repro_steps !== undefined && !isStringArray(candidate.repro_steps)) {
+    push('repro_steps', 'must be an array of strings when present');
   }
 
+  // Location is optional; when present it must be an object, but an empty file
+  // or a 0 line (no precise location) is allowed.
   const loc = candidate.vulnerable_code_location;
-  if (!isObject(loc)) {
-    push('vulnerable_code_location', 'must be an object { file, line }');
-  } else {
-    if (typeof loc.file !== 'string' || loc.file.length === 0) {
-      push('vulnerable_code_location.file', 'required non-empty string');
-    }
-    if (typeof loc.line !== 'number' || !Number.isFinite(loc.line)) {
-      push('vulnerable_code_location.line', 'required number');
-    }
+  if (loc !== undefined && !isObject(loc)) {
+    push('vulnerable_code_location', 'must be an object { file, line } when present');
   }
 
   return issues;
