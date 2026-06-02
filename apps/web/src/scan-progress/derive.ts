@@ -19,6 +19,10 @@ export interface AgentView {
   readonly label: string;
   readonly status: StepStatus;
   readonly durationMs: number | null;
+  /** Named sub-tasks the agent runs internally (static plan; drill-down). */
+  readonly subtasks: readonly string[];
+  /** Skills the agent has actually used so far (live). */
+  readonly skills: readonly string[];
 }
 
 export interface PhaseView {
@@ -80,12 +84,20 @@ export function deriveProgressView(scan: Scan): ProgressView {
     updatedAt: scan.finishedAt ?? scan.startedAt ?? '',
   };
 
+  const skillsByAgent = progress.skills ?? {};
   let completed = 0;
   const phases: PhaseView[] = PIPELINE_PLAN.map((phase) => {
     const agents: AgentView[] = phase.agents.map((a) => {
       const { status, durationMs } = agentStatus(a.name, progress, scanClosed);
       if (status === 'completed') completed += 1;
-      return { name: a.name, label: a.label, status, durationMs };
+      return {
+        name: a.name,
+        label: a.label,
+        status,
+        durationMs,
+        subtasks: a.subtasks ?? [],
+        skills: skillsByAgent[a.name] ?? [],
+      };
     });
     const done = agents.filter((a) => a.status === 'completed').length;
     return {

@@ -41,6 +41,18 @@ function asCompleted(v: unknown): AgentProgress[] {
   return out;
 }
 
+/** Coerce the posted `skills` map (agent → string[]) into a clean record. */
+function asSkills(v: unknown): Record<string, string[]> {
+  if (typeof v !== 'object' || v === null) return {};
+  const out: Record<string, string[]> = {};
+  for (const [agent, list] of Object.entries(v as Record<string, unknown>)) {
+    if (!Array.isArray(list)) continue;
+    const skills = list.filter((s): s is string => typeof s === 'string' && s.length > 0);
+    if (skills.length) out[agent] = skills;
+  }
+  return out;
+}
+
 /**
  * `POST /scans/:id/progress` — persist the worker's latest progress snapshot.
  * Body: `{ status?, currentPhase?, currentAgent?, failedAgent?, completedAgents? }`.
@@ -60,6 +72,7 @@ export async function handleIngestProgress(
     currentAgent: asStr(body.currentAgent),
     failedAgent: asStr(body.failedAgent),
     completedAgents: asCompleted(body.completedAgents),
+    skills: asSkills(body.skills),
     updatedAt: new Date().toISOString(),
   };
 

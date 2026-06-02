@@ -10,10 +10,17 @@
  * with the worker.
  */
 
-/** A single agent within a phase, in run order. */
+/**
+ * A single agent within a phase, in run order. `subtasks` are the named
+ * sub-agents / method phases the agent's system prompt runs internally — they
+ * are not independently tracked at runtime (the agent writes one deliverable),
+ * so the drill-down shows them as the agent's plan, sharing the agent's status.
+ * Authoritative source: the worker prompt files (`apps/worker/prompts/*.txt`).
+ */
 export interface AgentSpec {
   readonly name: string;
   readonly label: string;
+  readonly subtasks?: readonly string[];
 }
 
 /** A pipeline phase: a titled group of agents the feed renders as one card. */
@@ -27,36 +34,87 @@ export interface PhaseSpec {
  * The pipeline plan, in execution order. The flat agent order here MUST match
  * the worker's `ALL_AGENTS` so completed-agent records line up by name.
  */
+// Sub-task method phases the vuln/exploit prompts run internally (shared shape;
+// these agents have no named sub-agents, only numbered method sections).
+const VULN_SUBTASKS = ['Enumerate sources', 'Analyze sink classes', 'Confirm vectors', 'Write findings queue'];
+const EXPLOIT_SUBTASKS = ['Plan attack', 'Probe payloads', 'Bypass defenses', 'Capture evidence'];
+
 export const PIPELINE_PLAN: readonly PhaseSpec[] = [
-  { id: 'pre-recon', label: 'Reconnaissance', agents: [{ name: 'pre-recon', label: 'Pre-recon' }] },
-  { id: 'recon', label: 'Mapping', agents: [{ name: 'recon', label: 'Recon' }] },
+  {
+    id: 'pre-recon',
+    label: 'Reconnaissance',
+    agents: [
+      {
+        name: 'pre-recon',
+        label: 'Pre-recon',
+        // prompts/pre-recon-code.txt:180-200
+        subtasks: [
+          'Architecture Scanner',
+          'Entry Point Mapper',
+          'Security Pattern Hunter',
+          'XSS / Injection Sink Hunter',
+          'SSRF / External Request Tracer',
+          'Data Security Auditor',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'recon',
+    label: 'Mapping',
+    agents: [
+      {
+        name: 'recon',
+        label: 'Recon',
+        // prompts/recon.txt:155-161,381
+        subtasks: [
+          'Route Mapper',
+          'Authorization Checker',
+          'Input Validator',
+          'Session Handler',
+          'Authorization Architecture',
+          'Injection Source Tracer',
+        ],
+      },
+    ],
+  },
   {
     id: 'vulnerability-analysis',
     label: 'Vulnerability Analysis',
     agents: [
-      { name: 'injection-vuln', label: 'Injection' },
-      { name: 'xss-vuln', label: 'XSS' },
-      { name: 'auth-vuln', label: 'Auth' },
-      { name: 'ssrf-vuln', label: 'SSRF' },
-      { name: 'authz-vuln', label: 'Authz' },
+      { name: 'injection-vuln', label: 'Injection', subtasks: VULN_SUBTASKS },
+      { name: 'xss-vuln', label: 'XSS', subtasks: VULN_SUBTASKS },
+      { name: 'auth-vuln', label: 'Auth', subtasks: VULN_SUBTASKS },
+      { name: 'ssrf-vuln', label: 'SSRF', subtasks: VULN_SUBTASKS },
+      { name: 'authz-vuln', label: 'Authz', subtasks: VULN_SUBTASKS },
     ],
   },
   {
     id: 'exploitation',
     label: 'Validation',
     agents: [
-      { name: 'injection-exploit', label: 'Injection' },
-      { name: 'xss-exploit', label: 'XSS' },
-      { name: 'auth-exploit', label: 'Auth' },
-      { name: 'ssrf-exploit', label: 'SSRF' },
-      { name: 'authz-exploit', label: 'Authz' },
+      { name: 'injection-exploit', label: 'Injection', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'xss-exploit', label: 'XSS', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'auth-exploit', label: 'Auth', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'ssrf-exploit', label: 'SSRF', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'authz-exploit', label: 'Authz', subtasks: EXPLOIT_SUBTASKS },
     ],
   },
-  { id: 'reporting', label: 'Remediation Report', agents: [{ name: 'report', label: 'Report' }] },
+  {
+    id: 'reporting',
+    label: 'Remediation Report',
+    agents: [{ name: 'report', label: 'Report', subtasks: ['Assemble findings', 'Write executive report'] }],
+  },
   {
     id: 'attack-surface',
     label: 'Attack Surface & Fixes',
-    agents: [{ name: 'attack-surface', label: 'Attack Surface' }],
+    agents: [
+      {
+        name: 'attack-surface',
+        label: 'Attack Surface',
+        subtasks: ['Synthesize scenarios', 'Build kill chains', 'Generate fix prompts'],
+      },
+    ],
   },
 ];
 

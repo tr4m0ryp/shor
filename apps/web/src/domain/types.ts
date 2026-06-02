@@ -124,6 +124,8 @@ export interface ScanProgress {
   readonly currentAgent: string | null;
   readonly failedAgent: string | null;
   readonly completedAgents: readonly AgentProgress[];
+  /** agent name → skills it has used so far (live, worker-pushed). */
+  readonly skills?: Readonly<Record<string, readonly string[]>>;
   readonly updatedAt: string;
 }
 

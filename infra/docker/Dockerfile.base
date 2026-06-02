@@ -1,0 +1,257 @@
+# syntax=docker/dockerfile:1
+#
+# Aegis offensive-toolkit BASE image (multi-stage, Wolfi/glibc).
+#
+# This is the SLOW, RARELY-CHANGING half of the worker image: the ~30 offensive
+# tools (Go binaries, the shared Python venv, the git-clone tools), the runtime
+# OS closure (nmap, chromium + its glibc libs, node), and the Claude/Playwright
+# CLIs. It does NOT contain the Aegis Node app — that lives in the thin app image
+# (`infra/docker/Dockerfile`) which does `FROM` this base and only COPYs the
+# compiled worker on top.
+#
+# Why the split: Cloud Build runs each build on a fresh VM with no Docker layer
+# cache, so every build of the combined image re-ran all ~50 tool-install steps
+# (~14 min) even when only a few lines of Node changed. Building this base once
+# (when tools.lock / system deps change) lets app builds be ~1-2 min.
+#
+# Build: .acceptance/cloudbuild.base.yaml → aegis-worker-base:latest.
+#
+# Strategy mirrors the original combined Dockerfile (ADR-023/024/026/027):
+#   - Builder  : cgr.dev/chainguard/wolfi-base  (apk + shell; build everything)
+#   - Runtime  : cgr.dev/chainguard/glibc-dynamic  (minimal; binaries + venv copied in)
+#   - Wolfi is glibc; never copy Alpine/musl binaries.
+
+# ---------------------------------------------------------------------------
+# Stage 1: go-builder — compile all Go tools against Wolfi glibc.
+# ---------------------------------------------------------------------------
+FROM cgr.dev/chainguard/wolfi-base:latest AS go-builder
+
+# hadolint ignore=DL3018
+RUN apk update && apk add --no-cache \
+    build-base \
+    git \
+    ca-certificates \
+    go-1.25 \
+    libpcap-dev \
+    linux-headers
+
+ENV GOPATH=/go
+ENV PATH=/usr/lib/go-1.25/bin:/go/bin:$PATH
+ENV GOFLAGS=-buildvcs=false
+
+RUN mkdir -p /go/bin
+
+# Retry wrapper: the Go module proxy occasionally drops an HTTP/2 stream
+# mid-download (transient). Retry so a long build is not wasted on a flaky fetch.
+RUN printf '#!/bin/sh\nn=0\nuntil "$@"; do n=$((n+1)); [ "$n" -ge 5 ] && echo "retry: gave up after $n: $*" >&2 && exit 1; echo "retry $n/5: $*" >&2; sleep 8; done\n' > /usr/local/bin/retry && chmod +x /usr/local/bin/retry
+
+# --- ProjectDiscovery + pure-Go tools (CGO off → portable static binaries) ---
+ENV CGO_ENABLED=0
+RUN retry go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
+    retry go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
+    retry go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
+    retry go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
+    retry go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest
+RUN retry go install -v github.com/ffuf/ffuf/v2@latest && \
+    retry go install -v github.com/hahwul/dalfox/v2@latest && \
+    retry go install -v github.com/Emoe/kxss@latest && \
+    retry go install -v github.com/lc/gau/v2/cmd/gau@latest && \
+    retry go install -v github.com/tomnomnom/waybackurls@latest
+RUN retry go install -v github.com/zricethezav/gitleaks/v8@latest && \
+    retry go install -v github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
+
+# --- naabu needs CGO + libpcap ---
+ENV CGO_ENABLED=1
+RUN retry go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+
+# --- katana: CGO_ENABLED=1 for the headless (chromedp) build path (ADR-025) ---
+RUN retry go install -v github.com/projectdiscovery/katana/cmd/katana@latest
+
+# --- nosqli: no documented @latest; pinned to a commit SHA from tools.lock ---
+ARG NOSQLI_SHA
+RUN retry env CGO_ENABLED=0 go install -v "github.com/Charlie-belmer/nosqli@${NOSQLI_SHA}"
+
+# ---------------------------------------------------------------------------
+# Stage 2: py-builder — build the shared Python venv against Wolfi glibc.
+# ---------------------------------------------------------------------------
+FROM cgr.dev/chainguard/wolfi-base:latest AS py-builder
+
+# hadolint ignore=DL3018
+RUN apk update && apk add --no-cache \
+    build-base \
+    git \
+    curl \
+    ca-certificates \
+    python-3.13 \
+    python-3.13-dev \
+    py3.13-pip \
+    libffi-dev \
+    openssl-dev
+
+ENV VENV=/opt/aegis/venv
+RUN python3 -m venv "$VENV"
+ENV PATH=$VENV/bin:$PATH
+
+ENV TOOLS_DIR=/opt/aegis/tools
+RUN mkdir -p "$TOOLS_DIR"
+
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# --- PyPI tools (official glibc wheels) ---
+RUN pip install --no-cache-dir \
+    semgrep \
+    arjun \
+    wafw00f \
+    playwright
+
+# --- git-clone Python tools, pinned to SHAs from tools.lock (ADR-027) ---
+ARG SQLMAP_SHA
+ARG COMMIX_SHA
+ARG SSTIMAP_SHA
+ARG XSSTRIKE_SHA
+ARG SSRFMAP_SHA
+ARG JWT_TOOL_SHA
+ARG PARAMSPIDER_SHA
+
+RUN git clone --filter=blob:none https://github.com/sqlmapproject/sqlmap.git "$TOOLS_DIR/sqlmap" && \
+    git -C "$TOOLS_DIR/sqlmap" checkout --detach "$SQLMAP_SHA"
+RUN git clone --filter=blob:none https://github.com/commixproject/commix.git "$TOOLS_DIR/commix" && \
+    git -C "$TOOLS_DIR/commix" checkout --detach "$COMMIX_SHA"
+RUN git clone --filter=blob:none https://github.com/vladko312/SSTImap.git "$TOOLS_DIR/SSTImap" && \
+    git -C "$TOOLS_DIR/SSTImap" checkout --detach "$SSTIMAP_SHA" && \
+    pip install --no-cache-dir -r "$TOOLS_DIR/SSTImap/requirements.txt"
+RUN git clone --filter=blob:none https://github.com/s0md3v/XSStrike.git "$TOOLS_DIR/XSStrike" && \
+    git -C "$TOOLS_DIR/XSStrike" checkout --detach "$XSSTRIKE_SHA" && \
+    pip install --no-cache-dir -r "$TOOLS_DIR/XSStrike/requirements.txt"
+RUN git clone --filter=blob:none https://github.com/swisskyrepo/SSRFmap.git "$TOOLS_DIR/SSRFmap" && \
+    git -C "$TOOLS_DIR/SSRFmap" checkout --detach "$SSRFMAP_SHA" && \
+    pip install --no-cache-dir -r "$TOOLS_DIR/SSRFmap/requirements.txt"
+RUN git clone --filter=blob:none https://github.com/ticarpi/jwt_tool.git "$TOOLS_DIR/jwt_tool" && \
+    git -C "$TOOLS_DIR/jwt_tool" checkout --detach "$JWT_TOOL_SHA" && \
+    pip install --no-cache-dir -r "$TOOLS_DIR/jwt_tool/requirements.txt"
+RUN git clone --filter=blob:none https://github.com/devanshbatham/ParamSpider.git "$TOOLS_DIR/ParamSpider" && \
+    git -C "$TOOLS_DIR/ParamSpider" checkout --detach "$PARAMSPIDER_SHA" && \
+    pip install --no-cache-dir "$TOOLS_DIR/ParamSpider"
+
+# Strip the .git history from each clone to slim the layer and freeze the pin.
+RUN find "$TOOLS_DIR" -maxdepth 2 -name .git -type d -prune -exec rm -rf {} +
+
+# ---------------------------------------------------------------------------
+# Stage 3: runtime-staging — collect glibc runtime libraries + nmap + chromium.
+# ---------------------------------------------------------------------------
+FROM cgr.dev/chainguard/wolfi-base:latest AS runtime-staging
+
+# hadolint ignore=DL3018
+RUN apk update && apk add --no-cache \
+    bash \
+    git \
+    curl \
+    ca-certificates \
+    coreutils \
+    grep \
+    sed \
+    findutils \
+    nmap \
+    python-3.13 \
+    libpcap \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    fontconfig \
+    libx11 \
+    libxcomposite \
+    libxdamage \
+    libxext \
+    libxfixes \
+    libxrandr \
+    libxkbcommon \
+    libdrm \
+    mesa-gbm \
+    pango \
+    cairo \
+    at-spi2-core \
+    dbus-libs \
+    expat \
+    alsa-lib \
+    nodejs-22 \
+    npm
+
+# Claude Agent SDK CLI + Playwright CLI. The Agent SDK's bundled native `claude`
+# fails to launch on glibc-dynamic; pin the JS CLI at a stable path under /usr so
+# it travels with `COPY --from=runtime-staging /usr/`.
+RUN npm install -g @anthropic-ai/claude-code@2.1.84 @playwright/cli@0.1.1 && \
+    CLI="$(npm root -g)/@anthropic-ai/claude-code/cli.js" && \
+    test -f "$CLI" && ln -sf "$CLI" /usr/lib/aegis-claude-cli.js
+
+# ---------------------------------------------------------------------------
+# Stage 4: base runtime — minimal glibc-dynamic with the toolkit baked in but
+#          NO Aegis app. The app image does `FROM` this and adds the Node layer.
+# ---------------------------------------------------------------------------
+FROM cgr.dev/chainguard/glibc-dynamic:latest AS base
+
+USER root
+
+ENV AEGIS_HOME=/opt/aegis
+ENV TOOLS_DIR=/opt/aegis/tools
+ENV VENV=/opt/aegis/venv
+ENV AEGIS_CLAUDE_CLI=/usr/lib/aegis-claude-cli.js
+
+# 1) Runtime OS closure (libs, nmap, chromium, python3.13, bash/git/curl, …).
+COPY --from=runtime-staging /usr/ /usr/
+COPY --from=runtime-staging /etc/ssl/ /etc/ssl/
+COPY --from=runtime-staging /etc/fonts/ /etc/fonts/
+
+# 2) Go tool binaries → /usr/local/bin (single PATH entry).
+COPY --from=go-builder /go/bin/ /usr/local/bin/
+
+# 3) Shared Python venv + the in-place git-clone tools.
+COPY --from=py-builder /opt/aegis/venv/ /opt/aegis/venv/
+COPY --from=py-builder /opt/aegis/tools/ /opt/aegis/tools/
+
+# 4) Convenience wrappers so skills can invoke the in-place Python tools by name.
+RUN set -eux; \
+    venv_py="$VENV/bin/python3"; \
+    make_wrapper() { \
+      name="$1"; script="$2"; \
+      { \
+        printf '#!/bin/sh\n'; \
+        printf 'exec "%s" "%s" "$@"\n' "$venv_py" "$script"; \
+      } > "/usr/local/bin/$name"; \
+      chmod +x "/usr/local/bin/$name"; \
+    }; \
+    make_wrapper sqlmap   "$TOOLS_DIR/sqlmap/sqlmap.py"; \
+    make_wrapper commix   "$TOOLS_DIR/commix/commix.py"; \
+    make_wrapper sstimap  "$TOOLS_DIR/SSTImap/sstimap.py"; \
+    make_wrapper xsstrike "$TOOLS_DIR/XSStrike/xsstrike.py"; \
+    make_wrapper ssrfmap  "$TOOLS_DIR/SSRFmap/ssrfmap.py"; \
+    make_wrapper jwt_tool "$TOOLS_DIR/jwt_tool/jwt_tool.py"
+
+# System-level git config (clones/checkouts run as nonroot at runtime).
+RUN git config --system user.email "agent@localhost" && \
+    git config --system user.name "Aegis Agent" && \
+    git config --system --add safe.directory '*'
+
+# Ephemeral working dirs (per-run workdirs are mounted/created at runtime).
+# /tmp/.claude is pre-created so the app image's `COPY skills/` lands cleanly.
+RUN mkdir -p /work /tmp/.cache /tmp/.config /tmp/.claude && \
+    chmod 1777 /tmp/.cache /tmp/.config && \
+    chown -R 65532:65532 /work /opt/aegis /tmp/.claude
+
+# Entrypoint is tool-level (env/path setup), so it ships in the base.
+COPY infra/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# PATH: venv first (shared Python tools), then /usr/local/bin (Go + wrappers).
+ENV PATH=/opt/aegis/venv/bin:/usr/local/bin:/usr/bin:/bin
+ENV HOME=/tmp
+ENV XDG_CACHE_HOME=/tmp/.cache
+ENV XDG_CONFIG_HOME=/tmp/.config
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_BROWSERS_PATH=0
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PYTHONUNBUFFERED=1
+
+USER 65532
+WORKDIR /work
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

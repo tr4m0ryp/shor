@@ -4,6 +4,7 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
+import { skillTracker } from "../../job/progress/skill-tracker.js";
 import { PentestError } from "../../services/error-handling.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import { ErrorCode } from "../../types/errors.js";
@@ -128,6 +129,8 @@ export async function dispatchMessage(
 			const toolData = handleToolUseMessage(
 				message as unknown as ToolUseMessage,
 			);
+			// Attribute the tool call to the running agent for the live skills feed.
+			skillTracker.record(toolData.toolName, toolData.parameters);
 			outputLines(formatToolUseOutput(toolData.toolName, toolData.parameters));
 			await auditLogger.logToolStart(toolData.toolName, toolData.parameters);
 			return { type: "continue" };

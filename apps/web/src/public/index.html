@@ -293,13 +293,28 @@ body {
 .pending-phase__title { font-size: 13px; font-weight: 600; color: var(--text); }
 .pending-phase__count { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-left: auto; }
 .pending-phase__agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
-.pending-agent { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; background: var(--card); }
+.pending-agent { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; background: var(--card); cursor: pointer; transition: border-color .12s; }
+.pending-agent:hover { border-color: var(--text-muted); }
+.pending-agent.is-open { box-shadow: 0 0 0 1px var(--border-light) inset; grid-column: 1 / -1; }
 .pending-agent--in_progress { box-shadow: 0 0 0 1px var(--accent) inset; }
 .pending-agent--failed { border-color: var(--red); }
 .pending-agent--completed { background: var(--card-hover); }
 .pending-agent--skipped { opacity: .55; }
 .pending-agent__name { font-size: 12px; font-weight: 500; color: var(--text); display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .pending-agent__meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.pending-skills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.pending-skills--inline { margin-top: 5px; }
+.skill-chip {
+  font-size: 10px; font-family: var(--font-mono, monospace); color: var(--accent);
+  background: var(--card-hover); border: 1px solid var(--border-light);
+  padding: 1px 6px; border-radius: 9999px; white-space: nowrap;
+}
+.pending-agent__detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.pending-detail-h { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: 6px 0 4px; }
+.pending-subs { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 3px 10px; }
+.pending-sub { font-size: 12px; color: var(--text-secondary); padding-left: 12px; position: relative; }
+.pending-sub::before { content: '·'; position: absolute; left: 2px; color: var(--text-muted); }
+.pending-detail-empty { font-size: 11px; color: var(--text-muted); }
 .pending-status-pill {
   font-size: 9px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600;
   padding: 1px 6px; border-radius: 9999px; white-space: nowrap;
@@ -956,12 +971,22 @@ async function loadScanProgress(scanId) {
   }
 }
 
+var lastProgressView = null;
+var expandedAgents = new Set();
+
 function renderProgress(view) {
+  lastProgressView = view;
   renderProgressBar(view);
   const banner = renderProgressBanner(view);
   const phases = (view.phases || []).map(renderProgressPhase).join('');
   document.getElementById('panelActivity').innerHTML =
     banner + '<div class="pending-grid">' + phases + '</div>';
+}
+
+function toggleAgentDetail(name) {
+  if (expandedAgents.has(name)) expandedAgents.delete(name);
+  else expandedAgents.add(name);
+  if (lastProgressView) renderProgress(lastProgressView);
 }
 
 function renderProgressBar(view) {
@@ -1006,10 +1031,37 @@ function renderProgressPhase(phase) {
 
 function renderProgressAgent(agent) {
   const dur = fmtDur(agent.durationMs);
-  return '<div class="pending-agent pending-agent--' + agent.status + '">' +
+  const skills = agent.skills || [];
+  const open = expandedAgents.has(agent.name);
+  const meta = [dur, skills.length ? skills.length + ' skill' + (skills.length > 1 ? 's' : '') : '']
+    .filter(Boolean).join(' · ');
+  // Collapsed: a few skill chips inline; expanded: sub-tasks + all skills.
+  const chips = skills.slice(0, 4).map(skillChip).join('');
+  let detail = '';
+  if (open) {
+    const subs = (agent.subtasks || []).map(function (s) {
+      return '<li class="pending-sub">' + escapeHtml(s) + '</li>';
+    }).join('');
+    const allSkills = skills.length
+      ? '<div class="pending-skills">' + skills.map(skillChip).join('') + '</div>'
+      : '<div class="pending-detail-empty">No skills used yet</div>';
+    detail =
+      '<div class="pending-agent__detail">' +
+        '<div class="pending-detail-h">Sub-tasks</div><ul class="pending-subs">' + subs + '</ul>' +
+        '<div class="pending-detail-h">Skills used</div>' + allSkills +
+      '</div>';
+  }
+  return '<div class="pending-agent pending-agent--' + agent.status + (open ? ' is-open' : '') +
+      '" onclick="toggleAgentDetail(\'' + agent.name + '\')">' +
     '<div class="pending-agent__name"><span>' + escapeHtml(agent.label) + '</span>' + pill(agent.status) + '</div>' +
-    (dur ? '<div class="pending-agent__meta">' + dur + '</div>' : '') +
+    (meta ? '<div class="pending-agent__meta">' + escapeHtml(meta) + '</div>' : '') +
+    (chips && !open ? '<div class="pending-skills pending-skills--inline">' + chips + '</div>' : '') +
+    detail +
   '</div>';
+}
+
+function skillChip(name) {
+  return '<span class="skill-chip">' + escapeHtml(name) + '</span>';
 }
 
 var PILL_LABELS = { pending: 'Queued', in_progress: 'Running', completed: 'Done', failed: 'Failed', skipped: 'Skipped' };
