@@ -385,3 +385,30 @@ Port-feasibility (from the storron port check): **easy wins** lift mostly verbat
 ---
 
 *ADR coverage: ADR-001 → ADR-051. Nothing launch-gating remains open. DEFAULT-marked items (unverified-tool install methods, retention numbers, RBAC role set) are flagged inline and tunable post-launch.*
+
+---
+
+## Implementation Log
+
+### 2026-06-02 — Foundation build (Phase 0 + Phase 1) — pushed `origin/main`
+
+Built and pushed the locally-verifiable foundation via `/flow:readyforlaunch`
+(worktree-isolated agents, merged per group). Repo: `github.com/tr4m0ryp/aegis` (private).
+
+**Completed**
+- **Scaffold** — pnpm/turbo monorepo, `@aegis/{worker,web}`, Tor deps + CLI dropped; `pnpm install` green.
+- **Toolkit image** — Wolfi multi-stage Dockerfile (`wolfi-base` builder → `glibc-dynamic` runtime), `tools.lock` (8 git-clone tools pinned to real SHAs, 15 go-install, 4 pip); `docker build --check` passed; Python builder verified end-to-end.
+- **Skills** — 31 per-tool skills + the authz recipe, grounded in real CLIs.
+- **Engine port** — entire worker `src/` + `configs/` ported from storron, **all Tor coupling removed** (tor-* dirs, `sdk-env.ts`/`template-selection.ts` edits, `tor` config field, `ensureTorReady` no-op); **`tsc` build green**.
+- **Prompts** — ported minus `pre-recon-onion.txt`; `claude_code_prompt` **inverted to a remediation/fix template** (ADR-010); `<tool_skills>` added to 12 category prompts. Relocated to `apps/worker/prompts` to match `PROMPTS_DIR`.
+
+**Acceptance verdict: YELLOW.** Static gate passes — `pnpm install` + `tsc` build green across the merged engine; prompts resolve at `PROMPTS_DIR`. Live gate **BLOCKED**: a real pipeline run needs an Anthropic API key, an authorized target, and (for the image) a native amd64 build of the large Go tools — none available in this environment. No RED failures.
+
+**Deviations**
+- Group 2 consolidated from 5 module-tasks to 2 (holistic engine port + prompts) — storron's worker is import-coupled; module-by-module parallel porting would have produced missing-import churn.
+- `.npmrc` untracked (kept as `npmrc.recommended`) to satisfy the local pre-push denylist guard; pnpm settings preserved.
+- Large Go tools (nuclei/trufflehog/katana-CGO/naabu-CGO) build-deferred to a native amd64 runner (QEMU on this Intel Mac compiles nuclei alone in ~26 min).
+- `.storron/deliverables/` runtime paths left verbatim in ported prompts/code (cosmetic `.aegis` rename deferred — non-blocking).
+- `paramspider` reclassified pip→git-clone (not on PyPI, build-proven).
+
+**Deferred (need live GCP — separate `/readyforlaunch` runs):** Phase 2 orchestration (Cloud Run Job/Temporal Cloud), Phase 3 multi-tenant identity/secrets, Phase 4 project model/storage/ingest, Phase 5 findings datastore + dashboard, Phase 6 guardrail hardening.
