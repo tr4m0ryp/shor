@@ -22,8 +22,11 @@
 
 import { assertNetworkAllowed } from "./guardrails/index.js";
 import { readScanJobParams } from "./job/env.js";
+import { reportFindings } from "./job/findings/index.js";
 import { ConsoleActivityLogger } from "./job/logger.js";
 import { runScanPipeline } from "./job/pipeline.js";
+import { materializeRepo } from "./job/repo.js";
+import { deliverablesDir } from "./paths.js";
 
 export { readScanJobParams } from "./job/env.js";
 export { runScanPipeline } from "./job/pipeline.js";
@@ -46,12 +49,35 @@ export async function runJob(): Promise<void> {
 		repoGcsUri: params.repoGcsUri,
 	});
 
-	const result = await runScanPipeline(params, logger);
+	// Phase 4 ingest: copy the GCS-mounted snapshot into the writable repoPath if
+	// it is not already populated (no-op for the direct `docker run -v` case).
+	await materializeRepo(params, logger);
 
-	logger.info("Scan job completed", {
-		scanId: result.scanId,
-		agentCount: result.completedAgents.length,
-	});
+	// Deliverables live under the repo; the pipeline writes them via the same
+	// default subdir the container config uses (`.storron/deliverables`).
+	const deliverablesPath = deliverablesDir(params.repoPath);
+
+	try {
+		const result = await runScanPipeline(params, logger);
+
+		logger.info("Scan job completed", {
+			scanId: result.scanId,
+			agentCount: result.completedAgents.length,
+		});
+
+		// Post findings + attack surface to the dashboard sink (best-effort; a
+		// failed POST is logged, never fatal).
+		await reportFindings(deliverablesPath, params.scanId, "completed", logger);
+	} catch (err) {
+		// Pipeline failed: still emit a final `failed` status (with whatever
+		// partial deliverables exist) so the dashboard does not hang on `running`.
+		logger.error("Scan pipeline threw; reporting failed status", {
+			scanId: params.scanId,
+			error: err instanceof Error ? err.message : String(err),
+		});
+		await reportFindings(deliverablesPath, params.scanId, "failed", logger);
+		throw err;
+	}
 }
 
 // Execute only when invoked directly as the Job command (not when imported).
