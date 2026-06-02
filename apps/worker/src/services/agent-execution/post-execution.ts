@@ -1,0 +1,190 @@
+// Copyright (C) 2025 Keygraph, Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License version 3
+// as published by the Free Software Foundation.
+
+/**
+ * Post-execution stages for an agent run.
+ *
+ * Each helper handles one phase that runs after the Claude SDK returns:
+ * spending-cap detection, structured-output persistence, deliverable
+ * validation, and the success-commit + audit finalization.
+ */
+
+import { fs, path } from "zx";
+import {
+	type ClaudePromptResult,
+	validateAgentOutput,
+} from "../../ai/claude-executor.js";
+import { getQueueFilename } from "../../ai/queue-schemas.js";
+import type { AuditSession } from "../../audit/index.js";
+import { AGENTS } from "../../session-manager.js";
+import type { ActivityLogger } from "../../types/activity-logger.js";
+import type { AgentName } from "../../types/agents.js";
+import type { AgentEndResult } from "../../types/audit.js";
+import { ErrorCode } from "../../types/errors.js";
+import { ok, type Result } from "../../types/result.js";
+import { isSpendingCapBehavior } from "../../utils/billing-detection.js";
+import { failAgent } from "../agent-execution-internal.js";
+import type { PentestError } from "../error-handling.js";
+import { commitGitSuccess, getGitCommitHash } from "../git-manager.js";
+
+/**
+ * Defense-in-depth check that catches Claude returning a billing/spending-cap
+ * message instead of doing the work. When detected, rolls back and surfaces a
+ * retryable `SPENDING_CAP_REACHED` error.
+ *
+ * Returns `null` when the agent's behavior does not match the spending-cap
+ * pattern (caller should continue).
+ */
+export async function checkSpendingCap(
+	agentName: AgentName,
+	deliverablesPath: string,
+	auditSession: AuditSession,
+	logger: ActivityLogger,
+	attemptNumber: number,
+	result: ClaudePromptResult,
+): Promise<Result<AgentEndResult, PentestError> | null> {
+	if (!(result.success && (result.turns ?? 0) <= 2)) {
+		return null;
+	}
+	const resultText = result.result || "";
+	if (!isSpendingCapBehavior(result.turns ?? 0, resultText)) {
+		return null;
+	}
+	return failAgent(agentName, deliverablesPath, auditSession, logger, {
+		attemptNumber,
+		result,
+		rollbackReason: "spending cap detected",
+		errorMessage: `Spending cap likely reached: ${resultText.slice(0, 100)}`,
+		errorCode: ErrorCode.SPENDING_CAP_REACHED,
+		category: "billing",
+		retryable: true,
+		context: { agentName, turns: result.turns },
+	});
+}
+
+/**
+ * Handle a non-success `ClaudePromptResult` by rolling back and surfacing the
+ * SDK's retryable hint via `failAgent`.
+ */
+export async function handleExecutionFailure(
+	agentName: AgentName,
+	deliverablesPath: string,
+	auditSession: AuditSession,
+	logger: ActivityLogger,
+	attemptNumber: number,
+	result: ClaudePromptResult,
+): Promise<Result<AgentEndResult, PentestError>> {
+	return failAgent(agentName, deliverablesPath, auditSession, logger, {
+		attemptNumber,
+		result,
+		rollbackReason: "execution failure",
+		errorMessage: result.error || "Agent execution failed",
+		errorCode: ErrorCode.AGENT_EXECUTION_FAILED,
+		category: "validation",
+		retryable: result.retryable ?? true,
+		context: { agentName, originalError: result.error },
+	});
+}
+
+/**
+ * Persist structured-output JSON for vuln agents that produce a queue file.
+ * No-op for agents without a queue schema.
+ */
+export async function writeStructuredOutput(
+	agentName: AgentName,
+	deliverablesPath: string,
+	result: ClaudePromptResult,
+	logger: ActivityLogger,
+): Promise<void> {
+	const queueFilename = getQueueFilename(agentName);
+	if (result.structuredOutput === undefined || !queueFilename) {
+		return;
+	}
+	await fs.ensureDir(deliverablesPath);
+	const queuePath = path.join(deliverablesPath, queueFilename);
+	await fs.writeFile(
+		queuePath,
+		JSON.stringify(result.structuredOutput, null, 2),
+		"utf8",
+	);
+	logger.info(`Wrote structured output queue to ${queueFilename}`);
+}
+
+/**
+ * Validate the deliverable file produced by the agent. On failure, rolls back
+ * and surfaces a retryable `OUTPUT_VALIDATION_FAILED` error.
+ */
+export async function validateDeliverable(
+	agentName: AgentName,
+	deliverablesPath: string,
+	auditSession: AuditSession,
+	logger: ActivityLogger,
+	attemptNumber: number,
+	result: ClaudePromptResult,
+): Promise<Result<AgentEndResult, PentestError> | null> {
+	const validationPassed = await validateAgentOutput(
+		result,
+		agentName,
+		deliverablesPath,
+		logger,
+	);
+	if (validationPassed) {
+		return null;
+	}
+	return failAgent(agentName, deliverablesPath, auditSession, logger, {
+		attemptNumber,
+		result,
+		rollbackReason: "validation failure",
+		errorMessage: `Agent ${agentName} failed output validation`,
+		errorCode: ErrorCode.OUTPUT_VALIDATION_FAILED,
+		category: "validation",
+		retryable: true,
+		context: {
+			agentName,
+			deliverableFilename: AGENTS[agentName].deliverableFilename,
+		},
+	});
+}
+
+/**
+ * Commit deliverables, capture the resulting hash, build the
+ * `AgentEndResult`, and write the success record to the audit log.
+ */
+export async function finalizeSuccess(
+	agentName: AgentName,
+	deliverablesPath: string,
+	auditSession: AuditSession,
+	logger: ActivityLogger,
+	attemptNumber: number,
+	result: ClaudePromptResult,
+): Promise<Result<AgentEndResult, PentestError>> {
+	await commitGitSuccess(deliverablesPath, agentName, logger);
+	const commitHash = await getGitCommitHash(deliverablesPath);
+
+	const endResult: AgentEndResult = {
+		attemptNumber,
+		duration_ms: result.duration,
+		success: true,
+		model: result.model,
+		...(commitHash && { checkpoint: commitHash }),
+		...(result.inputTokens !== undefined && {
+			input_tokens: result.inputTokens,
+		}),
+		...(result.outputTokens !== undefined && {
+			output_tokens: result.outputTokens,
+		}),
+		...(result.cacheReadInputTokens !== undefined && {
+			cache_read_input_tokens: result.cacheReadInputTokens,
+		}),
+		...(result.cacheCreationInputTokens !== undefined && {
+			cache_creation_input_tokens: result.cacheCreationInputTokens,
+		}),
+		...(result.turns !== undefined && { num_turns: result.turns }),
+	};
+	await auditSession.endAgent(agentName, endResult);
+
+	return ok(endResult);
+}
