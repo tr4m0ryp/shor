@@ -45,34 +45,38 @@ ENV GOFLAGS=-buildvcs=false
 
 RUN mkdir -p /go/bin
 
+# Retry wrapper: the Go module proxy occasionally drops an HTTP/2 stream
+# mid-download (transient, not a code issue). Retry so a long build is not
+# wasted on a flaky fetch.
+RUN printf '#!/bin/sh\nn=0\nuntil "$@"; do n=$((n+1)); [ "$n" -ge 5 ] && echo "retry: gave up after $n: $*" >&2 && exit 1; echo "retry $n/5: $*" >&2; sleep 8; done\n' > /usr/local/bin/retry && chmod +x /usr/local/bin/retry
+
 # --- ProjectDiscovery + pure-Go tools (CGO off → portable static binaries) ---
-# Versions float to @latest per ADR-025; Go's module proxy records exact
-# versions in the build, and the runtime is reproducible from this Dockerfile.
+# Versions float to @latest per ADR-025; the runtime is reproducible from this Dockerfile.
 ENV CGO_ENABLED=0
-RUN go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
-    go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
-    go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
-    go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
-    go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest
-RUN go install -v github.com/ffuf/ffuf/v2@latest && \
-    go install -v github.com/hahwul/dalfox/v2@latest && \
-    go install -v github.com/Emoe/kxss@latest && \
-    go install -v github.com/lc/gau/v2/cmd/gau@latest && \
-    go install -v github.com/tomnomnom/waybackurls@latest
-RUN go install -v github.com/gitleaks/gitleaks/v8@latest && \
-    go install -v github.com/google/osv-scanner/v2/cmd/osv-scanner@latest && \
-    go install -v github.com/trufflesecurity/trufflehog/v3@latest
+RUN retry go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
+    retry go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
+    retry go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
+    retry go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
+    retry go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest
+RUN retry go install -v github.com/ffuf/ffuf/v2@latest && \
+    retry go install -v github.com/hahwul/dalfox/v2@latest && \
+    retry go install -v github.com/Emoe/kxss@latest && \
+    retry go install -v github.com/lc/gau/v2/cmd/gau@latest && \
+    retry go install -v github.com/tomnomnom/waybackurls@latest
+RUN retry go install -v github.com/zricethezav/gitleaks/v8@latest && \
+    retry go install -v github.com/google/osv-scanner/v2/cmd/osv-scanner@latest && \
+    retry go install -v github.com/trufflesecurity/trufflehog/v3@latest
 
 # --- naabu needs CGO + libpcap ---
 ENV CGO_ENABLED=1
-RUN go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+RUN retry go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
 
 # --- katana: CGO_ENABLED=1 for the headless (chromedp) build path (ADR-025) ---
-RUN CGO_ENABLED=1 go install -v github.com/projectdiscovery/katana/cmd/katana@latest
+RUN retry go install -v github.com/projectdiscovery/katana/cmd/katana@latest
 
 # --- nosqli: no documented @latest; pinned to a commit SHA from tools.lock ---
 ARG NOSQLI_SHA
-RUN CGO_ENABLED=0 go install -v "github.com/Charlie-belmer/nosqli@${NOSQLI_SHA}"
+RUN retry env CGO_ENABLED=0 go install -v "github.com/Charlie-belmer/nosqli@${NOSQLI_SHA}"
 
 # ---------------------------------------------------------------------------
 # Stage 2: py-builder — build the shared Python venv against Wolfi glibc.
@@ -157,6 +161,33 @@ RUN git clone --filter=blob:none https://github.com/devanshbatham/ParamSpider.gi
 RUN find "$TOOLS_DIR" -maxdepth 2 -name .git -type d -prune -exec rm -rf {} +
 
 # ---------------------------------------------------------------------------
+# Stage 2b: node-builder — build the Aegis worker (Node) + prune to prod deps.
+# ---------------------------------------------------------------------------
+# The worker is the per-scan agent pipeline (Claude Agent SDK). Built here against
+# the repo (build context = repo root), then its dist + prod node_modules + prompts
+# are copied into the runtime. hadolint ignore=DL3018
+FROM cgr.dev/chainguard/wolfi-base:latest AS node-builder
+
+RUN apk update && apk add --no-cache nodejs-22 npm git bash
+RUN npm install -g pnpm@10.33.0
+
+WORKDIR /app
+# Manifests first for install-layer caching.
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
+COPY infra/config ./infra/config
+COPY apps/worker/package.json ./apps/worker/
+COPY apps/web/package.json ./apps/web/
+RUN pnpm install --frozen-lockfile
+
+# Worker source + build.
+COPY apps/worker ./apps/worker
+RUN pnpm --filter @aegis/worker run build
+
+# Prune to production dependencies (drops devDeps; keeps the pnpm workspace layout).
+RUN rm -rf node_modules apps/worker/node_modules apps/web/node_modules && \
+    pnpm install --frozen-lockfile --prod
+
+# ---------------------------------------------------------------------------
 # Stage 3: runtime-staging — collect glibc runtime libraries + nmap + chromium.
 # ---------------------------------------------------------------------------
 # glibc-dynamic has no apk/shell, so we apk-install the runtime closure here
@@ -203,7 +234,16 @@ RUN apk update && apk add --no-cache \
     at-spi2-core \
     dbus-libs \
     expat \
-    alsa-lib
+    alsa-lib \
+    # Node.js runtime for the worker engine + the Claude/Playwright CLIs
+    nodejs-22 \
+    npm
+
+# Claude Agent SDK CLI + Playwright CLI: the worker engine spawns `claude`, and
+# the prompts' playwright-cli skill drives the headless browser. Installed here
+# (wolfi has npm) so the runtime's `COPY --from=runtime-staging /usr/` brings
+# them in — glibc-dynamic has no npm of its own.
+RUN npm install -g @anthropic-ai/claude-code@2.1.84 @playwright/cli@0.1.1
 
 # ---------------------------------------------------------------------------
 # Stage 4: runtime — minimal glibc-dynamic with binaries + venv copied in.
@@ -258,6 +298,23 @@ RUN set -eux; \
     make_wrapper ssrfmap  "$TOOLS_DIR/SSRFmap/ssrfmap.py"; \
     make_wrapper jwt_tool "$TOOLS_DIR/jwt_tool/jwt_tool.py"
 
+# 5) Aegis worker app (Node): dist + prod node_modules + prompts, from node-builder.
+#    Kept in the pnpm workspace layout at /opt/aegis/app so the symlinked
+#    node_modules resolve. WORKER_ROOT (paths.ts) → apps/worker; PROMPTS_DIR →
+#    apps/worker/prompts (both present here).
+COPY --from=node-builder /app/node_modules /opt/aegis/app/node_modules
+COPY --from=node-builder /app/apps/worker /opt/aegis/app/apps/worker
+COPY --from=node-builder /app/package.json /app/pnpm-workspace.yaml /opt/aegis/app/
+
+# 6) Per-tool skills the Claude Agent SDK loads on demand (progressive disclosure).
+#    HOME=/tmp + settingSources:["user"] → the SDK discovers ~/.claude/skills.
+COPY skills/ /tmp/.claude/skills/
+
+# 7) save-deliverable / generate-totp CLIs that the prompts invoke by name.
+RUN ln -sf /opt/aegis/app/apps/worker/dist/scripts/save-deliverable.js /usr/local/bin/save-deliverable && \
+    ln -sf /opt/aegis/app/apps/worker/dist/scripts/generate-totp.js /usr/local/bin/generate-totp && \
+    chmod +x /opt/aegis/app/apps/worker/dist/scripts/*.js 2>/dev/null || true
+
 # System-level git config (clones/checkouts run as nonroot at runtime).
 RUN git config --system user.email "agent@localhost" && \
     git config --system user.name "Aegis Agent" && \
@@ -266,10 +323,11 @@ RUN git config --system user.email "agent@localhost" && \
 # Ephemeral working dirs (per-run workdirs are mounted/created at runtime).
 RUN mkdir -p /work /tmp/.cache /tmp/.config && \
     chmod 1777 /tmp/.cache /tmp/.config && \
-    chown -R 65532:65532 /work /opt/aegis
+    chown -R 65532:65532 /work /opt/aegis /tmp/.claude
 
-# Build context is infra/docker/ (see README); entrypoint.sh sits beside this file.
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+# Build context is the repo root (so apps/ + skills/ are reachable); the
+# entrypoint script lives under infra/docker/.
+COPY infra/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # PATH: venv first (shared Python tools), then /usr/local/bin (Go + wrappers).
@@ -288,6 +346,6 @@ USER 65532
 WORKDIR /work
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-# Default: drop into a shell. The orchestration layer (Cloud Run Job, ADR-051)
-# overrides CMD with the worker entrypoint once the engine is ported.
-CMD ["bash"]
+# Default: run one scan (the per-scan Job command, ADR-051). job-entry.js reads
+# the scan params from the environment (AEGIS_*) and runs the pipeline, then exits.
+CMD ["node", "/opt/aegis/app/apps/worker/dist/job-entry.js"]

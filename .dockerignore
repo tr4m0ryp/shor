@@ -1,0 +1,21 @@
+# Build context = repo root. Keep manifests + apps/ + skills/ + infra/; exclude
+# everything else — ESPECIALLY .acceptance/ (holds the gitignored .env + the
+# target repo + secrets), .git, node_modules, build output, and local docs.
+.git
+.gitignore
+.dockerignore
+.acceptance
+.claude
+docs
+tasks
+notes
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+*.png
+*.log
+.DS_Store
+README.md
+npmrc.recommended

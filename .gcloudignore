@@ -1,0 +1,19 @@
+# Upload filter for `gcloud builds submit`. MUST exclude .acceptance/ (holds the
+# gitignored .env with the DeepSeek key + the target repo) so secrets never reach
+# Cloud Build / GCS. Keep apps/ + skills/ + infra/ + manifests (the build needs them).
+.git
+.acceptance
+.claude
+docs
+tasks
+notes
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+*.png
+*.log
+.DS_Store
+README.md
+npmrc.recommended
