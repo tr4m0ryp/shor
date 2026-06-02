@@ -36,6 +36,8 @@ interface ProgressSnapshot {
 	currentPhase: string | null;
 	currentAgent: string | null;
 	failedAgent: string | null;
+	/** All agents running RIGHT NOW (≥1 under concurrency). */
+	runningAgents: string[];
 	completedAgents: AgentProgress[];
 	/** agent → skills it has used so far (live, from the skill tracker). */
 	skills: Record<string, string[]>;
@@ -68,7 +70,8 @@ async function post(config: SinkConfig, snapshot: ProgressSnapshot, logger: Acti
 export class ProgressEmitter {
 	private readonly config: SinkConfig | undefined;
 	private readonly completed: AgentProgress[] = [];
-	private current: AgentName | null = null;
+	private readonly running = new Set<AgentName>();
+	private lastFailed: AgentName | null = null;
 	private lastSkillEmit = 0;
 
 	constructor(
@@ -76,29 +79,34 @@ export class ProgressEmitter {
 		private readonly logger: ActivityLogger,
 	) {
 		this.config = readSinkConfig(scanId);
-		// Push a live update the first time a running agent reaches for a new
+		// Push a live update the first time any running agent reaches for a new
 		// skill, throttled so a burst of tool calls is one post every ~3s.
 		skillTracker.onNewSkill = () => {
 			const now = Date.now();
 			if (now - this.lastSkillEmit < 3000) return;
 			this.lastSkillEmit = now;
-			void this.emit(this.current, this.current, null);
+			void this.emit();
 		};
 	}
 
-	private async emit(
-		phaseAgent: AgentName | null,
-		currentAgent: AgentName | null,
-		failedAgent: AgentName | null,
-	): Promise<void> {
+	/** A representative running agent for the banner (last started). */
+	private representative(): AgentName | null {
+		let rep: AgentName | null = null;
+		for (const a of this.running) rep = a;
+		return rep;
+	}
+
+	private async emit(): Promise<void> {
 		if (!this.config) return;
+		const rep = this.representative();
 		await post(
 			this.config,
 			{
 				status: "running",
-				currentPhase: phaseAgent ? AGENT_PHASE_MAP[phaseAgent] : null,
-				currentAgent,
-				failedAgent,
+				currentPhase: rep ? AGENT_PHASE_MAP[rep] : null,
+				currentAgent: rep,
+				failedAgent: this.lastFailed,
+				runningAgents: [...this.running],
 				completedAgents: this.completed,
 				skills: skillTracker.all(),
 			},
@@ -106,24 +114,24 @@ export class ProgressEmitter {
 		);
 	}
 
-	/** Announce an agent is now running (current phase derived from the agent). */
+	/** Announce an agent is now running (≥1 may run concurrently). */
 	async started(agent: AgentName): Promise<void> {
-		this.current = agent;
-		skillTracker.setAgent(agent);
-		await this.emit(agent, agent, null);
+		this.running.add(agent);
+		await this.emit();
 	}
 
 	/** Record an agent finished successfully and push the updated snapshot. */
 	async completed_(agent: AgentName, durationMs: number): Promise<void> {
+		this.running.delete(agent);
 		this.completed.push({ agent, status: "completed", durationMs });
-		this.current = null;
-		await this.emit(agent, null, null);
+		await this.emit();
 	}
 
 	/** Record an agent failed; the terminal status is set by the findings POST. */
 	async failed(agent: AgentName, durationMs: number): Promise<void> {
+		this.running.delete(agent);
+		this.lastFailed = agent;
 		this.completed.push({ agent, status: "failed", durationMs });
-		this.current = null;
-		await this.emit(agent, null, agent);
+		await this.emit();
 	}
 }

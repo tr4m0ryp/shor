@@ -123,6 +123,8 @@ export interface ScanProgress {
   readonly currentPhase: string | null;
   readonly currentAgent: string | null;
   readonly failedAgent: string | null;
+  /** Agents running concurrently right now (≥1 under 2-wide parallelism). */
+  readonly runningAgents?: readonly string[];
   readonly completedAgents: readonly AgentProgress[];
   /** agent name → skills it has used so far (live, worker-pushed). */
   readonly skills?: Readonly<Record<string, readonly string[]>>;

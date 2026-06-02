@@ -38,6 +38,8 @@ export interface MessageLoopDeps {
 	progress: ReturnType<typeof createProgressManager>;
 	auditLogger: ReturnType<typeof createAuditLogger>;
 	logger: ActivityLogger;
+	/** Owning agent — threaded to the dispatcher for per-agent skill attribution. */
+	agentName?: string | null;
 }
 
 /**
@@ -50,7 +52,7 @@ export async function processMessageStream(
 	deps: MessageLoopDeps,
 	timer: Timer,
 ): Promise<MessageLoopResult> {
-	const { execContext, description, progress, auditLogger, logger } = deps;
+	const { execContext, description, progress, auditLogger, logger, agentName } = deps;
 	const HEARTBEAT_INTERVAL = 30000;
 
 	let turnCount = 0;
@@ -102,6 +104,7 @@ export async function processMessageStream(
 				progress,
 				auditLogger,
 				logger,
+				agentName: agentName ?? null,
 			},
 		);
 

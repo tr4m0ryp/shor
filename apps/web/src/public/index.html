@@ -994,8 +994,12 @@ function renderProgressBar(view) {
   if (!view) { box.style.display = 'none'; return; }
   box.style.display = 'block';
   const fillClass = view.status === 'running' ? 'running' : view.status;
+  const running = view.runningAgents || [];
+  const runLabel = running.length > 1
+    ? running.length + ' agents · ' + running.map(function (n) { return agentLabel(view, n); }).join(' + ')
+    : (view.currentAgent ? agentLabel(view, view.currentAgent) : '');
   const where = view.currentPhase
-    ? phaseLabel(view, view.currentPhase) + (view.currentAgent ? ' · ' + agentLabel(view, view.currentAgent) : '')
+    ? phaseLabel(view, view.currentPhase) + (runLabel ? ' · ' + runLabel : '')
     : (isScanClosed(view.status) ? view.status : 'queued');
   box.innerHTML =
     '<div class="run-progress-meta-top">' +
@@ -1011,9 +1015,11 @@ function renderProgressBanner(view) {
     const cls = view.status === 'completed' ? 'closed' : 'failed';
     return '<div class="pending-banner ' + cls + '">Pipeline ' + escapeHtml(view.status) + '</div>';
   }
-  const where = view.currentAgent
-    ? phaseLabel(view, view.currentPhase) + ' / ' + agentLabel(view, view.currentAgent)
-    : 'starting…';
+  const running = view.runningAgents || [];
+  let where;
+  if (running.length === 0) where = 'starting…';
+  else if (running.length === 1) where = phaseLabel(view, view.currentPhase) + ' / ' + agentLabel(view, running[0]);
+  else where = running.map(function (n) { return agentLabel(view, n); }).join('  +  ');
   return '<div class="pending-banner">Now running · <b>' + escapeHtml(where) + '</b></div>';
 }
 

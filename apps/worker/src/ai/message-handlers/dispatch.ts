@@ -58,6 +58,8 @@ export interface MessageDispatchDeps {
 	progress: ProgressManager;
 	auditLogger: AuditLogger;
 	logger: ActivityLogger;
+	/** Owning agent — attributes tool calls to the right agent under concurrency. */
+	agentName?: string | null;
 }
 
 // Dispatches SDK messages to appropriate handlers and formatters
@@ -74,11 +76,11 @@ export async function dispatchMessage(
 			// emitting a top-level "tool_use" message, so the case below never
 			// fires. Capture tool calls HERE for the live skills feed.
 			const am = message as AssistantMessage;
-			if (Array.isArray(am.message?.content)) {
+			if (deps.agentName && Array.isArray(am.message?.content)) {
 				for (const block of am.message.content) {
 					const tb = block as { type?: string; name?: string; input?: Record<string, unknown> };
 					if (tb.type === "tool_use" && typeof tb.name === "string") {
-						skillTracker.record(tb.name, tb.input ?? {});
+						skillTracker.record(deps.agentName, tb.name, tb.input ?? {});
 					}
 				}
 			}
@@ -137,11 +139,12 @@ export async function dispatchMessage(
 			return { type: "continue" };
 
 		case "tool_use": {
+			// Legacy path — this SDK nests tool_use in assistant content, so this
+			// rarely fires; skill capture happens in the assistant case above.
 			const toolData = handleToolUseMessage(
 				message as unknown as ToolUseMessage,
 			);
-			// Attribute the tool call to the running agent for the live skills feed.
-			skillTracker.record(toolData.toolName, toolData.parameters);
+			if (deps.agentName) skillTracker.record(deps.agentName, toolData.toolName, toolData.parameters);
 			outputLines(formatToolUseOutput(toolData.toolName, toolData.parameters));
 			await auditLogger.logToolStart(toolData.toolName, toolData.parameters);
 			return { type: "continue" };

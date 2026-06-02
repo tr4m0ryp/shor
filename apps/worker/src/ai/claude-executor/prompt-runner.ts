@@ -109,7 +109,7 @@ export async function runClaudePrompt(
 		const messageLoopResult = await processMessageStream(
 			fullPrompt,
 			options,
-			{ execContext, description, progress, auditLogger, logger },
+			{ execContext, description, progress, auditLogger, logger, agentName },
 			timer,
 		);
 

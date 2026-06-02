@@ -60,26 +60,25 @@ function skillForToolUse(toolName: string, params: Record<string, unknown>): str
 }
 
 class SkillTracker {
-	private current: string | null = null;
 	private readonly byAgent = new Map<string, Set<string>>();
 	/** Fired (with the agent + skill) the first time an agent uses a new skill. */
 	onNewSkill: ((agent: string, skill: string) => void) | null = null;
 
-	/** Point subsequent tool calls at `agent` (call before running it). */
-	setAgent(agent: string): void {
-		this.current = agent;
-		if (!this.byAgent.has(agent)) this.byAgent.set(agent, new Set());
-	}
-
-	/** Record a tool_use against the current agent if it maps to a known skill. */
-	record(toolName: string, params: Record<string, unknown>): void {
-		if (!this.current) return;
+	/** Record a tool_use against `agent` if it maps to a known skill. Attributing
+	 *  by explicit agent (not a global "current") keeps it correct when agents
+	 *  run concurrently. */
+	record(agent: string, toolName: string, params: Record<string, unknown>): void {
+		if (!agent) return;
 		const skill = skillForToolUse(toolName, params);
 		if (!skill) return;
-		const set = this.byAgent.get(this.current);
-		if (!set || set.has(skill)) return;
+		let set = this.byAgent.get(agent);
+		if (!set) {
+			set = new Set();
+			this.byAgent.set(agent, set);
+		}
+		if (set.has(skill)) return;
 		set.add(skill);
-		this.onNewSkill?.(this.current, skill);
+		this.onNewSkill?.(agent, skill);
 	}
 
 	/** Skills used by one agent, in first-seen order. */

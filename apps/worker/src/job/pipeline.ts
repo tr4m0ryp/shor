@@ -18,15 +18,29 @@ import { AuditSession } from "../audit/index.js";
 import { deliverablesDir } from "../paths.js";
 import { getOrCreateContainer } from "../services/container.js";
 import { AGENTS } from "../session-manager.js";
-import { ALL_AGENTS, type AgentName } from "../types/agents.js";
+import type { Container } from "../services/container.js";
+import { type AgentName } from "../types/agents.js";
 import type { ActivityLogger } from "../types/activity-logger.js";
 import type { SessionMetadata } from "../types/audit.js";
 import type { ScanJobParams } from "./env.js";
 import { reportFindings } from "./findings/index.js";
 import { ProgressEmitter } from "./progress/index.js";
 
-/** Canonical agent execution order (pre-recon → … → attack-surface). */
-const PIPELINE_AGENTS: readonly AgentName[] = ALL_AGENTS;
+/**
+ * Pipeline stages (ADR-051). pre-recon and recon are prerequisites and run
+ * sequentially (fail-fast — the vuln agents read their deliverables). The 5 vuln
+ * agents are mutually independent, as are the 5 exploit agents, so each group
+ * runs CONCURRENTLY (2-wide — keeps us under the flash rate limit and ~2 headless
+ * browsers within the job's RAM). Within a group an agent failure is isolated
+ * (logged, the others continue); report + attack-surface are best-effort synthesis.
+ */
+const PREREQ_AGENTS: readonly AgentName[] = ["pre-recon", "recon"];
+const VULN_AGENTS: readonly AgentName[] = ["injection-vuln", "xss-vuln", "auth-vuln", "ssrf-vuln", "authz-vuln"];
+const EXPLOIT_AGENTS: readonly AgentName[] = ["injection-exploit", "xss-exploit", "auth-exploit", "ssrf-exploit", "authz-exploit"];
+const SYNTHESIS_AGENTS: readonly AgentName[] = ["report", "attack-surface"];
+
+/** Max agents running at once within a parallel group. */
+const GROUP_CONCURRENCY = 2;
 
 /** Per-agent metrics summary returned to the entrypoint. */
 export interface AgentRunSummary {
@@ -40,10 +54,77 @@ export interface PipelineRunResult {
 	completedAgents: AgentRunSummary[];
 }
 
+interface AgentContext {
+	params: ScanJobParams;
+	deliverablesPath: string;
+	container: Container;
+	sessionMetadata: SessionMetadata;
+	progress: ProgressEmitter;
+	completedAgents: AgentRunSummary[];
+	logger: ActivityLogger;
+}
+
+/** Run one agent: own AuditSession, execute, emit progress, push partial findings. Throws on failure. */
+async function runAgent(agentName: AgentName, ctx: AgentContext): Promise<void> {
+	const { params, deliverablesPath, container, sessionMetadata, progress, completedAgents, logger } = ctx;
+	logger.info(`Starting agent ${agentName}`, { phase: AGENTS[agentName].displayName, scanId: params.scanId });
+	await progress.started(agentName);
+
+	const auditSession = new AuditSession(sessionMetadata);
+	await auditSession.initialize(params.scanId);
+
+	const started = Date.now();
+	try {
+		const endResult = await container.agentExecution.executeOrThrow(
+			agentName,
+			{
+				webUrl: params.targetUrl,
+				repoPath: params.repoPath,
+				deliverablesPath,
+				attemptNumber: 1,
+				...(params.configPath !== undefined && { configPath: params.configPath }),
+			},
+			auditSession,
+			logger,
+			container,
+		);
+		const durationMs = endResult.duration_ms || Date.now() - started;
+		completedAgents.push({ agent: agentName, durationMs });
+		await progress.completed_(agentName, durationMs);
+		logger.info(`Completed agent ${agentName}`, { durationMs });
+	} catch (err) {
+		await progress.failed(agentName, Date.now() - started);
+		throw err;
+	} finally {
+		// Push cumulative findings after each agent (status stays `running`) so a
+		// timeout/OOM kill never loses results.
+		await reportFindings(deliverablesPath, params.scanId, "running", logger);
+	}
+}
+
+/** Run `agents` with at most `concurrency` in flight; an agent failure is isolated (logged), the rest continue. */
+async function runGroup(agents: readonly AgentName[], concurrency: number, ctx: AgentContext): Promise<void> {
+	const queue = [...agents];
+	const worker = async (): Promise<void> => {
+		for (let next = queue.shift(); next; next = queue.shift()) {
+			try {
+				await runAgent(next, ctx);
+			} catch (err) {
+				ctx.logger.error(`Agent ${next} failed; group continues`, {
+					scanId: ctx.params.scanId,
+					error: err instanceof Error ? err.message : String(err),
+				});
+			}
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(concurrency, agents.length) }, worker));
+}
+
 /**
- * Run the full agent pipeline for one scan in-process. Throws on the first agent
- * failure so the Job exits non-zero (Temporal's activity surfaces the failure to
- * the workflow). Returns the per-agent metrics on success.
+ * Run the full agent pipeline for one scan in-process. Prerequisites are
+ * fail-fast (throw → the Job exits non-zero → scan `failed`); the vuln/exploit
+ * groups and synthesis are resilient (a single agent failure does not abort the
+ * run). Returns the per-agent metrics.
  */
 export async function runScanPipeline(
 	params: ScanJobParams,
@@ -56,53 +137,38 @@ export async function runScanPipeline(
 	};
 
 	const container = getOrCreateContainer(params.scanId, sessionMetadata);
-	const deliverablesPath = deliverablesDir(
-		params.repoPath,
-		container.config.deliverablesSubdir,
-	);
+	const deliverablesPath = deliverablesDir(params.repoPath, container.config.deliverablesSubdir);
 
 	const completedAgents: AgentRunSummary[] = [];
-	const progress = new ProgressEmitter(params.scanId, logger);
+	const ctx: AgentContext = {
+		params,
+		deliverablesPath,
+		container,
+		sessionMetadata,
+		progress: new ProgressEmitter(params.scanId, logger),
+		completedAgents,
+		logger,
+	};
 
-	for (const agentName of PIPELINE_AGENTS) {
-		const phase = AGENTS[agentName].displayName;
-		logger.info(`Starting agent ${agentName}`, { phase, scanId: params.scanId });
-		await progress.started(agentName);
+	// 1) Prerequisites — sequential, fail-fast (vuln agents depend on these).
+	for (const agentName of PREREQ_AGENTS) {
+		await runAgent(agentName, ctx);
+	}
 
-		const auditSession = new AuditSession(sessionMetadata);
-		await auditSession.initialize(params.scanId);
+	// 2) Vulnerability analysis, then exploitation — each 2-wide, fault-isolated.
+	await runGroup(VULN_AGENTS, GROUP_CONCURRENCY, ctx);
+	await runGroup(EXPLOIT_AGENTS, GROUP_CONCURRENCY, ctx);
 
-		const started = Date.now();
-		let endResult: Awaited<ReturnType<typeof container.agentExecution.executeOrThrow>>;
+	// 3) Synthesis — best-effort; a failure here must not discard the findings.
+	for (const agentName of SYNTHESIS_AGENTS) {
 		try {
-			endResult = await container.agentExecution.executeOrThrow(
-				agentName,
-				{
-					webUrl: params.targetUrl,
-					repoPath: params.repoPath,
-					deliverablesPath,
-					attemptNumber: 1,
-					...(params.configPath !== undefined && { configPath: params.configPath }),
-				},
-				auditSession,
-				logger,
-				container,
-			);
+			await runAgent(agentName, ctx);
 		} catch (err) {
-			// Mark this agent failed in the live feed before the Job exits non-zero.
-			await progress.failed(agentName, Date.now() - started);
-			throw err;
+			logger.error(`Synthesis agent ${agentName} failed; continuing`, {
+				scanId: params.scanId,
+				error: err instanceof Error ? err.message : String(err),
+			});
 		}
-
-		const durationMs = endResult.duration_ms || Date.now() - started;
-		completedAgents.push({ agent: agentName, durationMs });
-		await progress.completed_(agentName, durationMs);
-		logger.info(`Completed agent ${agentName}`, { durationMs });
-
-		// Incrementally push cumulative findings (status stays `running`) so a
-		// timeout/OOM kill never loses a run's results — the dashboard already
-		// has everything found up to the last completed agent.
-		await reportFindings(deliverablesPath, params.scanId, "running", logger);
 	}
 
 	return { scanId: params.scanId, completedAgents };

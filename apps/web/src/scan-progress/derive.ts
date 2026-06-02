@@ -38,6 +38,8 @@ export interface ProgressView {
   readonly status: Scan['status'];
   readonly currentPhase: string | null;
   readonly currentAgent: string | null;
+  /** Names of agents running concurrently right now (for the banner). */
+  readonly runningAgents: readonly string[];
   readonly completed: number;
   readonly total: number;
   readonly percent: number;
@@ -61,9 +63,12 @@ function agentStatus(
   scanClosed: boolean,
 ): { status: StepStatus; durationMs: number | null } {
   const done = progress.completedAgents.find((a) => a.agent === name);
-  if (progress.failedAgent === name) return { status: 'failed', durationMs: done?.durationMs ?? null };
   if (done) return { status: done.status, durationMs: done.durationMs };
-  if (progress.currentAgent === name) return { status: 'in_progress', durationMs: null };
+  if (progress.failedAgent === name) return { status: 'failed', durationMs: null };
+  // Concurrency: any agent in the running set is in progress (currentAgent is
+  // just one representative for the banner).
+  const running = progress.runningAgents ?? (progress.currentAgent ? [progress.currentAgent] : []);
+  if (running.includes(name)) return { status: 'in_progress', durationMs: null };
   // A closed scan that never reached this agent skipped it; otherwise it is queued.
   return { status: scanClosed ? 'skipped' : 'pending', durationMs: null };
 }
@@ -111,10 +116,12 @@ export function deriveProgressView(scan: Scan): ProgressView {
   });
 
   const percent = TOTAL_AGENTS === 0 ? 0 : Math.round((completed / TOTAL_AGENTS) * 100);
+  const runningAgents = progress.runningAgents ?? (progress.currentAgent ? [progress.currentAgent] : []);
   return {
     status: scan.status,
     currentPhase: progress.currentPhase,
     currentAgent: progress.currentAgent,
+    runningAgents,
     completed,
     total: TOTAL_AGENTS,
     percent,

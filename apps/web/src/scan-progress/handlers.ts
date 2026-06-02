@@ -71,6 +71,9 @@ export async function handleIngestProgress(
     currentPhase: asStr(body.currentPhase),
     currentAgent: asStr(body.currentAgent),
     failedAgent: asStr(body.failedAgent),
+    runningAgents: Array.isArray(body.runningAgents)
+      ? body.runningAgents.filter((a): a is string => typeof a === 'string' && a.length > 0)
+      : [],
     completedAgents: asCompleted(body.completedAgents),
     skills: asSkills(body.skills),
     updatedAt: new Date().toISOString(),
