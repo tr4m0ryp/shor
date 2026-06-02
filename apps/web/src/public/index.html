@@ -213,7 +213,23 @@ body {
 .detail-header .run-id { font-size: 12px; color: var(--text-muted); font-family: 'SF Mono', 'Fira Code', monospace; margin-top: 2px; }
 .detail-summary { margin-bottom: 16px; padding: 20px 24px; }
 .detail-status-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
-.detail-actions { margin-left: auto; display: flex; gap: 6px; }
+.detail-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.scan-zip { display: flex; flex-direction: column; gap: 2px; }
+.scan-zip input[type=file] {
+  font-size: 12px; color: var(--text-secondary); font-family: var(--font);
+  max-width: 220px;
+}
+.scan-zip input[type=file]::-webkit-file-upload-button,
+.scan-zip input[type=file]::file-selector-button {
+  padding: 6px 12px; margin-right: 8px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: #FAFAFA; color: var(--text);
+  font-size: 12px; font-family: var(--font); cursor: pointer;
+  transition: border-color .15s;
+}
+.scan-zip input[type=file]::-webkit-file-upload-button:hover,
+.scan-zip input[type=file]::file-selector-button:hover { border-color: var(--accent); }
+.scan-zip .hint { font-size: 11px; color: var(--text-muted); }
 .detail-grid { display: grid; grid-template-columns: 200px 1fr; gap: 8px 16px; font-size: 13px; }
 .detail-grid dt { color: var(--text-muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; align-self: center; }
 .detail-grid dd { color: var(--text); word-break: break-all; }
@@ -440,6 +456,10 @@ body {
           <p id="projDetailSubtitle" class="run-id"></p>
         </div>
         <div class="detail-actions">
+          <div class="scan-zip">
+            <input type="file" id="scanZip" accept=".zip,application/zip">
+            <span class="hint">Attach source .zip (for projects with no connected repo)</span>
+          </div>
           <button class="btn btn-primary btn-sm" id="triggerScanBtn" onclick="triggerScan()">Run scan</button>
         </div>
       </div>
@@ -709,17 +729,42 @@ function renderScanCard(s) {
   );
 }
 
+// Read a File as base64 (strips the `data:...;base64,` prefix the API does not want).
+function readFileAsBase64(file) {
+  return new Promise(function (resolve, reject) {
+    const reader = new FileReader();
+    reader.onload = function () {
+      const result = reader.result || '';
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = function () { reject(reader.error || new Error('Failed to read file')); };
+    reader.readAsDataURL(file);
+  });
+}
+
 async function triggerScan() {
   if (!state.currentProject) return;
   const btn = document.getElementById('triggerScanBtn');
+  const zipInput = document.getElementById('scanZip');
+  const file = zipInput && zipInput.files && zipInput.files[0];
+  const label = btn.textContent;
   btn.disabled = true;
   try {
-    await api('POST', '/projects/' + state.currentProject.id + '/scan', {});
+    let body = {};
+    if (file) {
+      btn.textContent = 'Uploading…';
+      const zip = await readFileAsBase64(file);
+      body = { zip: zip, zipFilename: file.name };
+    }
+    await api('POST', '/projects/' + state.currentProject.id + '/scan', body);
     showToast('Scan triggered', 'success');
+    if (zipInput) zipInput.value = '';
     loadScans(state.currentProject.id);
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
+    btn.textContent = label;
     btn.disabled = false;
   }
 }
