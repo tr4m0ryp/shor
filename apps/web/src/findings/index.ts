@@ -30,6 +30,7 @@ export {
   handleIngestFindings,
   type IngestResult,
   ingestFindings,
+  resolveSinkTenant,
   type SinkResponse,
   SinkScanNotFoundError,
 } from './sink.js';

@@ -259,6 +259,58 @@ body {
   text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px;
 }
 
+/* === Activity tab — live run progress (storron-style) === */
+.run-progress-block { margin-top: 12px; }
+.run-progress-meta-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.run-progress-meta-top .progress-label { font-size: 12px; color: var(--text-secondary); }
+.run-progress-meta-top .progress-label b { color: var(--text); font-weight: 600; }
+.run-progress-meta-top .progress-percent { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.run-progress-bar-track { height: 8px; border-radius: 9999px; background: var(--border); overflow: hidden; }
+.run-progress-bar-fill { height: 100%; border-radius: 9999px; background: var(--accent); transition: width .4s ease; }
+.run-progress-bar-fill.completed { background: var(--green); }
+.run-progress-bar-fill.failed, .run-progress-bar-fill.cancelled { background: var(--red); }
+.run-progress-bar-fill.running {
+  background-image: linear-gradient(45deg, rgba(255,255,255,.25) 25%, transparent 25%, transparent 50%,
+    rgba(255,255,255,.25) 50%, rgba(255,255,255,.25) 75%, transparent 75%, transparent);
+  background-size: 16px 16px; animation: progressStripe 1s linear infinite;
+}
+@keyframes progressStripe { from { background-position: 0 0; } to { background-position: 16px 0; } }
+
+.pending-banner {
+  border-left: 3px solid var(--accent); background: var(--card-hover);
+  padding: 8px 12px; border-radius: var(--radius-sm); font-size: 13px; color: var(--text); margin-bottom: 14px;
+}
+.pending-banner.closed { border-left-color: var(--text-muted); color: var(--text-secondary); }
+.pending-banner.failed { border-left-color: var(--red); }
+.pending-banner b { font-weight: 600; }
+.pending-grid { display: flex; flex-direction: column; gap: 12px; }
+.pending-phase { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.pending-phase--in_progress { box-shadow: 0 0 0 1px var(--accent) inset; }
+.pending-phase--failed { border-color: var(--red); }
+.pending-phase--completed { opacity: .9; }
+.pending-phase--skipped { opacity: .55; }
+.pending-phase__header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.pending-phase__title { font-size: 13px; font-weight: 600; color: var(--text); }
+.pending-phase__count { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; margin-left: auto; }
+.pending-phase__agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.pending-agent { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; background: var(--card); }
+.pending-agent--in_progress { box-shadow: 0 0 0 1px var(--accent) inset; }
+.pending-agent--failed { border-color: var(--red); }
+.pending-agent--completed { background: var(--card-hover); }
+.pending-agent--skipped { opacity: .55; }
+.pending-agent__name { font-size: 12px; font-weight: 500; color: var(--text); display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.pending-agent__meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.pending-status-pill {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600;
+  padding: 1px 6px; border-radius: 9999px; white-space: nowrap;
+}
+.pending-status-pill--pending { color: var(--text-muted); background: var(--border); }
+.pending-status-pill--in_progress { color: #FFF; background: var(--accent); animation: pendingPulse 1.6s ease-in-out infinite; }
+.pending-status-pill--completed { color: var(--green); background: #E8F5E9; }
+.pending-status-pill--failed { color: var(--red); background: #FDECEA; }
+.pending-status-pill--skipped { color: var(--text-muted); background: var(--card-hover); }
+@keyframes pendingPulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+
 /* === Findings tab === */
 .findings-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .findings-filter-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; align-self: center; }
@@ -491,14 +543,17 @@ body {
         <div class="detail-status-row">
           <span class="badge" id="scanStatus"></span>
         </div>
+        <div class="run-progress-block" id="scanProgressBar" style="display:none"></div>
         <dl class="detail-grid" id="scanGrid"></dl>
       </div>
       <div class="detail-tabs" role="tablist">
-        <button class="detail-tab active" data-tab="findings" onclick="showScanTab('findings')">Findings <span class="count" id="findingsCount">0</span></button>
+        <button class="detail-tab active" data-tab="activity" onclick="showScanTab('activity')">Activity</button>
+        <button class="detail-tab" data-tab="findings" onclick="showScanTab('findings')">Findings <span class="count" id="findingsCount">0</span></button>
         <button class="detail-tab" data-tab="attackSurface" onclick="showScanTab('attackSurface')">Attack Surface <span class="count" id="attackSurfaceCount">0</span></button>
         <button class="detail-tab" data-tab="diff" onclick="showScanTab('diff')">Diff <span class="count" id="diffCount">0</span></button>
       </div>
-      <div class="detail-panel" id="panelFindings"></div>
+      <div class="detail-panel" id="panelActivity"></div>
+      <div class="detail-panel" id="panelFindings" style="display:none"></div>
       <div class="detail-panel" id="panelAttackSurface" style="display:none"></div>
       <div class="detail-panel" id="panelDiff" style="display:none"></div>
     </div>
@@ -601,6 +656,8 @@ async function logout(event) {
 // ===================== Page routing =====================
 
 function showPage(page) {
+  // Leaving any page stops the scan-detail live poll; openScan restarts it.
+  stopScanPolling();
   const pages = ['Targets', 'ProjectDetail', 'ScanDetail', 'Team'];
   pages.forEach((p) => {
     const el = document.getElementById('page' + p);
@@ -800,12 +857,16 @@ async function openScan(scanId) {
     statusEl.className = 'badge badge-' + data.scan.status;
     renderScanGrid(data.scan, data.findingCount);
     document.getElementById('scanBackBtn').onclick = () => openProject(data.scan.projectId);
-    state.scanTab = 'findings';
+    state.scanTab = 'activity';
     showPage('scanDetail');
-    showScanTab('findings');
+    showScanTab('activity');
+    loadScanProgress(scanId);
     loadScanFindings(scanId);
     loadScanAttackSurface(scanId);
     loadScanDiff(scanId);
+    // Poll the live feed while the run is active; the poller self-stops on a
+    // terminal status (and showPage stops it when navigating away).
+    if (!isScanClosed(data.scan.status)) startScanPolling(scanId);
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -830,9 +891,142 @@ function showScanTab(tab) {
   document.querySelectorAll('#pageScanDetail .detail-tab').forEach((b) => {
     b.classList.toggle('active', b.getAttribute('data-tab') === tab);
   });
+  document.getElementById('panelActivity').style.display = tab === 'activity' ? 'block' : 'none';
   document.getElementById('panelFindings').style.display = tab === 'findings' ? 'block' : 'none';
   document.getElementById('panelAttackSurface').style.display = tab === 'attackSurface' ? 'block' : 'none';
   document.getElementById('panelDiff').style.display = tab === 'diff' ? 'block' : 'none';
+}
+
+// ----- Activity (live run progress) -----
+
+var scanPollTimer = null;
+
+function isScanClosed(status) {
+  return status === 'completed' || status === 'failed' || status === 'cancelled';
+}
+
+function stopScanPolling() {
+  if (scanPollTimer) { clearInterval(scanPollTimer); scanPollTimer = null; }
+}
+
+function startScanPolling(scanId) {
+  stopScanPolling();
+  scanPollTimer = setInterval(function () { pollScan(scanId); }, 4000);
+}
+
+// One poll tick: refresh status badge + progress feed; when the run closes,
+// stop polling and pull the now-final findings/diff in.
+async function pollScan(scanId) {
+  if (!state.currentScan || state.currentScan.id !== scanId) { stopScanPolling(); return; }
+  try {
+    const data = await api('GET', '/scans/' + scanId);
+    const prev = state.currentScan.status;
+    state.currentScan = data.scan;
+    const statusEl = document.getElementById('scanStatus');
+    statusEl.textContent = data.scan.status;
+    statusEl.className = 'badge badge-' + data.scan.status;
+    renderScanGrid(data.scan, data.findingCount);
+    await loadScanProgress(scanId);
+    if (isScanClosed(data.scan.status)) {
+      stopScanPolling();
+      if (prev !== data.scan.status) {
+        loadScanFindings(scanId);
+        loadScanAttackSurface(scanId);
+        loadScanDiff(scanId);
+      }
+    }
+  } catch (_) { /* transient; keep polling */ }
+}
+
+function fmtDur(ms) {
+  if (ms == null || !isFinite(ms) || ms <= 0) return '';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60), r = s % 60;
+  return m + 'm' + (r ? ' ' + r + 's' : '');
+}
+
+async function loadScanProgress(scanId) {
+  const panel = document.getElementById('panelActivity');
+  try {
+    const data = await api('GET', '/scans/' + scanId + '/progress');
+    renderProgress(data.progress);
+  } catch (err) {
+    panel.innerHTML = '<div class="panel-empty">Progress unavailable</div>';
+  }
+}
+
+function renderProgress(view) {
+  renderProgressBar(view);
+  const banner = renderProgressBanner(view);
+  const phases = (view.phases || []).map(renderProgressPhase).join('');
+  document.getElementById('panelActivity').innerHTML =
+    banner + '<div class="pending-grid">' + phases + '</div>';
+}
+
+function renderProgressBar(view) {
+  const box = document.getElementById('scanProgressBar');
+  if (!view) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  const fillClass = view.status === 'running' ? 'running' : view.status;
+  const where = view.currentPhase
+    ? phaseLabel(view, view.currentPhase) + (view.currentAgent ? ' · ' + agentLabel(view, view.currentAgent) : '')
+    : (isScanClosed(view.status) ? view.status : 'queued');
+  box.innerHTML =
+    '<div class="run-progress-meta-top">' +
+      '<span class="progress-label"><b>' + escapeHtml(where) + '</b> · ' + view.completed + '/' + view.total + ' agents</span>' +
+      '<span class="progress-percent">' + view.percent + '%</span>' +
+    '</div>' +
+    '<div class="run-progress-bar-track"><div class="run-progress-bar-fill ' + fillClass +
+      '" style="width:' + view.percent + '%"></div></div>';
+}
+
+function renderProgressBanner(view) {
+  if (isScanClosed(view.status)) {
+    const cls = view.status === 'completed' ? 'closed' : 'failed';
+    return '<div class="pending-banner ' + cls + '">Pipeline ' + escapeHtml(view.status) + '</div>';
+  }
+  const where = view.currentAgent
+    ? phaseLabel(view, view.currentPhase) + ' / ' + agentLabel(view, view.currentAgent)
+    : 'starting…';
+  return '<div class="pending-banner">Now running · <b>' + escapeHtml(where) + '</b></div>';
+}
+
+function renderProgressPhase(phase) {
+  const agents = phase.agents.map(renderProgressAgent).join('');
+  return '<section class="pending-phase pending-phase--' + phase.status + '">' +
+    '<div class="pending-phase__header">' +
+      '<span class="pending-phase__title">' + escapeHtml(phase.label) + '</span>' +
+      pill(phase.status) +
+      '<span class="pending-phase__count">' + phase.done + '/' + phase.total + '</span>' +
+    '</div>' +
+    '<div class="pending-phase__agents">' + agents + '</div>' +
+  '</section>';
+}
+
+function renderProgressAgent(agent) {
+  const dur = fmtDur(agent.durationMs);
+  return '<div class="pending-agent pending-agent--' + agent.status + '">' +
+    '<div class="pending-agent__name"><span>' + escapeHtml(agent.label) + '</span>' + pill(agent.status) + '</div>' +
+    (dur ? '<div class="pending-agent__meta">' + dur + '</div>' : '') +
+  '</div>';
+}
+
+var PILL_LABELS = { pending: 'Queued', in_progress: 'Running', completed: 'Done', failed: 'Failed', skipped: 'Skipped' };
+function pill(status) {
+  return '<span class="pending-status-pill pending-status-pill--' + status + '">' +
+    (PILL_LABELS[status] || status) + '</span>';
+}
+function phaseLabel(view, id) {
+  const p = (view.phases || []).find(function (x) { return x.id === id; });
+  return p ? p.label : (id || '');
+}
+function agentLabel(view, name) {
+  for (const p of (view.phases || [])) {
+    const a = p.agents.find(function (x) { return x.name === name; });
+    if (a) return a.label;
+  }
+  return name || '';
 }
 
 // ----- Findings -----

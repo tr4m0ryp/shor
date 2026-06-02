@@ -7,7 +7,7 @@
  */
 
 import { query } from '../../cloud/pg.js';
-import type { NewScan, ProjectId, Scan, ScanId, ScanStatus, TenantId } from '../../domain/types.js';
+import type { NewScan, ProjectId, Scan, ScanId, ScanProgress, ScanStatus, TenantId } from '../../domain/types.js';
 import { type ScanRow, toScan } from './rows.js';
 
 const SELECT_SCOPED = `
@@ -70,6 +70,21 @@ export const scanRepo = {
 			 WHERE p.id = s.project_id AND p.tenant_id = $1 AND s.id = $2
 			 RETURNING s.*`,
       [tenantId, id, workflowId],
+    );
+    return rows[0] ? toScan(rows[0]) : null;
+  },
+
+  /**
+   * Persist the latest live progress snapshot (worker-pushed). Stored as JSONB
+   * on the scan row; overwrites the prior snapshot. Tenant-scoped.
+   */
+  async setProgress(tenantId: TenantId, id: ScanId, progress: ScanProgress): Promise<Scan | null> {
+    const { rows } = await query<ScanRow>(
+      `UPDATE scan s SET progress = $3::jsonb
+			 FROM project p
+			 WHERE p.id = s.project_id AND p.tenant_id = $1 AND s.id = $2
+			 RETURNING s.*`,
+      [tenantId, id, JSON.stringify(progress)],
     );
     return rows[0] ? toScan(rows[0]) : null;
   },

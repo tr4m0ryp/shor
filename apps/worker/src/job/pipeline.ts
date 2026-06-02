@@ -22,6 +22,7 @@ import { ALL_AGENTS, type AgentName } from "../types/agents.js";
 import type { ActivityLogger } from "../types/activity-logger.js";
 import type { SessionMetadata } from "../types/audit.js";
 import type { ScanJobParams } from "./env.js";
+import { ProgressEmitter } from "./progress/index.js";
 
 /** Canonical agent execution order (pre-recon → … → attack-surface). */
 const PIPELINE_AGENTS: readonly AgentName[] = ALL_AGENTS;
@@ -60,31 +61,41 @@ export async function runScanPipeline(
 	);
 
 	const completedAgents: AgentRunSummary[] = [];
+	const progress = new ProgressEmitter(params.scanId, logger);
 
 	for (const agentName of PIPELINE_AGENTS) {
 		const phase = AGENTS[agentName].displayName;
 		logger.info(`Starting agent ${agentName}`, { phase, scanId: params.scanId });
+		await progress.started(agentName);
 
 		const auditSession = new AuditSession(sessionMetadata);
 		await auditSession.initialize(params.scanId);
 
 		const started = Date.now();
-		const endResult = await container.agentExecution.executeOrThrow(
-			agentName,
-			{
-				webUrl: params.targetUrl,
-				repoPath: params.repoPath,
-				deliverablesPath,
-				attemptNumber: 1,
-				...(params.configPath !== undefined && { configPath: params.configPath }),
-			},
-			auditSession,
-			logger,
-			container,
-		);
+		let endResult: Awaited<ReturnType<typeof container.agentExecution.executeOrThrow>>;
+		try {
+			endResult = await container.agentExecution.executeOrThrow(
+				agentName,
+				{
+					webUrl: params.targetUrl,
+					repoPath: params.repoPath,
+					deliverablesPath,
+					attemptNumber: 1,
+					...(params.configPath !== undefined && { configPath: params.configPath }),
+				},
+				auditSession,
+				logger,
+				container,
+			);
+		} catch (err) {
+			// Mark this agent failed in the live feed before the Job exits non-zero.
+			await progress.failed(agentName, Date.now() - started);
+			throw err;
+		}
 
 		const durationMs = endResult.duration_ms || Date.now() - started;
 		completedAgents.push({ agent: agentName, durationMs });
+		await progress.completed_(agentName, durationMs);
 		logger.info(`Completed agent ${agentName}`, { durationMs });
 	}
 

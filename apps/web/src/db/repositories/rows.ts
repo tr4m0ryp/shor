@@ -143,6 +143,7 @@ export interface ScanRow {
   status: string;
   started_at: unknown;
   finished_at: unknown;
+  progress?: unknown;
 }
 
 export function toScan(r: ScanRow): Scan {
@@ -154,6 +155,7 @@ export function toScan(r: ScanRow): Scan {
     status: r.status as ScanStatus,
     startedAt: tsOrNull(r.started_at),
     finishedAt: tsOrNull(r.finished_at),
+    progress: (r.progress as Scan['progress']) ?? null,
   };
 }
 

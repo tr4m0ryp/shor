@@ -105,6 +105,28 @@ export type ScanStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cance
 
 export const SCAN_STATUSES: readonly ScanStatus[] = ['pending', 'running', 'completed', 'failed', 'cancelled'] as const;
 
+/** Per-agent terminal record inside a {@link ScanProgress} snapshot. */
+export interface AgentProgress {
+  readonly agent: string;
+  readonly status: 'completed' | 'failed';
+  readonly durationMs: number;
+}
+
+/**
+ * Live progress snapshot pushed by the worker as the pipeline walks its agents
+ * (the per-scan run feed). Stored verbatim in `scan.progress` (JSONB); the read
+ * route blends it with the static phase/agent taxonomy to render the activity
+ * tab. Absent until the worker posts its first update.
+ */
+export interface ScanProgress {
+  readonly status: ScanStatus;
+  readonly currentPhase: string | null;
+  readonly currentAgent: string | null;
+  readonly failedAgent: string | null;
+  readonly completedAgents: readonly AgentProgress[];
+  readonly updatedAt: string;
+}
+
 /** One pipeline run against a CodebaseVersion + live URL (ADR-015/019). */
 export interface Scan {
   readonly id: ScanId;
@@ -115,6 +137,8 @@ export interface Scan {
   readonly status: ScanStatus;
   readonly startedAt: Timestamp | null;
   readonly finishedAt: Timestamp | null;
+  /** Live run-progress snapshot (worker-pushed); null until first update. */
+  readonly progress: ScanProgress | null;
 }
 
 // ──────────────────────────────── finding ─────────────────────────────────
@@ -212,6 +236,7 @@ export type NewUser = Omit<User, 'id' | 'createdAt'>;
 export type NewProviderKey = Omit<ProviderKey, 'id' | 'createdAt'>;
 export type NewProject = Omit<Project, 'id' | 'createdAt'>;
 export type NewCodebaseVersion = Omit<CodebaseVersion, 'id' | 'createdAt'>;
-export type NewScan = Omit<Scan, 'id' | 'startedAt' | 'finishedAt'> & Partial<Pick<Scan, 'startedAt' | 'finishedAt'>>;
+export type NewScan = Omit<Scan, 'id' | 'startedAt' | 'finishedAt' | 'progress'> &
+  Partial<Pick<Scan, 'startedAt' | 'finishedAt'>>;
 export type NewFinding = Omit<Finding, 'id' | 'createdAt'>;
 export type NewAttackSurface = Omit<AttackSurface, 'id'>;

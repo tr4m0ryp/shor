@@ -154,7 +154,7 @@ function safeEqual(a: string, b: string): boolean {
  *     worker only knows the scan id). The token is never logged.
  *   - SESSION: the existing UI path — verify the session cookie and tenant-scope.
  */
-async function resolveSinkTenant(
+export async function resolveSinkTenant(
   scanId: ScanId,
   cookieHeader: string | undefined,
   authHeader: string | undefined,

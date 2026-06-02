@@ -20,6 +20,7 @@
  *   GET    /users                     tenant users (multi-user view)
  */
 
+import { getScanProgress } from '../../scan-progress/index.js';
 import type { ApiResponse } from '../router.js';
 import { methodNotAllowed, notFound } from './auth-util.js';
 import { createProject, deleteProject, getProject, listProjectScans, listProjects, updateProject } from './projects.js';
@@ -100,6 +101,10 @@ async function routeScans(
   // router); only GET is a dashboard read here.
   if (sub === 'findings') {
     return method === 'GET' ? listScanFindings(id, cookieHeader) : null;
+  }
+  if (sub === 'progress') {
+    // POST is the worker sink (handled by the parent router); GET is the feed.
+    return method === 'GET' ? getScanProgress(id, cookieHeader) : null;
   }
   if (sub === 'attack-surface') {
     return method === 'GET' ? getScanAttackSurface(id, cookieHeader) : methodNotAllowed;

@@ -11,6 +11,7 @@
 
 import { handleLogout, handleMe, handleSessionLogin } from '../auth/routes.js';
 import { handleIngestFindings, handleSarifExport } from '../findings/index.js';
+import { handleIngestProgress } from '../scan-progress/index.js';
 import { routeDashboard } from './dashboard/index.js';
 
 /** Standard response envelope: HTTP status, JSON body, optional `Set-Cookie`. */
@@ -51,6 +52,15 @@ export async function apiRouter(
     const scanId = segments[1];
     if (!scanId) return NOT_FOUND;
     return handleIngestFindings(scanId, body, cookieHeader, authHeader);
+  }
+
+  // POST /scans/:id/progress — the worker's live phase/agent progress sink
+  // (ADR-051). Dual auth like the findings sink; GET falls through to the
+  // dashboard read below.
+  if (resource === 'scans' && segments[2] === 'progress' && method === 'POST') {
+    const scanId = segments[1];
+    if (!scanId) return NOT_FOUND;
+    return handleIngestProgress(scanId, body, cookieHeader, authHeader);
   }
 
   // GET /export/sarif?scan=<scanId> — SARIF 2.1.0 export view (ADR-033).

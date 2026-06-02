@@ -1,0 +1,86 @@
+/**
+ * HTTP handlers for the live run-progress feed (ADR-051).
+ *
+ *   - POST /scans/:id/progress — the worker pushes a snapshot as it walks the
+ *     pipeline. Dual auth (service token or session), reusing the findings
+ *     sink's `resolveSinkTenant`. Best-effort: validates, persists, returns ok.
+ *   - GET  /scans/:id/progress — the dashboard polls this; returns the derived
+ *     phase/agent view (session-gated, tenant-scoped).
+ */
+
+import { scanRepo } from '../db/repositories/index.js';
+import type { AgentProgress, ScanId, ScanProgress, ScanStatus } from '../domain/types.js';
+import { resolveSinkTenant } from '../findings/index.js';
+import type { ApiResponse } from '../server/router.js';
+import { gate, notFound, ok, serverError } from '../server/dashboard/auth-util.js';
+import { deriveProgressView } from './derive.js';
+
+const STATUSES: ReadonlySet<string> = new Set(['pending', 'running', 'completed', 'failed', 'cancelled']);
+
+function asStatus(v: unknown, fallback: ScanStatus): ScanStatus {
+  return typeof v === 'string' && STATUSES.has(v) ? (v as ScanStatus) : fallback;
+}
+
+function asStr(v: unknown): string | null {
+  return typeof v === 'string' && v ? v : null;
+}
+
+/** Coerce the posted `completedAgents` array into validated records. */
+function asCompleted(v: unknown): AgentProgress[] {
+  if (!Array.isArray(v)) return [];
+  const out: AgentProgress[] = [];
+  for (const item of v) {
+    if (typeof item !== 'object' || item === null) continue;
+    const r = item as Record<string, unknown>;
+    const agent = asStr(r.agent);
+    if (!agent) continue;
+    const status = r.status === 'failed' ? 'failed' : 'completed';
+    const durationMs = typeof r.durationMs === 'number' && Number.isFinite(r.durationMs) ? r.durationMs : 0;
+    out.push({ agent, status, durationMs });
+  }
+  return out;
+}
+
+/**
+ * `POST /scans/:id/progress` — persist the worker's latest progress snapshot.
+ * Body: `{ status?, currentPhase?, currentAgent?, failedAgent?, completedAgents? }`.
+ */
+export async function handleIngestProgress(
+  scanId: ScanId,
+  body: Record<string, unknown>,
+  cookieHeader: string | undefined,
+  authHeader?: string | undefined,
+): Promise<ApiResponse> {
+  const resolved = await resolveSinkTenant(scanId, cookieHeader, authHeader);
+  if (!resolved.ok) return { status: resolved.status, body: { error: resolved.error } };
+
+  const snapshot: ScanProgress = {
+    status: asStatus(body.status, 'running'),
+    currentPhase: asStr(body.currentPhase),
+    currentAgent: asStr(body.currentAgent),
+    failedAgent: asStr(body.failedAgent),
+    completedAgents: asCompleted(body.completedAgents),
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    const updated = await scanRepo.setProgress(resolved.tenantId, scanId, snapshot);
+    if (!updated) return notFound('scan not found');
+    return ok({ ok: true });
+  } catch (err) {
+    return serverError(err);
+  }
+}
+
+/** `GET /scans/:id/progress` — the derived phase/agent feed for the activity tab. */
+export async function getScanProgress(scanId: ScanId, cookieHeader: string | undefined): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return g.response;
+  try {
+    const scan = await scanRepo.findById(g.tenantId, scanId);
+    if (!scan) return notFound('scan not found');
+    return ok({ progress: deriveProgressView(scan) });
+  } catch (err) {
+    return serverError(err);
+  }
+}
