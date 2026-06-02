@@ -4,8 +4,38 @@
 // it under the terms of the GNU Affero General Public License version 3
 // as published by the Free Software Foundation.
 
-import { path } from "zx";
+import { fs, path } from "zx";
 import type { ActivityLogger } from "../../types/activity-logger.js";
+
+/**
+ * Env var naming the file-mounted provider-key path (ADR-050). The control
+ * plane mounts the single selected provider key as a volume file (never an env
+ * value) and points this at it; the engine reads the file at use time. Mirrors
+ * `apps/web/src/secrets/injection.ts` (`PROVIDER_KEY_FILE_ENV`).
+ */
+export const PROVIDER_KEY_FILE_ENV = "AEGIS_PROVIDER_KEY_FILE";
+
+/**
+ * Read the provider API key from the file-mounted path named by
+ * `AEGIS_PROVIDER_KEY_FILE`, if set and present. Returns the trimmed material,
+ * or undefined when the env var is unset / the file is missing or empty.
+ *
+ * Read at use time (not import time) so a rotated mount is picked up and so a
+ * plaintext key is never held in long-lived process state.
+ */
+async function readProviderKeyFile(): Promise<string | undefined> {
+	const keyFile = process.env[PROVIDER_KEY_FILE_ENV];
+	if (!keyFile) return undefined;
+	try {
+		if (!(await fs.pathExists(keyFile))) return undefined;
+		const material = (await fs.readFile(keyFile, "utf8")).trim();
+		return material || undefined;
+	} catch {
+		// A mount race or transient read error should not crash env assembly;
+		// fall through to other key sources (passthrough env, providerConfig).
+		return undefined;
+	}
+}
 
 export interface SdkEnvParams {
 	sourceDir: string;
@@ -51,6 +81,16 @@ export async function buildSdkEnv(
 			STORRON_DELIVERABLES_SUBDIR: deliverablesSubdir,
 		}),
 	};
+
+	// 1b. File-mounted provider key (ADR-050): when no explicit apiKey was passed,
+	//     source the selected provider key from the mounted secret file at use
+	//     time and seed ANTHROPIC_API_KEY. providerConfig (below) still wins.
+	if (!apiKey) {
+		const mountedKey = await readProviderKeyFile();
+		if (mountedKey) {
+			sdkEnv.ANTHROPIC_API_KEY = mountedKey;
+		}
+	}
 
 	// 2. DeepSeek auto-detection: if DEEPSEEK_API_KEY is set and no other provider
 	//    is configured, route through DeepSeek's Anthropic-compatible endpoint.

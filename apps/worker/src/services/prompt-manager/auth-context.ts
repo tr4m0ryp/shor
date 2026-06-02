@@ -16,9 +16,12 @@ export function buildAuthContext(config: DistributedConfig | null): string {
 	}
 
 	const auth = config.authentication;
+	// ADR-050: never interpolate the plaintext username (or any credential) into
+	// prompt text. Report only that a credential is configured; the runtime
+	// resolves the value out-of-band via the {{AEGIS_LOGIN_*}} seam tokens.
 	const lines = [
 		`- Login type: ${auth.login_type.toUpperCase()}`,
-		`- Username: ${auth.credentials.username}`,
+		`- Username: ${auth.credentials?.username ? "configured (injected at runtime)" : "not configured"}`,
 		`- Login URL: ${auth.login_url}`,
 	];
 

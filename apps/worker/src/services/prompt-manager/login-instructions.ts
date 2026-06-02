@@ -11,9 +11,24 @@ import type { Authentication } from "../../types/config.js";
 import { PentestError } from "../error-handling.js";
 
 /**
+ * Stable, NON-SECRET seam tokens left in prompt text in place of plaintext
+ * credentials/TOTP (ADR-050). The login still happens at runtime, but the
+ * actual material is supplied out-of-band (file-mounted / injected by the
+ * browser-driver), never baked into the prompt string a model can echo or log.
+ */
+export const CREDENTIAL_SEAM = {
+	username: "{{AEGIS_LOGIN_USERNAME}}",
+	password: "{{AEGIS_LOGIN_PASSWORD}}",
+	totp: 'a generated TOTP code (from the run-injected secret, placeholder "{{AEGIS_LOGIN_TOTP}}")',
+	totpSecret: "{{AEGIS_LOGIN_TOTP_SECRET}}",
+} as const;
+
+/**
  * Build complete login instructions from authentication config.
  * Loads the shared template, extracts the relevant sections per login_type,
- * and interpolates credentials/TOTP placeholders.
+ * and substitutes NON-SECRET seam tokens for credential/TOTP placeholders
+ * (ADR-050). No plaintext credential or TOTP secret is ever interpolated into
+ * the returned prompt text; the runtime resolves the seam tokens out-of-band.
  */
 export async function buildLoginInstructions(
 	authentication: Authentication,
@@ -68,28 +83,33 @@ export async function buildLoginInstructions(
 				.join("\n\n");
 		}
 
-		// 4. Interpolate login flow and credential placeholders
-		let userInstructions = (authentication.login_flow ?? []).join("\n");
+		// 4. Substitute NON-SECRET seam tokens for credential/TOTP placeholders.
+		//    ADR-050: plaintext credentials and the TOTP secret are NEVER baked
+		//    into prompt text. The login flow's $username/$password/$totp markers
+		//    become stable seam tokens the runtime resolves out-of-band; whether a
+		//    credential exists is derived from config presence, not its value.
+		const hasUsername = Boolean(authentication.credentials?.username);
+		const hasPassword = Boolean(authentication.credentials?.password);
+		const hasTotp = Boolean(authentication.credentials?.totp_secret);
 
-		if (authentication.credentials) {
-			if (authentication.credentials.username) {
-				userInstructions = userInstructions.replace(
-					/\$username/g,
-					authentication.credentials.username,
-				);
-			}
-			if (authentication.credentials.password) {
-				userInstructions = userInstructions.replace(
-					/\$password/g,
-					authentication.credentials.password,
-				);
-			}
-			if (authentication.credentials.totp_secret) {
-				userInstructions = userInstructions.replace(
-					/\$totp/g,
-					`generated TOTP code using secret "${authentication.credentials.totp_secret}"`,
-				);
-			}
+		let userInstructions = (authentication.login_flow ?? []).join("\n");
+		if (hasUsername) {
+			userInstructions = userInstructions.replace(
+				/\$username/g,
+				CREDENTIAL_SEAM.username,
+			);
+		}
+		if (hasPassword) {
+			userInstructions = userInstructions.replace(
+				/\$password/g,
+				CREDENTIAL_SEAM.password,
+			);
+		}
+		if (hasTotp) {
+			userInstructions = userInstructions.replace(
+				/\$totp/g,
+				CREDENTIAL_SEAM.totp,
+			);
 		}
 
 		loginInstructions = loginInstructions.replace(
@@ -97,11 +117,12 @@ export async function buildLoginInstructions(
 			userInstructions,
 		);
 
-		// 5. Replace TOTP secret placeholder if present in template
-		if (authentication.credentials?.totp_secret) {
+		// 5. Replace the TOTP secret template marker with a seam token — never the
+		//    secret itself (ADR-050).
+		if (hasTotp) {
 			loginInstructions = loginInstructions.replace(
 				/{{totp_secret}}/g,
-				authentication.credentials.totp_secret,
+				CREDENTIAL_SEAM.totpSecret,
 			);
 		}
 
