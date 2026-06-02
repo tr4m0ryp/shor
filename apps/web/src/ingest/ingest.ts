@@ -1,18 +1,22 @@
 /**
  * Ingest orchestration (LAUNCH-SPEC §4.1/4.2, ADR-015/039).
  *
- * `ingestForScan(project)` mints the immutable `CodebaseVersion` a scan runs
- * against:
+ * `ingestForScan(project)` mints (or reuses) the immutable `CodebaseVersion` a
+ * scan runs against:
+ *   - source already staged in GCS  → reuse the latest existing
+ *     `CodebaseVersion` for the project (seeded/test projects need no pull or
+ *     zip). Pass `forceFresh: true` to skip reuse and ingest anew.
  *   - `project.repoInstallationId` set  → GitHub pull of the default branch via
  *     the App installation (egress constrained to the installation allowlist).
  *   - otherwise                         → require a zip upload (callers pass the
  *     archive bytes through the options).
  *
- * Either path returns the new `CodebaseVersion`. Connecting a repo and choosing
+ * Each path returns a `CodebaseVersion`. Connecting a repo and choosing
  * github-vs-zip is a project property, so the dispatch lives here rather than in
  * the caller.
  */
 
+import { codebaseVersionRepo } from '../db/repositories/index.js';
 import type { CodebaseVersion, Project, TenantId } from '../domain/types.js';
 import { ingestGithub } from './git-source.js';
 import { ingestZip } from './zip-source.js';
@@ -27,17 +31,30 @@ export interface IngestForScanOptions {
   readonly ref?: string;
   /** Uploaded zip bytes — required when the project has no connected repo. */
   readonly zip?: { readonly archive: Buffer; readonly filename?: string; readonly maxBytes?: number };
+  /**
+   * Skip GCS reuse and always ingest a fresh snapshot. Default false — when a
+   * version already exists for the project (source already staged in GCS), it is
+   * reused so seeded/test projects need no GitHub pull or zip upload.
+   */
+  readonly forceFresh?: boolean;
 }
 
 /**
- * Mint the CodebaseVersion to scan for `project`.
+ * Mint (or reuse) the CodebaseVersion to scan for `project`.
  *
- * Dispatches on whether a GitHub App installation is connected. A project with
- * no installation MUST supply `options.zip`; a project with an installation
- * ignores any supplied zip and pulls from the repo (the connected repo is the
- * source of truth).
+ * Reuse first: unless `forceFresh`, an already-staged latest version is returned
+ * so seeded/test projects scan without a GitHub pull or zip. Otherwise dispatches
+ * on whether a GitHub App installation is connected. A project with no
+ * installation MUST supply `options.zip`; a project with an installation ignores
+ * any supplied zip and pulls from the repo (the connected repo is the source of
+ * truth).
  */
 export async function ingestForScan(project: Project, options: IngestForScanOptions): Promise<CodebaseVersion> {
+  if (!options.forceFresh) {
+    const existing = await codebaseVersionRepo.latestForProject(options.tenantId, project.id);
+    if (existing) return existing;
+  }
+
   if (project.repoInstallationId) {
     const installationId = Number.parseInt(project.repoInstallationId, 10);
     if (!Number.isFinite(installationId)) {

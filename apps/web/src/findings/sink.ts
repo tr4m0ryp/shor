@@ -15,8 +15,16 @@
 
 import { authenticate } from '../auth/middleware.js';
 import { scopedTenantId } from '../auth/tenant-scope.js';
+import { getConfig } from '../config.js';
 import { attackSurfaceRepo, findingRepo, scanRepo } from '../db/repositories/index.js';
-import type { AttackSurfaceData, Finding, FindingRecord, ScanId, TenantId } from '../domain/types.js';
+import type {
+  AttackSurfaceData,
+  Finding,
+  FindingRecord,
+  ScanId,
+  ScanStatus,
+  TenantId,
+} from '../domain/types.js';
 import { withFingerprints } from './fingerprint.js';
 import { assertValidFindings } from './validate.js';
 
@@ -109,21 +117,81 @@ function isAttackSurface(value: unknown): value is AttackSurfaceData {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Sink statuses the worker may report on its callback; others are ignored. */
+const SINK_STATUSES: ReadonlySet<ScanStatus> = new Set<ScanStatus>(['completed', 'failed']);
+
+function asSinkStatus(value: unknown): ScanStatus | undefined {
+  return typeof value === 'string' && SINK_STATUSES.has(value as ScanStatus)
+    ? (value as ScanStatus)
+    : undefined;
+}
+
+/** Parse a `Bearer <token>` Authorization header; returns the token or undefined. */
+function bearerToken(authHeader: string | undefined): string | undefined {
+  if (!authHeader) return undefined;
+  const m = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
+  return m ? m[1] : undefined;
+}
+
+/**
+ * Length-independent, timing-safe-ish string equality. Never short-circuits on
+ * the first differing byte and never logs either operand — used to compare the
+ * presented service token against the configured `sinkToken`.
+ */
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+/**
+ * Resolve the calling tenant for a findings ingest. Two trust paths:
+ *   - SERVICE: a `Bearer <token>` matching `getConfig().sinkToken` authorizes the
+ *     call with no session; the tenant is derived from the scan itself (the
+ *     worker only knows the scan id). The token is never logged.
+ *   - SESSION: the existing UI path — verify the session cookie and tenant-scope.
+ */
+async function resolveSinkTenant(
+  scanId: ScanId,
+  cookieHeader: string | undefined,
+  authHeader: string | undefined,
+): Promise<{ ok: true; tenantId: TenantId } | { ok: false; status: number; error: string }> {
+  const { sinkToken } = getConfig();
+  const presented = bearerToken(authHeader);
+  if (presented !== undefined && sinkToken !== '' && safeEqual(presented, sinkToken)) {
+    const tenantId = await scanRepo.findTenantById(scanId);
+    if (!tenantId) return { ok: false, status: 404, error: `scan not found: ${scanId}` };
+    return { ok: true, tenantId };
+  }
+
+  const auth = authenticate(cookieHeader);
+  if (!auth.ok) return { ok: false, status: auth.status, error: auth.error };
+  return { ok: true, tenantId: scopedTenantId(auth.principal) };
+}
+
 /**
  * `POST /scans/:id/findings` — thin HTTP wrapper over `ingestFindings`.
- * Authenticates + tenant-scopes via the session cookie, then lands the batch.
- * Body: `{ findings: FindingRecord[], attackSurface?: AttackSurfaceData }`.
+ *
+ * Authorizes via EITHER the worker service token (`Authorization: Bearer
+ * <sinkToken>`, tenant resolved from the scan) OR the UI session cookie, then
+ * lands the batch. When a service caller supplies a terminal `status`
+ * (`completed`/`failed`) the scan is transitioned accordingly. Body:
+ * `{ findings: FindingRecord[], attackSurface?: object, status?: "completed"|"failed" }`.
  */
 export async function handleIngestFindings(
   scanId: ScanId,
   body: Record<string, unknown>,
   cookieHeader: string | undefined,
+  authHeader?: string | undefined,
 ): Promise<SinkResponse> {
-  const auth = authenticate(cookieHeader);
-  if (!auth.ok) {
-    return { status: auth.status, body: { error: auth.error } };
+  const resolved = await resolveSinkTenant(scanId, cookieHeader, authHeader);
+  if (!resolved.ok) {
+    return { status: resolved.status, body: { error: resolved.error } };
   }
-  const tenantId = scopedTenantId(auth.principal);
+  const { tenantId } = resolved;
 
   const findings = body.findings;
   if (!Array.isArray(findings)) {
@@ -134,7 +202,11 @@ export async function handleIngestFindings(
 
   try {
     const result = await ingestFindings(tenantId, scanId, findings, attackSurface);
-    return { status: 200, body: { ...result } };
+    const status = asSinkStatus(body.status);
+    if (status) {
+      await scanRepo.setStatus(tenantId, scanId, status);
+    }
+    return { status: 200, body: { ...result, ...(status ? { scanStatus: status } : {}) } };
   } catch (err) {
     return sinkError(err);
   }

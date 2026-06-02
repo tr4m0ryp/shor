@@ -28,6 +28,7 @@ export async function apiRouter(
   url: string,
   body: Record<string, unknown>,
   cookieHeader: string | undefined,
+  authHeader?: string | undefined,
 ): Promise<ApiResponse> {
   const parsed = new URL(url, 'http://localhost');
   const parts = parsed.pathname.split('/').filter(Boolean);
@@ -42,11 +43,12 @@ export async function apiRouter(
   }
 
   // POST /scans/:id/findings — connectivity-only findings sink (ADR-047).
+  // Accepts the worker service token (Authorization: Bearer) or a UI session.
   if (resource === 'scans' && segments[2] === 'findings') {
     if (method !== 'POST') return METHOD_NOT_ALLOWED;
     const scanId = segments[1];
     if (!scanId) return NOT_FOUND;
-    return handleIngestFindings(scanId, body, cookieHeader);
+    return handleIngestFindings(scanId, body, cookieHeader, authHeader);
   }
 
   // GET /export/sarif?scan=<scanId> — SARIF 2.1.0 export view (ADR-033).
