@@ -221,23 +221,32 @@ body {
 .detail-summary { margin-bottom: 16px; padding: 20px 24px; }
 .detail-status-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
 .detail-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-/* New-project mode toggle */
-.mode-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+/* New-project mode toggle — segmented control, equal halves */
+.mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: #F1F1F3; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .mode-toggle .mode-opt {
-  border: none; background: var(--card); color: var(--text-secondary);
-  padding: 7px 12px; font-size: 13px; font-family: var(--font); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  border: none; background: transparent; color: var(--text-secondary);
+  padding: 9px 12px; font-size: 13px; font-weight: 500; font-family: var(--font);
+  border-radius: 5px; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s;
 }
-.mode-toggle .mode-opt span { color: var(--text-muted); font-size: 11px; }
-.mode-toggle .mode-opt + .mode-opt { border-left: 1px solid var(--border); }
-.mode-toggle .mode-opt.active { background: var(--accent); color: #fff; }
-.mode-toggle .mode-opt.active span { color: rgba(255,255,255,.8); }
+.mode-toggle .mode-opt svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.mode-toggle .mode-opt span { color: var(--text-muted); font-size: 11px; font-weight: 400; }
+.mode-toggle .mode-opt:hover:not(.active) { color: var(--text); }
+.mode-toggle .mode-opt.active { background: var(--accent); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.mode-toggle .mode-opt.active span { color: rgba(255,255,255,.82); }
+/* repo picker disabled (black-box) — keeps its grid cell so nothing shifts */
+.repo-disabled select { opacity: .45; pointer-events: none; }
 /* white/black-box label */
 .mode-badge { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 9999px; white-space: nowrap; }
 .mode-badge.whitebox { color: var(--accent); background: #F3ECF8; }
 .mode-badge.blackbox { color: var(--text-secondary); background: var(--card-hover); border: 1px solid var(--border-light); }
-/* GitHub settings */
-.gh-connect-row { display: flex; gap: 8px; align-items: center; }
-.gh-connect-row input { flex: 1; }
+/* GitHub settings — token input */
+.gh-connect-row { display: flex; gap: 10px; align-items: stretch; }
+.gh-input-wrap { flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: #FAFAFA; border: 1px solid var(--border); border-radius: var(--radius-sm); transition: border-color .15s, box-shadow .15s; }
+.gh-input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(125,70,152,.12); }
+.gh-input-wrap svg { width: 15px; height: 15px; color: var(--text-muted); flex: 0 0 auto; }
+.gh-connect-row input { flex: 1; border: none; background: transparent; outline: none; padding: 11px 0; font-size: 13px; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--text); letter-spacing: .02em; }
+.gh-connect-row input::placeholder { font-family: var(--font); letter-spacing: 0; color: var(--text-muted); }
 .gh-status { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 /* Settings card */
 .settings-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow); max-width: 640px; }
@@ -514,8 +523,14 @@ body {
           <div>
             <label for="projMode">Scan mode</label>
             <div class="mode-toggle" id="projMode">
-              <button type="button" class="mode-opt active" data-mode="whitebox" onclick="setProjMode('whitebox')">White-box <span>(with code)</span></button>
-              <button type="button" class="mode-opt" data-mode="blackbox" onclick="setProjMode('blackbox')">Black-box <span>(URL only)</span></button>
+              <button type="button" class="mode-opt active" data-mode="whitebox" onclick="setProjMode('whitebox')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                White-box <span>with code</span>
+              </button>
+              <button type="button" class="mode-opt" data-mode="blackbox" onclick="setProjMode('blackbox')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                Black-box <span>URL only</span>
+              </button>
             </div>
           </div>
           <div id="projRepoWrap">
@@ -629,7 +644,10 @@ body {
             <div id="ghPatInput">
               <p class="hint" style="margin:0 0 8px">Paste a Personal Access Token (classic with <code>repo</code> scope, or fine-grained read access). Stored encrypted; used only to list and clone your repos.</p>
               <div class="gh-connect-row">
-                <input type="password" id="ghToken" placeholder="ghp_… or github_pat_…" autocomplete="off">
+                <div class="gh-input-wrap">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+                  <input type="password" id="ghToken" placeholder="ghp_… or github_pat_…" autocomplete="off">
+                </div>
                 <button class="btn btn-primary" id="ghConnectBtn" onclick="connectGithub()">Connect</button>
               </div>
               <div class="hint" style="margin-top:6px">Create one at <span class="mono">github.com/settings/tokens</span>.</div>
@@ -864,7 +882,19 @@ function setProjMode(mode) {
   document.querySelectorAll('#projMode .mode-opt').forEach(function (b) {
     b.classList.toggle('active', b.getAttribute('data-mode') === mode);
   });
-  document.getElementById('projRepoWrap').style.display = mode === 'whitebox' ? 'block' : 'none';
+  // Keep the repo field in place (no layout shift) — just disable + dim it and
+  // reword the hint for black-box.
+  const wrap = document.getElementById('projRepoWrap');
+  const sel = document.getElementById('projRepo');
+  const hint = document.getElementById('projRepoHint');
+  const black = mode === 'blackbox';
+  wrap.classList.toggle('repo-disabled', black);
+  sel.disabled = black;
+  if (black) {
+    if (hint) hint.textContent = 'Not used for a black-box (URL-only) scan.';
+  } else if (hint) {
+    hint.textContent = ghState.repos.length ? ghState.repos.length + ' repos from your GitHub account.' : 'Connect GitHub in Settings to list your repos.';
+  }
 }
 
 function selectedProjMode() {
