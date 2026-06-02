@@ -7,11 +7,45 @@
  * router authenticates + tenant-scopes via the `auth` middleware (ADR-044).
  */
 
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage } from 'node:http';
+import { extname, join, normalize } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getConfig } from '../config.js';
 import { apiRouter } from './router.js';
 
 const PORT = Number.parseInt(process.env.WEB_PORT ?? '3457', 10);
+
+/** Static asset root: `dist/public` next to this compiled module. */
+const PUBLIC_DIR = join(fileURLToPath(import.meta.url), '..', '..', 'public');
+
+const MIME_TYPES: Readonly<Record<string, string>> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+};
+
+/**
+ * Resolve a static asset for a GET path, or `null` to fall through to the API
+ * router. Serves `index.html` for `/` and asset requests (anything with a known
+ * extension); leaves extension-less paths (`/projects`, `/auth/me`) for the API.
+ * Paths are normalized and confined to `PUBLIC_DIR` (no `..` traversal).
+ */
+function serveStatic(pathname: string): { body: Buffer; mime: string } | null {
+  const isRoot = pathname === '/' || pathname === '';
+  const ext = extname(pathname);
+  if (!isRoot && !ext) return null; // an API path, not an asset
+
+  const rel = isRoot ? 'index.html' : pathname.replace(/^\/+/, '');
+  const filePath = normalize(join(PUBLIC_DIR, rel));
+  if (!filePath.startsWith(PUBLIC_DIR) || !existsSync(filePath)) return null;
+
+  const mime = MIME_TYPES[extname(filePath)] ?? 'application/octet-stream';
+  return { body: readFileSync(filePath), mime };
+}
 
 function parseBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve) => {
@@ -44,6 +78,21 @@ export function createDashboardServer(): ReturnType<typeof createServer> {
     }
 
     try {
+      // Static assets (the ported dashboard UI) for GET requests to `/` or an
+      // asset path; extension-less GETs fall through to the API router.
+      if (method === 'GET') {
+        const pathname = new URL(url, 'http://localhost').pathname;
+        const file = serveStatic(pathname);
+        if (file) {
+          const headers: Record<string, string> = { 'Content-Type': file.mime };
+          // No HTML caching so a rebuilt dashboard bundle never sticks.
+          if (file.mime.startsWith('text/html')) headers['Cache-Control'] = 'no-store, must-revalidate';
+          res.writeHead(200, headers);
+          res.end(file.body);
+          return;
+        }
+      }
+
       const body = method === 'POST' || method === 'PUT' ? await parseBody(req) : {};
       const result = await apiRouter(method, url, body, req.headers.cookie);
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };

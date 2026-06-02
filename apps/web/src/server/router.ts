@@ -11,6 +11,7 @@
 
 import { handleLogout, handleMe, handleSessionLogin } from '../auth/routes.js';
 import { handleIngestFindings, handleSarifExport } from '../findings/index.js';
+import { routeDashboard } from './dashboard/index.js';
 
 /** Standard response envelope: HTTP status, JSON body, optional `Set-Cookie`. */
 export interface ApiResponse {
@@ -54,6 +55,11 @@ export async function apiRouter(
     const res = await handleSarifExport(parsed.searchParams.get('scan') ?? undefined, cookieHeader);
     return { status: res.status, body: { ...res.body } };
   }
+
+  // Dashboard data plane (Phase 5): projects, scans, findings/attack-surface,
+  // diff, trigger, users. Returns null when the path is not a dashboard route.
+  const dashboard = await routeDashboard(method, segments, body, cookieHeader);
+  if (dashboard) return dashboard;
 
   return NOT_FOUND;
 }
