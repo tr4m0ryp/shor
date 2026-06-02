@@ -123,7 +123,7 @@ payload class. Do NOT run those exploit tools in this analysis-only phase.
 <data_format_specifications>
 
 <exploitation_queue_format>
-**Purpose:** Defines the structure of the agent's final structured response. The orchestration layer reads this object into `.storron/deliverables/xss_exploitation_queue.json` as the array `vulnerabilities: [...]`.
+**Purpose:** Defines the structure of the exploitation queue you MUST write yourself, using the Write tool, to `.storron/deliverables/xss_exploitation_queue.json`. The file is a single object whose array key is `vulnerabilities: [...]`.
 
 **Structure:** Each `vulnerability` JSON object MUST follow this exact format. NEVER rename or remove fields; you MAY leave optional fields as empty strings or `null` when not applicable.
 
@@ -358,7 +358,7 @@ COMPLETION REQUIREMENTS (ALL must be satisfied):
      4. Run `save-deliverable` with `--type XSS_ANALYSIS --file-path ".storron/deliverables/xss_analysis_deliverable.md"`.
      **WARNING:** NEVER write the entire report in a single tool call — exceeds 32K output token limit. Split into multiple Write/Edit operations.
 
-**Note:** Save your deliverable markdown via save-deliverable first. The exploitation queue (`xss_exploitation_queue.json`, array key `vulnerabilities`) is captured automatically at the end of your session from the structured response.
+**Writing the exploitation queue (MANDATORY final step):** After saving your deliverable markdown via save-deliverable, you MUST write the exploitation queue yourself to `.storron/deliverables/xss_exploitation_queue.json` using the Write tool. It MUST be valid JSON matching `exploitation_queue_format` exactly — the wrapper object is `{ "vulnerabilities": [ ... ] }` (NEVER rename `vulnerabilities`, NEVER nest under another key). Only entries with `verdict = "vulnerable"` go in the array; if there are none, write `{ "vulnerabilities": [] }`. Do not end your session until this file is written and parses as valid JSON.
 
 ONLY AFTER both systematic analysis AND successful deliverable generation, announce "XSS ANALYSIS COMPLETE" and stop.
 

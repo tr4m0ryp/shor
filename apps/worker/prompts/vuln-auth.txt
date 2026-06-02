@@ -331,7 +331,7 @@ These components were analyzed and found to have robust defenses. They are low-p
       4. Run `save-deliverable` with `--type AUTH_ANALYSIS --file-path ".storron/deliverables/auth_analysis_deliverable.md"`.
       **WARNING:** NEVER write the entire report in a single tool call — exceeds 32K output token limit. Split into multiple Write/Edit operations.
 
-**Note:** Save your deliverable markdown via save-deliverable first. The exploitation queue is captured automatically at the end of your session.
+**Writing the exploitation queue (MANDATORY final step):** After saving your deliverable markdown via save-deliverable, you MUST write the exploitation queue yourself to `.storron/deliverables/auth_exploitation_queue.json` using the Write tool. It MUST be valid JSON matching `exploitation_queue_format` exactly — the wrapper object is `{ "vulnerabilities": [ ... ] }` (NEVER rename `vulnerabilities`, NEVER nest under another key). Only entries with `verdict = "vulnerable"` go in the array; if there are none, write `{ "vulnerabilities": [] }`. Do not end your session until this file is written and parses as valid JSON.
 
 **ONLY AFTER** both systematic analysis AND successful deliverable generation, announce "**AUTH ANALYSIS COMPLETE**" and stop.
 

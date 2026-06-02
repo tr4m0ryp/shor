@@ -90,8 +90,15 @@ export async function handleExecutionFailure(
 }
 
 /**
- * Persist structured-output JSON for vuln agents that produce a queue file.
- * No-op for agents without a queue schema.
+ * Ensure a vuln agent's exploitation-queue file exists and is valid JSON.
+ *
+ * All-flash mode: the agent writes the queue file itself (the prompt instructs
+ * the exact `{ "vulnerabilities": [...] }` shape). This backstops that:
+ *   1. if the SDK still returned structured output, persist it (capable-model path);
+ *   2. else if the agent's hand-written file parses, keep it;
+ *   3. else write an empty valid queue so a flash hiccup degrades to "no
+ *      findings" instead of failing queue validation and crashing the pipeline.
+ * No-op for non-vuln agents.
  */
 export async function writeStructuredOutput(
 	agentName: AgentName,
@@ -100,17 +107,32 @@ export async function writeStructuredOutput(
 	logger: ActivityLogger,
 ): Promise<void> {
 	const queueFilename = getQueueFilename(agentName);
-	if (result.structuredOutput === undefined || !queueFilename) {
-		return;
-	}
+	if (!queueFilename) return;
 	await fs.ensureDir(deliverablesPath);
 	const queuePath = path.join(deliverablesPath, queueFilename);
-	await fs.writeFile(
-		queuePath,
-		JSON.stringify(result.structuredOutput, null, 2),
-		"utf8",
-	);
-	logger.info(`Wrote structured output queue to ${queueFilename}`);
+
+	if (result.structuredOutput !== undefined) {
+		await fs.writeFile(queuePath, JSON.stringify(result.structuredOutput, null, 2), "utf8");
+		logger.info(`Wrote structured output queue to ${queueFilename}`);
+		return;
+	}
+
+	// The agent should have written the queue itself; accept it if it parses.
+	if (await fs.pathExists(queuePath)) {
+		try {
+			const parsed: unknown = JSON.parse(await fs.readFile(queuePath, "utf8"));
+			if (parsed && typeof parsed === "object" && Array.isArray((parsed as { vulnerabilities?: unknown }).vulnerabilities)) {
+				logger.info(`Using agent-written queue ${queueFilename}`);
+				return;
+			}
+			logger.warn(`Queue ${queueFilename} malformed; replacing with empty queue`);
+		} catch {
+			logger.warn(`Queue ${queueFilename} is not valid JSON; replacing with empty queue`);
+		}
+	} else {
+		logger.warn(`Queue ${queueFilename} missing; writing empty queue (no findings)`);
+	}
+	await fs.writeFile(queuePath, JSON.stringify({ vulnerabilities: [] }, null, 2), "utf8");
 }
 
 /**

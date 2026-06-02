@@ -5,9 +5,7 @@
 // as published by the Free Software Foundation.
 
 import { skillTracker } from "../../job/progress/skill-tracker.js";
-import { PentestError } from "../../services/error-handling.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
-import { ErrorCode } from "../../types/errors.js";
 import type { AuditLogger } from "../audit-logger.js";
 import {
 	formatAssistantOutput,
@@ -150,16 +148,14 @@ export async function dispatchMessage(
 			outputLines(formatResultOutput(resultData, !execContext.useCleanOutput));
 
 			if (resultData.subtype === "error_max_structured_output_retries") {
-				return {
-					type: "throw",
-					error: new PentestError(
-						"Structured output validation failed after max retries",
-						"validation",
-						true,
-						{},
-						ErrorCode.OUTPUT_VALIDATION_FAILED,
-					),
-				};
+				// Non-fatal: structured output is disabled in all-flash mode, but if
+				// it is ever re-enabled and the model exhausts retries, don't crash —
+				// complete with whatever text we have. The queue backstop
+				// (ensureQueueFile) guarantees a valid queue file downstream.
+				logger.warn(
+					"Structured output retries exhausted; continuing (queue backstop applies)",
+				);
+				return { type: "complete" as const, result: resultData.result };
 			}
 
 			return {

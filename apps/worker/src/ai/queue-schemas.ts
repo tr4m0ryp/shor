@@ -129,10 +129,19 @@ const VULN_AGENT_QUEUE_FILENAMES: Partial<Record<AgentName, string>> = {
 	"authz-vuln": "authz_exploitation_queue.json",
 };
 
-/** Returns the structured output format for a vuln agent, or undefined for non-vuln agents. */
-export function getOutputFormat(
-	agentName: AgentName,
-): JsonSchemaOutputFormat | undefined {
+/**
+ * SDK structured-output enforcement is DISABLED (all-flash mode). DeepSeek flash
+ * cannot reliably satisfy the queue JSON schema, and the SDK's max-retry failure
+ * killed the vuln agents after ~6 min. Instead the agent writes the queue file
+ * itself (the prompt instructs the exact `{ "vulnerabilities": [...] }` shape)
+ * and `ensureQueueFile` backstops a missing/garbled file with an empty queue, so
+ * a flash hiccup degrades to "no findings" rather than crashing the pipeline.
+ *
+ * Set `AEGIS_STRUCTURED_OUTPUT=1` to re-enable the SDK schema enforcement (only
+ * worthwhile on a model that reliably emits structured output, e.g. a pro tier).
+ */
+export function getOutputFormat(agentName: AgentName): JsonSchemaOutputFormat | undefined {
+	if (process.env.AEGIS_STRUCTURED_OUTPUT !== "1") return undefined;
 	return VULN_AGENT_OUTPUT_FORMAT[agentName];
 }
 
