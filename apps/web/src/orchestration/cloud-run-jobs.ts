@@ -49,6 +49,29 @@ export interface JobLaunch {
   readonly executionName: string | null;
 }
 
+/**
+ * Launch ONE execution of a pre-created Cloud Run Job (named by `scanJobName`)
+ * with per-run env overrides — the direct-launch path the dashboard uses
+ * (ADR-051). Unlike `runScanJob`, this creates NO per-scan Job resource: a
+ * single worker Job already exists and every scan runs as an execution of it.
+ * Returns the Job + execution resource names so the caller has a cancel handle.
+ */
+export async function launchScanExecution(
+  jobShortName: string,
+  runEnv: readonly JobEnvVar[],
+): Promise<JobLaunch> {
+  const cfg = getConfig().cloudRun;
+  const client = await getJobsClient();
+  const name = jobName(cfg, jobShortName);
+
+  const [operation] = await client.runJob({
+    name,
+    overrides: buildRunOverrides(runEnv) as never,
+  });
+  const executionName = executionNameFromMetadata(operation);
+  return { jobName: name, executionName };
+}
+
 export interface RunScanJobArgs {
   /** Stable per-scan Job id (`aegis-scan-<scanId>`); names the Job resource. */
   readonly jobId: string;

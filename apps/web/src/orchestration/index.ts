@@ -1,19 +1,21 @@
 /**
  * Scan orchestration (ADR-051) — public surface.
  *
- * The dashboard mints a scan, `startScan` launches a Temporal Cloud workflow,
- * whose single activity runs a per-scan Cloud Run Job. `cancelScan` cancels the
- * workflow (= kill switch). All clients are lazy: importing this module performs
- * no I/O and needs no live GCP/Temporal credentials.
+ * The dashboard mints a scan, then `startScan` DIRECTLY launches one execution of
+ * the pre-created Cloud Run Job (`getConfig().scanJobName`) with per-run env
+ * overrides — no Temporal. `cancelScan` cancels that execution (= kill switch).
+ * All clients are lazy: importing this module performs no I/O and needs no live
+ * GCP credentials.
  *
- * NOTE: the worker fleet registers `scanWorkflow` (workflow) + the activities
- * from `./scan-activities.js`; the dashboard only uses the orchestrator.
+ * NOTE: the Temporal `scanWorkflow`/activities exports below are retained for the
+ * worker fleet but are no longer used by the dashboard's launch path.
  */
 
 export {
   cancelExecution,
   deleteScanJob,
   type JobLaunch,
+  launchScanExecution,
   type RunScanJobArgs,
   runScanJob,
   waitForExecution,

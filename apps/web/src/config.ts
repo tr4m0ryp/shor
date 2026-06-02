@@ -167,6 +167,21 @@ export interface GithubAppConfig {
 export interface AegisConfig {
   readonly env: 'development' | 'production' | 'test';
   /**
+   * Direct Cloud Run Job launch + findings-sink wiring (ADR-051).
+   *
+   * The dashboard launches a per-run EXECUTION of a single, pre-created Cloud Run
+   * Job (`scanJobName`) with env overrides, then the worker POSTs findings back
+   * to the dashboard's own base URL (`publicUrl`) authenticated with a shared
+   * service token (`sinkToken`). `sinkToken` is a secret and MUST be set to a
+   * strong random value in any non-local deployment.
+   */
+  /** Pre-created Cloud Run Job that runs the worker image (`CLOUD_RUN_SCAN_JOB`). */
+  readonly scanJobName: string;
+  /** Shared service token the worker presents to the findings sink (`AEGIS_SINK_TOKEN`). */
+  readonly sinkToken: string;
+  /** The dashboard's own public base URL the worker POSTs findings to (`AEGIS_PUBLIC_URL`). */
+  readonly publicUrl: string;
+  /**
    * Env-gated dev login (`AEGIS_DEV_LOGIN`, default false).
    *
    * When true, `GET /auth/me` with no valid session provisions a seeded dev
@@ -206,6 +221,10 @@ export function getConfig(): AegisConfig {
     env: resolvedEnv,
     // Env-gated dev login (default OFF). Never enable in production.
     devLogin: envBool('AEGIS_DEV_LOGIN', false),
+    // Direct Cloud Run Job launch + findings sink (ADR-051).
+    scanJobName: env('CLOUD_RUN_SCAN_JOB', 'aegis-scan-worker'),
+    sinkToken: env('AEGIS_SINK_TOKEN'),
+    publicUrl: env('AEGIS_PUBLIC_URL'),
     gcp: { projectId, region },
     sql: {
       host: env('CLOUD_SQL_HOST'),
