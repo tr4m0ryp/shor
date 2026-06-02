@@ -39,6 +39,21 @@ export const scanRepo = {
     return rows[0] ? toScan(rows[0]) : null;
   },
 
+  /**
+   * Resolve the owning tenant for a scan WITHOUT a caller-supplied tenant id.
+   * Used only by service-token callers (the worker findings sink) that prove
+   * trust via the shared token, not a session — the tenant is then derived from
+   * the scan so all downstream repo calls stay tenant-scoped. Returns null when
+   * the scan does not exist.
+   */
+  async findTenantById(id: ScanId): Promise<TenantId | null> {
+    const { rows } = await query<{ tenant_id: string }>(
+      `SELECT p.tenant_id FROM scan s JOIN project p ON p.id = s.project_id WHERE s.id = $1`,
+      [id],
+    );
+    return rows[0] ? rows[0].tenant_id : null;
+  },
+
   async listByProject(tenantId: TenantId, projectId: ProjectId): Promise<Scan[]> {
     const { rows } = await query<ScanRow>(
       `${SELECT_SCOPED} AND s.project_id = $2 ORDER BY s.started_at DESC NULLS LAST`,

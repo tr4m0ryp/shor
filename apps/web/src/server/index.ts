@@ -94,7 +94,7 @@ export function createDashboardServer(): ReturnType<typeof createServer> {
       }
 
       const body = method === 'POST' || method === 'PUT' ? await parseBody(req) : {};
-      const result = await apiRouter(method, url, body, req.headers.cookie);
+      const result = await apiRouter(method, url, body, req.headers.cookie, req.headers.authorization);
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (result.setCookie) headers['Set-Cookie'] = result.setCookie;
       res.writeHead(result.status, headers);
