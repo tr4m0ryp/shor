@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aegis</title>
+<meta name="description" content="Aegis -- multi-tenant AI pentest platform. Targets, scans, findings, attack surface, and scan-to-scan diffs.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
+<style>
+/* Aegis dashboard styles. The visual design language (color tokens, fonts,
+ * layout, sidebar, tabs, cards, badges, finding rows, attack-scenario blocks,
+ * toast) is ported verbatim from storron's web UI to preserve look-and-feel. */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --card: #FFFFFF;
+  --card-hover: #F8F8F8;
+  --border: #F0F0F0;
+  --border-light: #E5E5E5;
+  --text: #000000;
+  --text-secondary: #595959;
+  --text-muted: #999999;
+  --accent: #7D4698;
+  --accent-hover: #9A5FB8;
+  --green: #10A651;
+  --red: #E53E3E;
+  --yellow: #D69E2E;
+  --shadow: 0 4px 4px rgba(0,0,0,0.04), 0 0 1px rgba(0,0,0,0.62);
+  --radius: 8px;
+  --radius-sm: 6px;
+  --font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+html, body { overscroll-behavior: none; overflow-x: clip; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* === Layout === */
+.app { display: flex; min-height: 100vh; }
+
+/* === Sidebar === */
+.sidebar {
+  width: 240px;
+  background: #FAF7FC;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 16px;
+  flex-shrink: 0;
+}
+.sidebar .logo {
+  font-size: 20px; font-weight: 600; letter-spacing: -0.02em;
+  padding: 0 12px 24px; display: flex; align-items: center; gap: 10px;
+}
+.sidebar .logo svg { width: 28px; height: 28px; flex-shrink: 0; }
+.sidebar .logo .wordmark { color: var(--text); font-weight: 600; }
+.sidebar .logo .wordmark .accent { color: var(--accent); }
+.sidebar nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.sidebar nav a {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500; color: var(--text-secondary);
+  text-decoration: none; transition: all .15s; cursor: pointer;
+}
+.sidebar nav a:hover { background: #F0E6F5; color: var(--text); }
+.sidebar nav a.active { background: #F0E6F5; color: var(--text); }
+.sidebar nav a svg { width: 16px; height: 16px; flex-shrink: 0; opacity: .7; }
+
+/* Signed-in user chip (multi-user). */
+.user-chip {
+  margin-top: auto; padding: 12px; border-radius: var(--radius-sm);
+  background: #F0E6F5; display: flex; flex-direction: column; gap: 2px;
+}
+.user-chip .user-email { font-size: 12px; font-weight: 500; color: var(--text); word-break: break-all; }
+.user-chip .user-meta { font-size: 11px; color: var(--text-secondary); }
+.role-badge {
+  display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 9999px;
+  font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  background: #E8F0FE; color: #1A56DB;
+}
+.role-owner { background: #F3E8FF; color: #6B21A8; }
+.role-admin { background: #E8F0FE; color: #1A56DB; }
+.role-member { background: #E8F5E9; color: #2E7D32; }
+.role-viewer { background: var(--card-hover); color: var(--text-secondary); }
+
+/* === Main === */
+.main { flex: 1; padding: 32px 40px; max-width: 1280px; min-width: 0; }
+.page { min-width: 0; }
+.page-header { margin-bottom: 32px; }
+.page-header h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+.page-header p { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+
+/* === New / form card === */
+.new-run-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; margin-bottom: 32px;
+  box-shadow: var(--shadow);
+}
+.new-run-card h2 { font-size: 15px; font-weight: 600; margin-bottom: 20px; color: var(--text); }
+.new-run-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: end; }
+.new-run-grid .full { grid-column: 1 / -1; }
+.new-run-grid label {
+  display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em;
+}
+.new-run-grid input, .new-run-grid select {
+  width: 100%; padding: 10px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: #FAFAFA; color: var(--text);
+  font-size: 14px; font-family: var(--font); outline: none;
+  transition: border-color .15s;
+}
+.new-run-grid input:focus, .new-run-grid select:focus { border-color: var(--accent); }
+.new-run-grid input::placeholder { color: var(--text-muted); }
+.new-run-grid .hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+.new-run-grid select {
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23595959' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat; background-position: right 14px center; background-size: 12px; cursor: pointer;
+}
+.start-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 4px; grid-column: 1 / -1; }
+
+/* === Buttons === */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 20px; border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500; font-family: var(--font);
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.btn:hover { opacity: .9; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--card); color: var(--text); }
+.btn-danger { background: transparent; color: var(--red); border: 1px solid transparent; }
+.btn-danger:hover { background: rgba(229,62,62,.1); border-color: var(--red); }
+
+/* === Section header === */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.section-header h2 { font-size: 15px; font-weight: 600; }
+.section-header .count {
+  font-size: 12px; color: var(--text-muted);
+  background: var(--card); padding: 2px 10px; border-radius: 9999px; border: 1px solid var(--border);
+}
+
+/* === Cards (targets / runs) === */
+.runs-grid { display: flex; flex-direction: column; gap: 8px; }
+.run-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow);
+  transition: border-color .15s; display: grid;
+  grid-template-columns: 1fr auto; grid-template-rows: auto auto;
+  gap: 4px 16px; align-items: center; cursor: pointer;
+}
+.run-card:hover { border-color: var(--accent); background: var(--card-hover); }
+.run-card .run-meta { display: flex; align-items: center; gap: 12px; grid-column: 1; }
+.run-card .run-target {
+  font-size: 15px; font-weight: 500;
+  max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.run-card .run-id { font-size: 12px; color: var(--text-muted); font-family: 'SF Mono', 'Fira Code', monospace; }
+.run-card .run-status { grid-column: 2; grid-row: 1; justify-self: end; }
+.run-card .run-details { grid-column: 2; grid-row: 2; justify-self: end; display: flex; align-items: center; gap: 12px; }
+.run-card .run-progress { grid-column: 1; grid-row: 2; font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 16px; }
+.run-card .run-actions { display: flex; gap: 4px; }
+
+/* === Status badges === */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 9999px;
+  font-size: 11px; font-weight: 500; letter-spacing: .02em; text-transform: uppercase;
+}
+.badge-running { background: #E8F5E9; color: #2E7D32; }
+.badge-completed { background: #E8F5E9; color: #2E7D32; }
+.badge-pending { background: #FFF8E1; color: #F57F17; }
+.badge-failed { background: #FFEBEE; color: #C62828; }
+.badge-cancelled { background: #FFEBEE; color: #C62828; }
+
+/* === Diff status badges (new/open/fixed/regressed) === */
+.diff-badge {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px;
+  font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+}
+.diff-new { background: #E8F0FE; color: #1A56DB; }
+.diff-open { background: var(--card-hover); color: var(--text-secondary); }
+.diff-fixed { background: #E8F5E9; color: #2E7D32; }
+.diff-regressed { background: #FFEBEE; color: #C62828; }
+
+/* === Empty state === */
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.empty-state svg { width: 40px; height: 40px; opacity: .3; margin-bottom: 16px; }
+.empty-state p { font-size: 14px; }
+
+/* === Detail page === */
+#pageScanDetail { display: flex; flex-direction: column; min-width: 0; }
+#pageScanDetail > * { min-width: 0; }
+.detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.detail-header .btn-ghost { flex-shrink: 0; }
+.detail-header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+.detail-header .run-id { font-size: 12px; color: var(--text-muted); font-family: 'SF Mono', 'Fira Code', monospace; margin-top: 2px; }
+.detail-summary { margin-bottom: 16px; padding: 20px 24px; }
+.detail-status-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.detail-actions { margin-left: auto; display: flex; gap: 6px; }
+.detail-grid { display: grid; grid-template-columns: 200px 1fr; gap: 8px 16px; font-size: 13px; }
+.detail-grid dt { color: var(--text-muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; align-self: center; }
+.detail-grid dd { color: var(--text); word-break: break-all; }
+.detail-grid dd.mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+
+.detail-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-top: 8px; }
+.detail-tab {
+  background: transparent; border: none; border-bottom: 2px solid transparent;
+  padding: 8px 16px; color: var(--text-secondary);
+  font-size: 13px; font-weight: 500; font-family: var(--font); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px; transition: color .15s, border-color .15s;
+}
+.detail-tab:hover { color: var(--text); }
+.detail-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.detail-tab .count {
+  font-size: 11px; color: var(--text-muted); background: var(--card);
+  padding: 1px 8px; border-radius: 9999px; border: 1px solid var(--border); font-weight: 500;
+}
+.detail-panel {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; margin-top: 16px; box-shadow: var(--shadow); min-width: 0; overflow-x: hidden;
+}
+.detail-panel .panel-empty { text-align: center; padding: 24px 12px; color: var(--text-muted); font-size: 13px; }
+.detail-panel .panel-section + .panel-section { margin-top: 20px; }
+.detail-panel .panel-section h3 {
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px;
+}
+
+/* === Findings tab === */
+.findings-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.findings-filter-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; align-self: center; }
+.findings-filter {
+  padding: 4px 12px; border: 1px solid var(--border); background: transparent; border-radius: 9999px;
+  font-size: 12px; cursor: pointer; color: var(--text-secondary); font-family: var(--font);
+  transition: background .15s, color .15s, border-color .15s;
+}
+.findings-filter:hover { background: var(--card-hover); color: var(--text); }
+.findings-filter.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.finding-row {
+  display: grid; grid-template-columns: 70px 140px 1fr auto 24px;
+  gap: 12px; align-items: center; padding: 10px 12px; border-radius: var(--radius-sm);
+  cursor: pointer; transition: background .15s; font-size: 13px; border-bottom: 1px solid var(--border);
+}
+.finding-row:hover { background: var(--card-hover); }
+.finding-row .finding-type-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  background: var(--card-hover); color: var(--text-secondary); padding: 3px 8px; border-radius: 9999px;
+}
+.finding-row .finding-id { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: var(--text); }
+.finding-row .finding-summary { color: var(--text-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.finding-row .finding-badges { display: inline-flex; gap: 6px; flex-wrap: nowrap; }
+.finding-row .finding-chevron { color: var(--text-muted); font-size: 14px; text-align: center; transition: transform .15s; }
+.finding-row.expanded .finding-chevron { transform: rotate(90deg); }
+.finding-detail { padding: 8px 12px 16px; background: var(--card-hover); }
+.finding-detail[hidden] { display: none; }
+.finding-field { display: grid; grid-template-columns: 180px 1fr; gap: 8px 16px; margin-bottom: 6px; font-size: 13px; }
+.finding-field dt { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.finding-field dd { color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.finding-field.highlight dt { color: var(--accent); }
+.finding-field.highlight dd { font-weight: 500; }
+.confidence-badge {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px;
+  font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
+  background: var(--card-hover); color: var(--text-secondary); border: 1px solid var(--border);
+}
+
+/* === Severity badges === */
+.severity-badge {
+  display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 9999px;
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+}
+.severity-critical { background: #FFEBEE; color: #C62828; }
+.severity-high { background: #FFEBEE; color: #C62828; }
+.severity-medium { background: #FFF8E1; color: #B45309; }
+.severity-low { background: #E8F0FE; color: #1A56DB; }
+.severity-info, .severity-informational { background: var(--card-hover); color: var(--text-secondary); }
+
+/* === Attack scenarios === */
+.attack-scenario {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow);
+}
+.attack-scenario-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.attack-scenario-header h3 { font-size: 15px; font-weight: 600; color: var(--text); margin: 0; flex: 1; min-width: 0; }
+.attack-scenario-section { margin-top: 12px; }
+.attack-scenario-section .field-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.attack-scenario-section .field-value { font-size: 13px; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.attack-scenario-section .field-value.muted { color: var(--text-secondary); }
+.attack-chain { margin: 8px 0 0 18px; padding: 0; font-size: 13px; }
+.attack-chain li { margin: 4px 0; color: var(--text); }
+.attack-chain li .chain-tool { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; color: var(--text-muted); }
+.attack-scenario-footer {
+  display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px;
+  border-top: 1px solid var(--border); flex-wrap: wrap;
+}
+.attack-scenario-footer .effort { font-size: 12px; color: var(--text-muted); font-family: 'SF Mono', 'Fira Code', monospace; }
+
+/* === Users table (multi-user) === */
+.users-table { display: flex; flex-direction: column; gap: 6px; }
+.user-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+  padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card);
+}
+.user-row.is-current { border-color: var(--accent); background: var(--card-hover); }
+.user-row .u-email { font-size: 13px; font-weight: 500; word-break: break-all; }
+.user-row .u-you { font-size: 11px; color: var(--accent); font-weight: 600; }
+
+/* === Toast === */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: var(--radius-sm);
+  color: #fff; font-size: 14px; font-weight: 500; z-index: 100;
+  opacity: 0; transition: opacity .2s; pointer-events: none; box-shadow: var(--shadow);
+}
+.toast.show { opacity: 1; }
+.toast.success { background: #2E7D32; color: #fff; }
+.toast.error { background: #C62828; color: #fff; }
+
+/* === Spinner === */
+.spinner {
+  display: inline-block; width: 20px; height: 20px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main { padding: 20px; }
+  .new-run-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#7D4698" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <span class="wordmark">Ae<span class="accent">gis</span></span>
+    </div>
+    <nav>
+      <a id="navTargets" class="active" onclick="showPage('targets')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        Targets
+      </a>
+      <a id="navTeam" onclick="showPage('team')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team
+      </a>
+      <a id="navLogout" onclick="logout(event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign out
+      </a>
+    </nav>
+    <div class="user-chip" id="userChip" style="display:none">
+      <span class="user-email" id="userEmail">--</span>
+      <span class="user-meta"><span class="role-badge" id="userRole">viewer</span> <span id="userOrg"></span></span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- ===================== Targets page ===================== -->
+    <div id="pageTargets" class="page">
+      <div class="page-header">
+        <h1>Targets</h1>
+        <p>Named targets &mdash; a live site plus a connected repo and optional schedule. Trigger scans and track them over time.</p>
+      </div>
+
+      <div class="new-run-card">
+        <h2>New Target</h2>
+        <div class="new-run-grid">
+          <div>
+            <label for="projName">Name</label>
+            <input type="text" id="projName" placeholder="My production app">
+          </div>
+          <div>
+            <label for="projUrl">Target URL</label>
+            <input type="url" id="projUrl" placeholder="https://example.com">
+          </div>
+          <div>
+            <label for="projRepo">Repo installation id</label>
+            <input type="text" id="projRepo" placeholder="GitHub App installation id (optional)">
+            <div class="hint">Leave blank for zip-only ingest.</div>
+          </div>
+          <div>
+            <label for="projSchedule">Schedule</label>
+            <input type="text" id="projSchedule" placeholder="cron, e.g. 0 3 * * 1 (optional)">
+            <div class="hint">Blank = on-demand.</div>
+          </div>
+          <div class="start-row">
+            <button class="btn btn-primary" id="createProjBtn" onclick="createProject()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Create Target
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <h2>All Targets</h2>
+        <span class="count" id="projCount">0</span>
+      </div>
+      <div class="runs-grid" id="projectsContainer">
+        <div class="empty-state" id="projectsEmpty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/></svg>
+          <p>No targets yet. Create one above.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== Project detail (scans list) ===================== -->
+    <div id="pageProjectDetail" class="page" style="display:none">
+      <div class="page-header detail-header">
+        <button class="btn btn-ghost btn-sm" onclick="showPage('targets')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="15 18 9 12 15 6"/></svg>
+          All targets
+        </button>
+        <div>
+          <h1 id="projDetailTitle">Target</h1>
+          <p id="projDetailSubtitle" class="run-id"></p>
+        </div>
+        <div class="detail-actions">
+          <button class="btn btn-primary btn-sm" id="triggerScanBtn" onclick="triggerScan()">Run scan</button>
+        </div>
+      </div>
+      <div class="section-header">
+        <h2>Scans</h2>
+        <span class="count" id="scanCount">0</span>
+      </div>
+      <div class="runs-grid" id="scansContainer">
+        <div class="empty-state" id="scansEmpty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <p>No scans yet. Run one above.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== Scan detail ===================== -->
+    <div id="pageScanDetail" class="page" style="display:none">
+      <div class="page-header detail-header">
+        <button class="btn btn-ghost btn-sm" id="scanBackBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="15 18 9 12 15 6"/></svg>
+          Scans
+        </button>
+        <div>
+          <h1 id="scanDetailTitle">Scan</h1>
+          <p id="scanDetailSubtitle" class="run-id"></p>
+        </div>
+      </div>
+      <div class="detail-summary new-run-card">
+        <div class="detail-status-row">
+          <span class="badge" id="scanStatus"></span>
+        </div>
+        <dl class="detail-grid" id="scanGrid"></dl>
+      </div>
+      <div class="detail-tabs" role="tablist">
+        <button class="detail-tab active" data-tab="findings" onclick="showScanTab('findings')">Findings <span class="count" id="findingsCount">0</span></button>
+        <button class="detail-tab" data-tab="attackSurface" onclick="showScanTab('attackSurface')">Attack Surface <span class="count" id="attackSurfaceCount">0</span></button>
+        <button class="detail-tab" data-tab="diff" onclick="showScanTab('diff')">Diff <span class="count" id="diffCount">0</span></button>
+      </div>
+      <div class="detail-panel" id="panelFindings"></div>
+      <div class="detail-panel" id="panelAttackSurface" style="display:none"></div>
+      <div class="detail-panel" id="panelDiff" style="display:none"></div>
+    </div>
+
+    <!-- ===================== Team page (multi-user) ===================== -->
+    <div id="pageTeam" class="page" style="display:none">
+      <div class="page-header">
+        <h1>Team</h1>
+        <p>Users in your tenant. Every view is scoped to your organization.</p>
+      </div>
+      <div class="section-header">
+        <h2>Members</h2>
+        <span class="count" id="userCount">0</span>
+      </div>
+      <div class="users-table" id="usersContainer"></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===================== Aegis dashboard client =====================
+// Drives the Aegis API (auth-gated, tenant-scoped). Mirrors storron's
+// framework-less, fetch-based client style.
+
+const state = {
+  me: null,
+  currentProject: null,
+  currentScan: null,
+  scanTab: 'findings',
+  findingsCache: [],
+  attackSurfaceCache: null,
+  severityFilter: 'all',
+};
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+let toastTimer = null;
+function showToast(message, kind) {
+  const el = document.getElementById('toast');
+  el.textContent = message;
+  el.className = 'toast show ' + (kind || '');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = 'toast'; }, 2600);
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: {}, credentials: 'same-origin' };
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(path, opts);
+  let json = {};
+  try { json = await res.json(); } catch (_) {}
+  if (!res.ok) {
+    const msg = (json && json.error) || ('HTTP ' + res.status);
+    throw new Error(msg);
+  }
+  return json;
+}
+
+// ===================== Auth / identity =====================
+
+async function loadMe() {
+  try {
+    const data = await api('GET', '/auth/me');
+    state.me = data.user;
+    renderUserChip();
+  } catch (_) {
+    state.me = null;
+  }
+}
+
+function renderUserChip() {
+  const chip = document.getElementById('userChip');
+  if (!state.me) { chip.style.display = 'none'; return; }
+  chip.style.display = 'flex';
+  document.getElementById('userEmail').textContent = state.me.email || state.me.uid || 'signed in';
+  const roleEl = document.getElementById('userRole');
+  const role = state.me.role || 'viewer';
+  roleEl.textContent = role;
+  roleEl.className = 'role-badge role-' + role;
+  document.getElementById('userOrg').textContent = state.me.org || '';
+}
+
+async function logout(event) {
+  if (event) event.preventDefault();
+  try { await api('POST', '/auth/logout'); } catch (_) {}
+  showToast('Signed out', 'success');
+  state.me = null;
+  renderUserChip();
+}
+
+// ===================== Page routing =====================
+
+function showPage(page) {
+  const pages = ['Targets', 'ProjectDetail', 'ScanDetail', 'Team'];
+  pages.forEach((p) => {
+    const el = document.getElementById('page' + p);
+    if (el) el.style.display = 'none';
+  });
+  document.querySelectorAll('.sidebar nav a').forEach((a) => a.classList.remove('active'));
+
+  if (page === 'targets') {
+    document.getElementById('pageTargets').style.display = 'block';
+    document.getElementById('navTargets').classList.add('active');
+    loadProjects();
+  } else if (page === 'projectDetail') {
+    document.getElementById('pageProjectDetail').style.display = 'block';
+    document.getElementById('navTargets').classList.add('active');
+  } else if (page === 'scanDetail') {
+    document.getElementById('pageScanDetail').style.display = 'flex';
+    document.getElementById('navTargets').classList.add('active');
+  } else if (page === 'team') {
+    document.getElementById('pageTeam').style.display = 'block';
+    document.getElementById('navTeam').classList.add('active');
+    loadUsers();
+  }
+}
+
+// ===================== Targets (projects) =====================
+
+async function loadProjects() {
+  const container = document.getElementById('projectsContainer');
+  try {
+    const data = await api('GET', '/projects');
+    const projects = data.projects || [];
+    document.getElementById('projCount').textContent = String(projects.length);
+    if (projects.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No targets yet. Create one above.</p></div>';
+      return;
+    }
+    container.innerHTML = projects.map(renderProjectCard).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="empty-state"><p>' + escapeHtml(err.message) + '</p></div>';
+  }
+}
+
+function renderProjectCard(p) {
+  const sched = p.schedule ? '<span>schedule: ' + escapeHtml(p.schedule) + '</span>' : '<span>on-demand</span>';
+  const repo = p.repoInstallationId ? 'github' : 'zip';
+  return (
+    '<div class="run-card" onclick="openProject(\'' + escapeHtml(p.id) + '\')">' +
+      '<div class="run-meta">' +
+        '<span class="run-target">' + escapeHtml(p.name) + '</span>' +
+        '<span class="run-id">' + escapeHtml(p.targetUrl) + '</span>' +
+      '</div>' +
+      '<div class="run-status"><span class="badge badge-pending">' + escapeHtml(repo) + '</span></div>' +
+      '<div class="run-progress">' + sched + '</div>' +
+      '<div class="run-details"><span class="run-id">' + escapeHtml(p.id) + '</span></div>' +
+    '</div>'
+  );
+}
+
+async function createProject() {
+  const btn = document.getElementById('createProjBtn');
+  const name = document.getElementById('projName').value.trim();
+  const targetUrl = document.getElementById('projUrl').value.trim();
+  const repoInstallationId = document.getElementById('projRepo').value.trim();
+  const schedule = document.getElementById('projSchedule').value.trim();
+  if (!name) { showToast('Name is required', 'error'); return; }
+  if (!targetUrl) { showToast('Target URL is required', 'error'); return; }
+  btn.disabled = true;
+  try {
+    const payload = { name, targetUrl };
+    if (repoInstallationId) payload.repoInstallationId = repoInstallationId;
+    if (schedule) payload.schedule = schedule;
+    await api('POST', '/projects', payload);
+    showToast('Target created', 'success');
+    document.getElementById('projName').value = '';
+    document.getElementById('projUrl').value = '';
+    document.getElementById('projRepo').value = '';
+    document.getElementById('projSchedule').value = '';
+    loadProjects();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function openProject(id) {
+  try {
+    const data = await api('GET', '/projects/' + id);
+    state.currentProject = data.project;
+    document.getElementById('projDetailTitle').textContent = data.project.name;
+    document.getElementById('projDetailSubtitle').textContent = data.project.targetUrl + '  ·  ' + data.project.id;
+    showPage('projectDetail');
+    loadScans(id);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function loadScans(projectId) {
+  const container = document.getElementById('scansContainer');
+  try {
+    const data = await api('GET', '/projects/' + projectId + '/scans');
+    const scans = data.scans || [];
+    document.getElementById('scanCount').textContent = String(scans.length);
+    if (scans.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No scans yet. Run one above.</p></div>';
+      return;
+    }
+    container.innerHTML = scans.map(renderScanCard).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="empty-state"><p>' + escapeHtml(err.message) + '</p></div>';
+  }
+}
+
+function renderScanCard(s) {
+  const started = s.startedAt ? new Date(s.startedAt).toLocaleString() : 'not started';
+  return (
+    '<div class="run-card" onclick="openScan(\'' + escapeHtml(s.id) + '\')">' +
+      '<div class="run-meta">' +
+        '<span class="run-target">Scan ' + escapeHtml(s.id.slice(0, 8)) + '</span>' +
+        '<span class="run-id">' + escapeHtml(started) + '</span>' +
+      '</div>' +
+      '<div class="run-status"><span class="badge badge-' + escapeHtml(s.status) + '">' + escapeHtml(s.status) + '</span></div>' +
+      '<div class="run-details"><span class="run-id">' + escapeHtml(s.id) + '</span></div>' +
+    '</div>'
+  );
+}
+
+async function triggerScan() {
+  if (!state.currentProject) return;
+  const btn = document.getElementById('triggerScanBtn');
+  btn.disabled = true;
+  try {
+    await api('POST', '/projects/' + state.currentProject.id + '/scan', {});
+    showToast('Scan triggered', 'success');
+    loadScans(state.currentProject.id);
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ===================== Scan detail =====================
+
+async function openScan(scanId) {
+  try {
+    const data = await api('GET', '/scans/' + scanId);
+    state.currentScan = data.scan;
+    document.getElementById('scanDetailTitle').textContent = 'Scan ' + data.scan.id.slice(0, 8);
+    document.getElementById('scanDetailSubtitle').textContent = data.scan.id;
+    const statusEl = document.getElementById('scanStatus');
+    statusEl.textContent = data.scan.status;
+    statusEl.className = 'badge badge-' + data.scan.status;
+    renderScanGrid(data.scan, data.findingCount);
+    document.getElementById('scanBackBtn').onclick = () => openProject(data.scan.projectId);
+    state.scanTab = 'findings';
+    showPage('scanDetail');
+    showScanTab('findings');
+    loadScanFindings(scanId);
+    loadScanAttackSurface(scanId);
+    loadScanDiff(scanId);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function renderScanGrid(scan, findingCount) {
+  const rows = [
+    ['Status', escapeHtml(scan.status)],
+    ['Findings', escapeHtml(String(findingCount != null ? findingCount : 0))],
+    ['Codebase version', '<span class="mono">' + escapeHtml(scan.codebaseVersionId) + '</span>'],
+    ['Workflow', '<span class="mono">' + escapeHtml(scan.temporalWorkflowId || '--') + '</span>'],
+    ['Started', escapeHtml(scan.startedAt ? new Date(scan.startedAt).toLocaleString() : '--')],
+    ['Finished', escapeHtml(scan.finishedAt ? new Date(scan.finishedAt).toLocaleString() : '--')],
+  ];
+  document.getElementById('scanGrid').innerHTML = rows
+    .map(([k, v]) => '<dt>' + k + '</dt><dd>' + v + '</dd>')
+    .join('');
+}
+
+function showScanTab(tab) {
+  state.scanTab = tab;
+  document.querySelectorAll('#pageScanDetail .detail-tab').forEach((b) => {
+    b.classList.toggle('active', b.getAttribute('data-tab') === tab);
+  });
+  document.getElementById('panelFindings').style.display = tab === 'findings' ? 'block' : 'none';
+  document.getElementById('panelAttackSurface').style.display = tab === 'attackSurface' ? 'block' : 'none';
+  document.getElementById('panelDiff').style.display = tab === 'diff' ? 'block' : 'none';
+}
+
+// ----- Findings -----
+
+async function loadScanFindings(scanId) {
+  const panel = document.getElementById('panelFindings');
+  panel.innerHTML = '<div class="panel-empty"><span class="spinner"></span></div>';
+  try {
+    const data = await api('GET', '/scans/' + scanId + '/findings');
+    state.findingsCache = (data.findings || []).map((f) => f.data || f);
+    document.getElementById('findingsCount').textContent = String(state.findingsCache.length);
+    renderFindings();
+  } catch (err) {
+    panel.innerHTML = '<div class="panel-empty">' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+function setSeverityFilter(sev) { state.severityFilter = sev; renderFindings(); }
+
+function renderFindings() {
+  const panel = document.getElementById('panelFindings');
+  const all = state.findingsCache;
+  if (all.length === 0) {
+    panel.innerHTML = '<div class="panel-empty">No findings for this scan.</div>';
+    return;
+  }
+  const severities = ['all', 'critical', 'high', 'medium', 'low', 'info'];
+  const filters = '<div class="findings-filters"><span class="findings-filter-label">Severity</span>' +
+    severities.map((s) => '<button class="findings-filter' + (state.severityFilter === s ? ' active' : '') +
+      '" onclick="setSeverityFilter(\'' + s + '\')">' + s + '</button>').join('') + '</div>';
+
+  const rows = all
+    .filter((f) => state.severityFilter === 'all' || String(f.severity || '').toLowerCase() === state.severityFilter)
+    .map((f, i) => renderFindingRow(f, i))
+    .join('');
+
+  panel.innerHTML = filters + (rows || '<div class="panel-empty">No findings at this severity.</div>');
+}
+
+function renderFindingRow(f, i) {
+  const sev = String(f.severity || 'info').toLowerCase();
+  const conf = String(f.confidence || '');
+  const cat = String(f.category || 'finding');
+  const cwe = String(f.cwe || '');
+  const loc = f.vulnerable_code_location || {};
+  const locStr = loc.file ? loc.file + ':' + (loc.line != null ? loc.line : '?') : '';
+  const summary = String(f.evidence || f.missing_defense || '');
+  const confBadge = conf ? '<span class="confidence-badge">' + escapeHtml(conf) + '</span>' : '';
+
+  const detailRows = [];
+  const push = (label, value, highlight) => {
+    if (!value) return;
+    detailRows.push('<div class="finding-field' + (highlight ? ' highlight' : '') + '"><dt>' +
+      escapeHtml(label) + '</dt><dd>' + escapeHtml(value) + '</dd></div>');
+  };
+  push('CWE', cwe);
+  push('OWASP', String(f.owasp_category || ''));
+  push('Location', locStr);
+  push('Evidence', String(f.evidence || ''));
+  push('Missing defense', String(f.missing_defense || ''));
+  push('Remediation', String(f.remediation || ''), true);
+  push('Safe PoC', String(f.safe_poc || ''));
+  if (Array.isArray(f.repro_steps) && f.repro_steps.length) {
+    push('Repro steps', f.repro_steps.map((s, n) => (n + 1) + '. ' + s).join('\n'));
+  }
+  push('Fingerprint', String(f.fingerprint || ''));
+
+  return (
+    '<div class="finding-row" onclick="toggleFinding(' + i + ')">' +
+      '<span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span>' +
+      '<span class="finding-id">' + escapeHtml(cat) + '</span>' +
+      '<span class="finding-summary">' + escapeHtml(summary) + '</span>' +
+      '<span class="finding-badges">' + confBadge + '</span>' +
+      '<span class="finding-chevron">&rsaquo;</span>' +
+    '</div>' +
+    '<div class="finding-detail" id="findingDetail' + i + '" hidden>' + detailRows.join('') + '</div>'
+  );
+}
+
+function toggleFinding(i) {
+  const detail = document.getElementById('findingDetail' + i);
+  if (!detail) return;
+  const row = detail.previousElementSibling;
+  const open = detail.hasAttribute('hidden');
+  if (open) { detail.removeAttribute('hidden'); row.classList.add('expanded'); }
+  else { detail.setAttribute('hidden', ''); row.classList.remove('expanded'); }
+}
+
+// ----- Attack surface (with the remediation "fix" prompt) -----
+
+async function loadScanAttackSurface(scanId) {
+  const panel = document.getElementById('panelAttackSurface');
+  try {
+    const data = await api('GET', '/scans/' + scanId + '/attack-surface');
+    state.attackSurfaceCache = data.attackSurface || { scenarios: [] };
+    const scenarios = Array.isArray(state.attackSurfaceCache.scenarios) ? state.attackSurfaceCache.scenarios : [];
+    document.getElementById('attackSurfaceCount').textContent = String(scenarios.length);
+    if (scenarios.length === 0) {
+      panel.innerHTML = '<div class="panel-empty">No attack-surface scenarios for this scan.</div>';
+      return;
+    }
+    panel.innerHTML = scenarios.map(renderAttackScenario).join('');
+  } catch (err) {
+    panel.innerHTML = '<div class="panel-empty">' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+function renderAttackScenario(scenario, index) {
+  const id = String(scenario.id || scenario.ID || ('ATK-' + (index + 1)));
+  const title = String(scenario.title || 'Untitled scenario');
+  const severity = String(scenario.severity || 'Informational');
+  const severityClass = 'severity-' + severity.toLowerCase().replace(/[^a-z]/g, '');
+  const killChain = Array.isArray(scenario.kill_chain) ? scenario.kill_chain : [];
+  const fixPrompt = String(scenario.claude_code_prompt || '');
+
+  const chainHtml = killChain.length > 0
+    ? '<ol class="attack-chain">' + killChain.map((step) => '<li>' + escapeHtml(String(step)) + '</li>').join('') + '</ol>'
+    : '';
+
+  const sections = [];
+  if (scenario.business_impact) {
+    sections.push('<div class="attack-scenario-section"><div class="field-label">Business impact</div><div class="field-value">' + escapeHtml(String(scenario.business_impact)) + '</div></div>');
+  }
+  if (chainHtml) {
+    sections.push('<div class="attack-scenario-section"><div class="field-label">Kill chain</div>' + chainHtml + '</div>');
+  }
+
+  // ADR-010: the attack-prompt button is flipped to a remediation "fix" prompt.
+  // It copies the (now remediation) `claude_code_prompt` field (name kept).
+  const copyLabel = 'Copy fix prompt for ' + id;
+  const copyBtn = fixPrompt
+    ? '<button class="btn btn-ghost btn-sm copy-prompt-btn" aria-label="' + escapeHtml(copyLabel) +
+        '" onclick="copyFixPrompt(\'' + escapeHtml(id) + '\')">Copy fix prompt</button>'
+    : '';
+
+  return (
+    '<div class="attack-scenario" data-scenario-id="' + escapeHtml(id) + '">' +
+      '<div class="attack-scenario-header">' +
+        '<span class="severity-badge ' + escapeHtml(severityClass) + '">' + escapeHtml(severity) + '</span>' +
+        '<h3>' + escapeHtml(id) + ' &mdash; ' + escapeHtml(title) + '</h3>' +
+      '</div>' +
+      sections.join('') +
+      '<div class="attack-scenario-footer">' + copyBtn + '</div>' +
+    '</div>'
+  );
+}
+
+async function copyFixPrompt(scenarioId) {
+  const surface = state.attackSurfaceCache;
+  const scenarios = (surface && Array.isArray(surface.scenarios)) ? surface.scenarios : [];
+  const scenario = scenarios.find((s) => String(s.id || s.ID || '') === scenarioId);
+  if (!scenario || !scenario.claude_code_prompt) {
+    showToast('No fix prompt available for this scenario', 'error');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(String(scenario.claude_code_prompt));
+    showToast('Fix prompt copied', 'success');
+  } catch (err) {
+    showToast(err.message || 'Failed to copy fix prompt', 'error');
+  }
+}
+
+// ----- Diff (scan-to-scan) -----
+
+async function loadScanDiff(scanId) {
+  const panel = document.getElementById('panelDiff');
+  try {
+    const data = await api('GET', '/scans/' + scanId + '/diff');
+    const diff = data.diff || { transitions: [], counts: {}, priorScanId: null };
+    const counts = diff.counts || {};
+    const total = (diff.transitions || []).length;
+    document.getElementById('diffCount').textContent = String(total);
+
+    const summary = '<div class="findings-filters">' +
+      '<span class="diff-badge diff-new">new ' + (counts.new || 0) + '</span>' +
+      '<span class="diff-badge diff-open">open ' + (counts.open || 0) + '</span>' +
+      '<span class="diff-badge diff-fixed">fixed ' + (counts.fixed || 0) + '</span>' +
+      '<span class="diff-badge diff-regressed">regressed ' + (counts.regressed || 0) + '</span>' +
+      '</div>';
+
+    const priorNote = diff.priorScanId
+      ? '<div class="panel-section"><h3>Compared against prior scan ' + escapeHtml(String(diff.priorScanId).slice(0, 8)) + '</h3></div>'
+      : '<div class="panel-section"><h3>First scan for this target &mdash; all findings are new</h3></div>';
+
+    const transitions = (diff.transitions || []);
+    if (transitions.length === 0) {
+      panel.innerHTML = summary + priorNote + '<div class="panel-empty">No findings to diff.</div>';
+      return;
+    }
+    const rows = transitions.map((t) => {
+      const to = String(t.to || 'open');
+      const from = t.from ? escapeHtml(String(t.from)) + ' &rarr; ' : '';
+      return (
+        '<div class="finding-row" style="cursor:default">' +
+          '<span class="diff-badge diff-' + escapeHtml(to) + '">' + escapeHtml(to) + '</span>' +
+          '<span class="finding-id">' + escapeHtml(String(t.fingerprint).slice(0, 16)) + '</span>' +
+          '<span class="finding-summary">' + from + escapeHtml(to) + '</span>' +
+          '<span class="finding-badges"></span><span></span>' +
+        '</div>'
+      );
+    }).join('');
+    panel.innerHTML = summary + priorNote + rows;
+  } catch (err) {
+    panel.innerHTML = '<div class="panel-empty">' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+// ===================== Team (multi-user) =====================
+
+async function loadUsers() {
+  const container = document.getElementById('usersContainer');
+  try {
+    const data = await api('GET', '/users');
+    const users = data.users || [];
+    document.getElementById('userCount').textContent = String(users.length);
+    if (users.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>No users in this tenant.</p></div>';
+      return;
+    }
+    container.innerHTML = users.map(renderUserRow).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="empty-state"><p>' + escapeHtml(err.message) + '</p></div>';
+  }
+}
+
+function renderUserRow(u) {
+  const role = String(u.role || 'viewer');
+  const you = u.isCurrent ? '<span class="u-you">you</span>' : '';
+  return (
+    '<div class="user-row' + (u.isCurrent ? ' is-current' : '') + '">' +
+      '<span class="u-email">' + escapeHtml(u.email || u.id) + '</span>' +
+      '<span class="role-badge role-' + escapeHtml(role) + '">' + escapeHtml(role) + '</span>' +
+      you +
+    '</div>'
+  );
+}
+
+// ===================== Boot =====================
+
+(async function boot() {
+  await loadMe();
+  showPage('targets');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+/**
+ * Dashboard projects API (LAUNCH-SPEC §4 project model, ADR-015).
+ *
+ * A project = a named target (live site + connected repo + optional schedule).
+ * These handlers back the Targets view: create / list / get / update / delete a
+ * project, and list the scans under it. Every handler is authenticated and
+ * tenant-scoped via `gate()` — the principal's verified `tenantId` is the only
+ * tenant id the repositories ever see, so a caller can never name another
+ * tenant's project.
+ */
+
+import { projectRepo, scanRepo } from '../../db/repositories/index.js';
+import type { NewProject, ProjectId } from '../../domain/types.js';
+import type { ApiResponse } from '../router.js';
+import { badRequest, created, gate, notFound, ok, serverError } from './auth-util.js';
+
+/** `GET /projects` — list the caller-tenant's projects (Targets view). */
+export async function listProjects(cookieHeader: string | undefined): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return g.response;
+  try {
+    const projects = await projectRepo.listByTenant(g.tenantId);
+    return ok({ projects });
+  } catch (err) {
+    return serverError(err);
+  }
+}
+
+/**
+ * `POST /projects` — create a project (Targets view). Body:
+ * `{ name, targetUrl, repoInstallationId?, schedule?, authConfig? }`.
+ */
+export async function createProject(
+  body: Record<string, unknown>,
+  cookieHeader: string | undefined,
+): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return g.response;
+
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const targetUrl = typeof body.targetUrl === 'string' ? body.targetUrl.trim() : '';
+  if (!name) return badRequest('name is required');
+  if (!targetUrl) return badRequest('targetUrl is required');
+  try {
+    new URL(targetUrl);
+  } catch {
+    return badRequest('targetUrl is not a valid URL');
+  }
+
+  const repoInstallationId =
+    typeof body.repoInstallationId === 'string' && body.repoInstallationId.trim()
+      ? body.repoInstallationId.trim()
+      : null;
+  const schedule = typeof body.schedule === 'string' && body.schedule.trim() ? body.schedule.trim() : null;
+  const authConfig =
+    typeof body.authConfig === 'object' && body.authConfig !== null && !Array.isArray(body.authConfig)
+      ? (body.authConfig as Record<string, unknown>)
+      : null;
+
+  const input: NewProject = { tenantId: g.tenantId, name, targetUrl, repoInstallationId, schedule, authConfig };
+  try {
+    const project = await projectRepo.create(input);
+    return created({ project });
+  } catch (err) {
+    return serverError(err);
+  }
+}
+
+/** `GET /projects/:id` — fetch one project (tenant-scoped). */
+export async function getProject(id: ProjectId, cookieHeader: string | undefined): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return g.response;
+  try {
+    const project = await projectRepo.findById(g.tenantId, id);
+    return project ? ok({ project }) : notFound('project not found');
+  } catch (err) {
+    return serverError(err);
+  }
+}
+
+/**
+ * `PUT /projects/:id` — patch mutable project fields (name / targetUrl /
+ * repoInstallationId / schedule / authConfig). Only provided keys are changed.
+ */
+export async function updateProject(
+  id: ProjectId,
+  body: Record<string, unknown>,
+  cookieHeader: string | undefined,
+): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return g.response;
+
+  const patch: Record<string, unknown> = {};
+  if (typeof body.name === 'string') patch.name = body.name.trim();
+  if (typeof body.targetUrl === 'string') {
+    const url = body.targetUrl.trim();
+    try {
+      new URL(url);
+    } catch {
+      return badRequest('targetUrl is not a valid URL');
+    }
+    patch.targetUrl = url;
+  }
+  if ('repoInstallationId' in body) {
+    patch.repoInstallationId =
+      typeof body.repoInstallationId === 'string' && body.repoInstallationId.trim()
+        ? body.repoInstallationId.trim()
+        : null;
+  }
+  if ('schedule' in body) {
+    patch.schedule = typeof body.schedule === 'string' && body.schedule.trim() ? body.schedule.trim() : null;
+  }
+  if (typeof body.authConfig === 'object' && body.authConfig !== null && !Array.isArray(body.authConfig)) {
+    patch.authConfig = body.authConfig as Record<string, unknown>;
+  }
+
+  try {
+    const project = await projectRepo.update(g.tenantId, id, patch);
+    return project ? ok({ project }) : notFound('project not found');
+  } catch (err) {
+    return serverError(err);
+  }
+}
+
+/** `DELETE /projects/:id` — remove a project (tenant-scoped). */
+export async function deleteProject(id: ProjectId, cookieHeader: string | undefined): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return g.response;
+  try {
+    await projectRepo.delete(g.tenantId, id);
+    return ok({ ok: true });
+  } catch (err) {
+    return serverError(err);
+  }
+}
+
+/** `GET /projects/:id/scans` — list a project's scans, newest first. */
+export async function listProjectScans(id: ProjectId, cookieHeader: string | undefined): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return g.response;
+  try {
+    const project = await projectRepo.findById(g.tenantId, id);
+    if (!project) return notFound('project not found');
+    const scans = await scanRepo.listByProject(g.tenantId, id);
+    return ok({ scans });
+  } catch (err) {
+    return serverError(err);
+  }
+}
