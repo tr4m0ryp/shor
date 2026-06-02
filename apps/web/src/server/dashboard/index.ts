@@ -22,6 +22,10 @@
  *   POST   /settings/github           connect a PAT { token } → { connected, login }
  *   DELETE /settings/github           disconnect (delete the PAT)
  *   GET    /github/repos              list the caller's selectable repos
+ *
+ * The GitHub OAuth web-login routes (`GET /settings/github/{config,start,callback}`)
+ * need the full URL (querystring + 302 redirect) and are wired in the parent
+ * `server/router.ts` rather than here.
  */
 
 import { getScanProgress } from '../../scan-progress/index.js';

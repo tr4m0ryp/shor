@@ -238,6 +238,28 @@ body {
 .gh-connect-row { display: flex; gap: 8px; align-items: center; }
 .gh-connect-row input { flex: 1; }
 .gh-status { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+/* Settings card */
+.settings-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow); max-width: 640px; }
+.settings-card__head { display: flex; align-items: flex-start; gap: 12px; }
+.settings-card__head h2 { font-size: 15px; font-weight: 600; }
+.gh-mark { width: 24px; height: 24px; color: var(--text); flex: 0 0 auto; margin-top: 1px; }
+.btn-github {
+  display: inline-flex; align-items: center; gap: 9px; cursor: pointer;
+  background: #1F2328; color: #fff; border: none; border-radius: var(--radius-sm);
+  padding: 10px 16px; font-size: 14px; font-weight: 500; font-family: var(--font);
+  transition: background .15s;
+}
+.btn-github:hover { background: #32383f; }
+.link-btn { display: inline-block; background: none; border: none; color: var(--accent); font-size: 12px; cursor: pointer; padding: 10px 0 0; font-family: var(--font); }
+/* Project stats overview */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 4px 0 18px; }
+.stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; box-shadow: var(--shadow); }
+.stat-card .stat-val { font-size: 22px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat-card .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; margin-top: 3px; }
+.stat-card.sev-critical .stat-val { color: var(--red); }
+.stat-card.sev-high .stat-val { color: #E8590C; }
+.stat-card.sev-medium .stat-val { color: var(--yellow); }
+.stat-card.sev-low .stat-val { color: var(--text-secondary); }
 .detail-grid { display: grid; grid-template-columns: 200px 1fr; gap: 8px 16px; font-size: 13px; }
 .detail-grid dt { color: var(--text-muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; align-self: center; }
 .detail-grid dd { color: var(--text); word-break: break-all; }
@@ -537,6 +559,7 @@ body {
           <button class="btn btn-primary btn-sm" id="triggerScanBtn" onclick="triggerScan()">Run scan</button>
         </div>
       </div>
+      <div class="stats-row" id="projStats"></div>
       <div class="section-header">
         <h2>Scans</h2>
         <span class="count" id="scanCount">0</span>
@@ -586,19 +609,36 @@ body {
         <h1>Settings</h1>
         <p>Connect your GitHub account so projects can scan your repos (private, starred, and forked included).</p>
       </div>
-      <div class="new-run-card">
-        <h2>GitHub</h2>
-        <div id="ghDisconnected">
-          <p class="hint" style="margin-bottom:10px">Paste a GitHub Personal Access Token (classic with <code>repo</code> scope, or a fine-grained token with read access to the repos you want to scan). Stored encrypted; used only to list and clone your repos.</p>
-          <div class="gh-connect-row">
-            <input type="password" id="ghToken" placeholder="ghp_… or github_pat_…" autocomplete="off">
-            <button class="btn btn-primary" id="ghConnectBtn" onclick="connectGithub()">Connect</button>
+      <div class="settings-card">
+        <div class="settings-card__head">
+          <svg class="gh-mark" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          <div>
+            <h2>GitHub</h2>
+            <p class="hint" id="ghSubhead" style="margin:2px 0 0">Connect your account to scan your repos (private, starred, and forked included).</p>
           </div>
-          <div class="hint" style="margin-top:6px">Create one at <span class="mono">github.com/settings/tokens</span>.</div>
         </div>
-        <div id="ghConnected" style="display:none">
+
+        <div id="ghDisconnected" style="margin-top:16px">
+          <button class="btn-github" id="ghOauthBtn" style="display:none" onclick="window.location='/settings/github/start'">
+            <svg viewBox="0 0 16 16" fill="currentColor" style="width:18px;height:18px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+            Connect with GitHub
+          </button>
+          <div id="ghPatBlock">
+            <button class="link-btn" id="ghPatToggle" style="display:none" onclick="togglePat()">Use a personal access token instead</button>
+            <div id="ghPatInput">
+              <p class="hint" style="margin:0 0 8px">Paste a Personal Access Token (classic with <code>repo</code> scope, or fine-grained read access). Stored encrypted; used only to list and clone your repos.</p>
+              <div class="gh-connect-row">
+                <input type="password" id="ghToken" placeholder="ghp_… or github_pat_…" autocomplete="off">
+                <button class="btn btn-primary" id="ghConnectBtn" onclick="connectGithub()">Connect</button>
+              </div>
+              <div class="hint" style="margin-top:6px">Create one at <span class="mono">github.com/settings/tokens</span>.</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="ghConnected" style="display:none; margin-top:16px">
           <div class="gh-status">
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M20 6L9 17l-5-5"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M20 6L9 17l-5-5"/></svg>
             <span>Connected as <b id="ghLogin">—</b></span>
             <button class="btn btn-ghost btn-sm" onclick="disconnectGithub()" style="margin-left:auto">Disconnect</button>
           </div>
@@ -625,6 +665,7 @@ const state = {
   findingsCache: [],
   attackSurfaceCache: null,
   severityFilter: 'all',
+  scanNumbers: {},
 };
 
 function escapeHtml(s) {
@@ -703,21 +744,39 @@ function showPage(page) {
 
 // ===================== Settings / GitHub =====================
 
-var ghState = { connected: false, login: null, repos: [] };
+var ghState = { connected: false, login: null, repos: [], oauthEnabled: false, patShown: false };
 
 async function loadGithubSettings() {
+  try {
+    const cfg = await api('GET', '/settings/github/config');
+    ghState.oauthEnabled = !!cfg.oauthEnabled;
+  } catch (_) { ghState.oauthEnabled = false; }
   try {
     const s = await api('GET', '/settings/github');
     ghState.connected = !!s.connected;
     ghState.login = s.login || null;
   } catch (_) { ghState.connected = false; }
+  if (ghState.connected) { try { await loadReposIntoPicker(); } catch (_) {} }
   renderGithubSettings();
+}
+
+function togglePat() {
+  ghState.patShown = !ghState.patShown;
+  document.getElementById('ghPatInput').style.display = ghState.patShown ? 'block' : 'none';
 }
 
 function renderGithubSettings() {
   const disc = document.getElementById('ghDisconnected');
   const conn = document.getElementById('ghConnected');
   if (!disc || !conn) return;
+  // When OAuth is configured, the button is primary and the PAT is collapsed
+  // behind a link; otherwise the PAT input is the only option.
+  const oauthBtn = document.getElementById('ghOauthBtn');
+  const patToggle = document.getElementById('ghPatToggle');
+  const patInput = document.getElementById('ghPatInput');
+  if (oauthBtn) oauthBtn.style.display = ghState.oauthEnabled ? 'inline-flex' : 'none';
+  if (patToggle) patToggle.style.display = ghState.oauthEnabled ? 'inline-block' : 'none';
+  if (patInput) patInput.style.display = (ghState.oauthEnabled && !ghState.patShown) ? 'none' : 'block';
   if (ghState.connected) {
     disc.style.display = 'none';
     conn.style.display = 'block';
@@ -893,34 +952,80 @@ async function openProject(id) {
   }
 }
 
+function scanNo(n) { return '#' + String(n).padStart(5, '0'); }
+
 async function loadScans(projectId) {
   const container = document.getElementById('scansContainer');
   try {
     const data = await api('GET', '/projects/' + projectId + '/scans');
     const scans = data.scans || [];
     document.getElementById('scanCount').textContent = String(scans.length);
-    if (scans.length === 0) {
+    // Number scans oldest=#00001; the list is newest-first, so the first card
+    // gets the highest number. Persist id→number so the detail view matches.
+    const total = scans.length;
+    scans.forEach(function (s, i) { state.scanNumbers[s.id] = total - i; });
+    // Run vs Rerun label.
+    const tb = document.getElementById('triggerScanBtn');
+    if (tb) tb.textContent = total > 0 ? 'Rerun scan' : 'Run scan';
+    renderProjectStats(scans);
+    if (total === 0) {
       container.innerHTML = '<div class="empty-state"><p>No scans yet. Run one above.</p></div>';
       return;
     }
-    container.innerHTML = scans.map(renderScanCard).join('');
+    container.innerHTML = scans.map(function (s) { return renderScanCard(s, state.scanNumbers[s.id]); }).join('');
   } catch (err) {
     container.innerHTML = '<div class="empty-state"><p>' + escapeHtml(err.message) + '</p></div>';
   }
 }
 
-function renderScanCard(s) {
+function renderScanCard(s, num) {
   const started = s.startedAt ? new Date(s.startedAt).toLocaleString() : 'not started';
   return (
     '<div class="run-card" onclick="openScan(\'' + escapeHtml(s.id) + '\')">' +
       '<div class="run-meta">' +
-        '<span class="run-target">Scan ' + escapeHtml(s.id.slice(0, 8)) + '</span>' +
+        '<span class="run-target">Scan ' + scanNo(num) + '</span>' +
         '<span class="run-id">' + escapeHtml(started) + '</span>' +
       '</div>' +
       '<div class="run-status"><span class="badge badge-' + escapeHtml(s.status) + '">' + escapeHtml(s.status) + '</span></div>' +
-      '<div class="run-details"><span class="run-id">' + escapeHtml(s.id) + '</span></div>' +
+      '<div class="run-details"><span class="run-id">' + (s.findingCount != null ? s.findingCount + ' findings' : '') + '</span></div>' +
     '</div>'
   );
+}
+
+// Aggregate stats from the project's scans + the latest scan's findings.
+async function renderProjectStats(scans) {
+  const box = document.getElementById('projStats');
+  if (!box) return;
+  const total = scans.length;
+  const completed = scans.filter(function (s) { return s.status === 'completed'; });
+  const last = scans[0];
+  const lastRun = last && last.startedAt ? new Date(last.startedAt).toLocaleDateString() : '—';
+  // Severity breakdown from the most-recent scan that has findings.
+  let sev = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+  let findingsTotal = 0;
+  const latestWithData = completed[0] || last;
+  if (latestWithData) {
+    try {
+      const fd = await api('GET', '/scans/' + latestWithData.id + '/findings');
+      const findings = fd.findings || [];
+      findingsTotal = findings.length;
+      findings.forEach(function (f) {
+        const s = (f.data && f.data.severity) || f.severity || 'info';
+        if (sev[s] != null) sev[s] += 1;
+      });
+    } catch (_) {}
+  }
+  function card(val, label, cls) {
+    return '<div class="stat-card ' + (cls || '') + '"><div class="stat-val">' + val + '</div><div class="stat-label">' + label + '</div></div>';
+  }
+  box.innerHTML =
+    card(findingsTotal, 'Vulnerabilities') +
+    card(sev.critical, 'Critical', 'sev-critical') +
+    card(sev.high, 'High', 'sev-high') +
+    card(sev.medium, 'Medium', 'sev-medium') +
+    card(sev.low, 'Low', 'sev-low') +
+    card(total, 'Total scans') +
+    card(escapeHtml(lastRun), 'Last run');
 }
 
 async function triggerScan() {
@@ -949,7 +1054,8 @@ async function openScan(scanId) {
   try {
     const data = await api('GET', '/scans/' + scanId);
     state.currentScan = data.scan;
-    document.getElementById('scanDetailTitle').textContent = 'Scan ' + data.scan.id.slice(0, 8);
+    const num = state.scanNumbers[data.scan.id];
+    document.getElementById('scanDetailTitle').textContent = 'Scan ' + (num ? scanNo(num) : data.scan.id.slice(0, 8));
     document.getElementById('scanDetailSubtitle').textContent = data.scan.id;
     const statusEl = document.getElementById('scanStatus');
     statusEl.textContent = data.scan.status;
@@ -1419,6 +1525,13 @@ function renderUserRow(u) {
 
 (async function boot() {
   await loadMe();
+  // Handle the GitHub OAuth redirect back (?gh=connected|error).
+  const gh = new URLSearchParams(location.search).get('gh');
+  if (gh) {
+    history.replaceState({}, '', location.pathname);
+    if (gh === 'connected') { showToast('GitHub connected', 'success'); showPage('settings'); return; }
+    if (gh === 'error') showToast('GitHub connection failed', 'error');
+  }
   showPage('targets');
 })();
 </script>

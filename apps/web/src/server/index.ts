@@ -95,6 +95,16 @@ export function createDashboardServer(): ReturnType<typeof createServer> {
 
       const body = method === 'POST' || method === 'PUT' ? await parseBody(req) : {};
       const result = await apiRouter(method, url, body, req.headers.cookie, req.headers.authorization);
+      // Browser-redirect responses (GitHub OAuth): emit a 302 to `Location`
+      // instead of the JSON body, carrying any `Set-Cookie` along.
+      if (result.redirect) {
+        res.writeHead(302, {
+          Location: result.redirect,
+          ...(result.setCookie ? { 'Set-Cookie': result.setCookie } : {}),
+        });
+        res.end();
+        return;
+      }
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (result.setCookie) headers['Set-Cookie'] = result.setCookie;
       res.writeHead(result.status, headers);

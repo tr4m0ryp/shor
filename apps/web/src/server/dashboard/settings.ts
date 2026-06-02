@@ -13,6 +13,8 @@
  * keyed on the principal's `(tenantId, uid)`.
  */
 
+import { randomUUID } from 'node:crypto';
+import { getConfig } from '../../config.js';
 import { deleteGithubToken, getGithubToken, getGithubUser, listUserRepos, storeGithubToken } from '../../github/index.js';
 import type { ApiResponse } from '../router.js';
 import { badRequest, gate, notFound, ok, serverError } from './auth-util.js';
@@ -95,5 +97,126 @@ export async function listGithubRepos(cookieHeader: string | undefined): Promise
     return ok({ repos });
   } catch (err) {
     return serverError(err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// GitHub OAuth ("Connect with GitHub") web-login flow.
+//
+// A browser-redirect alternative to the PAT flow. `startGithubOauth` 302s to
+// GitHub's authorize endpoint (CSRF-guarded by a short-lived `gh_oauth_state`
+// cookie); `githubOauthCallback` re-gates the still-logged-in session, verifies
+// the state, exchanges the `code` for a USER access token, validates it, and
+// stores it in the SAME slot the PAT flow uses — so repo listing/cloning read it
+// transparently. The browser is bounced back to `/?gh=connected|error`.
+// ---------------------------------------------------------------------------
+
+const STATE_COOKIE = 'gh_oauth_state';
+/** Set the state cookie for `value` (short-lived, HttpOnly, SameSite=Lax). */
+const stateCookie = (value: string): string => `${STATE_COOKIE}=${value}; Path=/; Max-Age=600; SameSite=Lax; HttpOnly`;
+/** Clear the state cookie (Max-Age=0). */
+const clearStateCookie = (): string => `${STATE_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly`;
+/** A 302 browser redirect to `location`, optionally setting/clearing a cookie. */
+const redirectTo = (location: string, setCookie?: string): ApiResponse => ({
+  status: 302,
+  body: {},
+  redirect: location,
+  ...(setCookie ? { setCookie } : {}),
+});
+
+/** Read the `gh_oauth_state` value from a raw `Cookie` request header (or null). */
+function readStateCookie(cookieHeader: string | undefined): string | null {
+  if (!cookieHeader) return null;
+  for (const pair of cookieHeader.split(';')) {
+    const eq = pair.indexOf('=');
+    if (eq < 0) continue;
+    if (pair.slice(0, eq).trim() === STATE_COOKIE) {
+      return pair.slice(eq + 1).trim() || null;
+    }
+  }
+  return null;
+}
+
+/**
+ * `GET /settings/github/config` — report whether the OAuth flow is configured
+ * (so the UI can show/hide the "Connect with GitHub" button). Gated like the
+ * other settings routes for consistency.
+ */
+export async function getGithubConfig(cookieHeader: string | undefined): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return g.response;
+  return ok({ oauthEnabled: getConfig().githubOauth.oauthEnabled });
+}
+
+/**
+ * `GET /settings/github/start` — begin the OAuth dance. Mints a CSRF `state`,
+ * stashes it in a short-lived cookie, and 302s to GitHub's authorize endpoint.
+ * 400 when OAuth is not configured.
+ */
+export async function startGithubOauth(cookieHeader: string | undefined): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return g.response;
+
+  const oauth = getConfig().githubOauth;
+  if (!oauth.oauthEnabled) return badRequest('github oauth not configured');
+
+  const state = randomUUID();
+  const authorize =
+    'https://github.com/login/oauth/authorize' +
+    `?client_id=${encodeURIComponent(oauth.clientId)}` +
+    `&redirect_uri=${encodeURIComponent(oauth.redirectUri)}` +
+    '&scope=repo%20read:user' +
+    `&state=${encodeURIComponent(state)}`;
+
+  return redirectTo(authorize, stateCookie(state));
+}
+
+/**
+ * `GET /settings/github/callback?code&state` — finish the OAuth dance. Re-gates
+ * the session, verifies the `state` cookie, exchanges the code for a user access
+ * token, validates + stores it, then 302s back to `/?gh=connected`. Any failure
+ * (bad state, denied consent, exchange/validation error) bounces to `/?gh=error`
+ * and clears the state cookie.
+ */
+export async function githubOauthCallback(
+  query: { readonly code?: string | undefined; readonly state?: string | undefined; readonly error?: string | undefined },
+  cookieHeader: string | undefined,
+): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return redirectTo('/?gh=error', clearStateCookie());
+
+  try {
+    const expectedState = readStateCookie(cookieHeader);
+    if (!expectedState || expectedState !== query.state) {
+      return redirectTo('/?gh=error', clearStateCookie());
+    }
+    if (query.error || !query.code) {
+      return redirectTo('/?gh=error', clearStateCookie());
+    }
+
+    const oauth = getConfig().githubOauth;
+    if (!oauth.oauthEnabled) return redirectTo('/?gh=error', clearStateCookie());
+
+    const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: oauth.clientId,
+        client_secret: oauth.clientSecret,
+        code: query.code,
+        redirect_uri: oauth.redirectUri,
+      }),
+    });
+    const tokenBody = (await tokenRes.json()) as { access_token?: unknown };
+    const accessToken = typeof tokenBody.access_token === 'string' ? tokenBody.access_token : '';
+    if (!accessToken) return redirectTo('/?gh=error', clearStateCookie());
+
+    // Validate the token, then store it in the same slot the PAT flow uses.
+    await getGithubUser(accessToken);
+    await storeGithubToken(g.tenantId, g.principal.uid, accessToken);
+
+    return redirectTo('/?gh=connected', clearStateCookie());
+  } catch {
+    return redirectTo('/?gh=error', clearStateCookie());
   }
 }

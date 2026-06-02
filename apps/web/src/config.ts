@@ -164,6 +164,26 @@ export interface GithubAppConfig {
   readonly cloneDepth: number;
 }
 
+/**
+ * GitHub OAuth ("Connect with GitHub") web-login config.
+ *
+ * The browser is redirected to GitHub's authorize endpoint; the callback
+ * exchanges the `code` for a user access token, which is stored in the SAME
+ * Secret Manager slot the PAT flow uses (repo listing/cloning read it
+ * transparently). `clientId`/`clientSecret` are the OAuth App credentials;
+ * `oauthEnabled` gates the flow when either is absent.
+ */
+export interface GithubOauthConfig {
+  /** OAuth App client id (`GITHUB_OAUTH_CLIENT_ID`). Empty disables the flow. */
+  readonly clientId: string;
+  /** OAuth App client secret (`GITHUB_OAUTH_CLIENT_SECRET`). Empty disables the flow. */
+  readonly clientSecret: string;
+  /** Authorized callback URL (`GITHUB_OAUTH_REDIRECT_URI`); defaults under `publicUrl`. */
+  readonly redirectUri: string;
+  /** True only when BOTH the client id and secret are configured. */
+  readonly oauthEnabled: boolean;
+}
+
 export interface AegisConfig {
   readonly env: 'development' | 'production' | 'test';
   /**
@@ -199,6 +219,7 @@ export interface AegisConfig {
   readonly session: SessionConfig;
   readonly secrets: SecretsConfig;
   readonly github: GithubAppConfig;
+  readonly githubOauth: GithubOauthConfig;
 }
 
 let cached: AegisConfig | undefined;
@@ -217,6 +238,10 @@ export function getConfig(): AegisConfig {
   const nodeEnv = env('NODE_ENV', 'development');
   const resolvedEnv: AegisConfig['env'] = nodeEnv === 'production' || nodeEnv === 'test' ? nodeEnv : 'development';
 
+  const publicUrl = env('AEGIS_PUBLIC_URL');
+  const githubOauthClientId = env('GITHUB_OAUTH_CLIENT_ID');
+  const githubOauthClientSecret = env('GITHUB_OAUTH_CLIENT_SECRET');
+
   cached = {
     env: resolvedEnv,
     // Env-gated dev login (default OFF). Never enable in production.
@@ -224,7 +249,7 @@ export function getConfig(): AegisConfig {
     // Direct Cloud Run Job launch + findings sink (ADR-051).
     scanJobName: env('CLOUD_RUN_SCAN_JOB', 'aegis-scan-worker'),
     sinkToken: env('AEGIS_SINK_TOKEN'),
-    publicUrl: env('AEGIS_PUBLIC_URL'),
+    publicUrl,
     gcp: { projectId, region },
     sql: {
       host: env('CLOUD_SQL_HOST'),
@@ -281,6 +306,12 @@ export function getConfig(): AegisConfig {
       appId: env('GITHUB_APP_ID'),
       privateKeySecretRef: env('GITHUB_APP_PRIVATE_KEY_SECRET_REF', 'aegis/github-app/private-key'),
       cloneDepth: envInt('GITHUB_CLONE_DEPTH', 1),
+    },
+    githubOauth: {
+      clientId: githubOauthClientId,
+      clientSecret: githubOauthClientSecret,
+      redirectUri: env('GITHUB_OAUTH_REDIRECT_URI', `${publicUrl}/settings/github/callback`),
+      oauthEnabled: githubOauthClientId !== '' && githubOauthClientSecret !== '',
     },
   };
 

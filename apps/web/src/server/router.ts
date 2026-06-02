@@ -13,12 +13,19 @@ import { handleLogout, handleMe, handleSessionLogin } from '../auth/routes.js';
 import { handleIngestFindings, handleSarifExport } from '../findings/index.js';
 import { handleIngestProgress } from '../scan-progress/index.js';
 import { routeDashboard } from './dashboard/index.js';
+import { getGithubConfig, githubOauthCallback, startGithubOauth } from './dashboard/settings.js';
 
 /** Standard response envelope: HTTP status, JSON body, optional `Set-Cookie`. */
 export interface ApiResponse {
   readonly status: number;
   readonly body: Record<string, unknown>;
   readonly setCookie?: string;
+  /**
+   * When set, the server writes a 302 to this `Location` instead of the JSON
+   * body (used by the GitHub OAuth browser-redirect flow). Any `setCookie` is
+   * still emitted on the redirect response.
+   */
+  readonly redirect?: string;
 }
 
 const METHOD_NOT_ALLOWED: ApiResponse = { status: 405, body: { error: 'Method not allowed' } };
@@ -68,6 +75,24 @@ export async function apiRouter(
     if (method !== 'GET') return METHOD_NOT_ALLOWED;
     const res = await handleSarifExport(parsed.searchParams.get('scan') ?? undefined, cookieHeader);
     return { status: res.status, body: { ...res.body } };
+  }
+
+  // GitHub OAuth web-login routes. These need the full URL (querystring +
+  // redirect support) which the dashboard router does not receive, so they are
+  // wired here. The PAT routes under `/settings/github` (no 3rd segment) and
+  // `/github/repos` still fall through to the dashboard router below.
+  if (resource === 'settings' && action === 'github' && segments[2]) {
+    if (method !== 'GET') return METHOD_NOT_ALLOWED;
+    if (segments[2] === 'config') return getGithubConfig(cookieHeader);
+    if (segments[2] === 'start') return startGithubOauth(cookieHeader);
+    if (segments[2] === 'callback') {
+      const query = {
+        code: parsed.searchParams.get('code') ?? undefined,
+        state: parsed.searchParams.get('state') ?? undefined,
+        error: parsed.searchParams.get('error') ?? undefined,
+      };
+      return githubOauthCallback(query, cookieHeader);
+    }
   }
 
   // Dashboard data plane (Phase 5): projects, scans, findings/attack-surface,

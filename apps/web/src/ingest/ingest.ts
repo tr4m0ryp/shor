@@ -13,7 +13,6 @@
  * here rather than in the caller.
  */
 
-import { codebaseVersionRepo } from '../db/repositories/index.js';
 import type { CodebaseVersion, Project, TenantId, UserId } from '../domain/types.js';
 import { getGithubToken } from '../github/index.js';
 import { ingestGithub } from './git-source.js';
@@ -26,12 +25,6 @@ export interface IngestForScanOptions {
   readonly userId: UserId;
   /** Git ref to pull; defaults to the repo's default branch (white-box only). */
   readonly ref?: string;
-  /**
-   * Skip GCS reuse and always ingest a fresh snapshot. Default false — when a
-   * version already exists for the project (source already staged in GCS), it is
-   * reused so seeded/test projects need no GitHub pull.
-   */
-  readonly forceFresh?: boolean;
 }
 
 /**
@@ -52,11 +45,9 @@ export async function ingestForScan(
     return null;
   }
 
-  if (!options.forceFresh) {
-    const existing = await codebaseVersionRepo.latestForProject(options.tenantId, project.id);
-    if (existing) return existing;
-  }
-
+  // White-box ALWAYS clones the latest commit on each run — a scan should test
+  // the current code, not a stale snapshot. (The prior reuse-latest shortcut was
+  // for the removed seed/zip flow.)
   const pat = await getGithubToken(options.tenantId, options.userId);
   if (!pat) {
     throw new Error(
