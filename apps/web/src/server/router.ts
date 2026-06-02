@@ -10,6 +10,7 @@
  */
 
 import { handleLogout, handleMe, handleSessionLogin } from '../auth/routes.js';
+import { handleIngestFindings, handleSarifExport } from '../findings/index.js';
 
 /** Standard response envelope: HTTP status, JSON body, optional `Set-Cookie`. */
 export interface ApiResponse {
@@ -37,6 +38,21 @@ export async function apiRouter(
 
   if (resource === 'auth') {
     return routeAuth(method, action, body, cookieHeader);
+  }
+
+  // POST /scans/:id/findings — connectivity-only findings sink (ADR-047).
+  if (resource === 'scans' && segments[2] === 'findings') {
+    if (method !== 'POST') return METHOD_NOT_ALLOWED;
+    const scanId = segments[1];
+    if (!scanId) return NOT_FOUND;
+    return handleIngestFindings(scanId, body, cookieHeader);
+  }
+
+  // GET /export/sarif?scan=<scanId> — SARIF 2.1.0 export view (ADR-033).
+  if (resource === 'export' && action === 'sarif') {
+    if (method !== 'GET') return METHOD_NOT_ALLOWED;
+    const res = await handleSarifExport(parsed.searchParams.get('scan') ?? undefined, cookieHeader);
+    return { status: res.status, body: { ...res.body } };
   }
 
   return NOT_FOUND;
