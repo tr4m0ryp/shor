@@ -70,6 +70,19 @@ export async function dispatchMessage(
 
 	switch (message.type) {
 		case "assistant": {
+			// The current SDK nests tool_use inside assistant content rather than
+			// emitting a top-level "tool_use" message, so the case below never
+			// fires. Capture tool calls HERE for the live skills feed.
+			const am = message as AssistantMessage;
+			if (Array.isArray(am.message?.content)) {
+				for (const block of am.message.content) {
+					const tb = block as { type?: string; name?: string; input?: Record<string, unknown> };
+					if (tb.type === "tool_use" && typeof tb.name === "string") {
+						skillTracker.record(tb.name, tb.input ?? {});
+					}
+				}
+			}
+
 			const assistantResult = handleAssistantMessage(
 				message as AssistantMessage,
 				turnCount,
