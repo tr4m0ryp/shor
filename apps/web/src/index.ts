@@ -31,6 +31,10 @@ export { getConfig, resetConfig } from './config.js';
 export { migrate } from './db/migrate.js';
 export * as repositories from './db/repositories/index.js';
 export * from './domain/types.js';
+export * as findings from './findings/index.js';
+export * as guardrails from './guardrails/index.js';
+export * as ingest from './ingest/index.js';
+export * as orchestration from './orchestration/index.js';
 export { createDashboardServer, startDashboard } from './server/index.js';
 export * as secrets from './secrets/index.js';
 
