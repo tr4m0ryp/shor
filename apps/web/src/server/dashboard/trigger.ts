@@ -60,6 +60,9 @@ export async function triggerScan(
       ...(typeof body.repoFullName === 'string' ? { repoFullName: body.repoFullName } : {}),
       ...(typeof body.ref === 'string' ? { ref: body.ref } : {}),
       ...(zip ? { zip } : {}),
+      // An explicitly uploaded zip is a NEW snapshot — never silently reuse the
+      // project's already-staged version, or the operator's upload is dropped.
+      ...(zip ? { forceFresh: true } : {}),
     };
     const codebaseVersion = await ingestForScan(project, ingestOptions);
 

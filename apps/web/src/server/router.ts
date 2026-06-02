@@ -44,8 +44,10 @@ export async function apiRouter(
 
   // POST /scans/:id/findings — connectivity-only findings sink (ADR-047).
   // Accepts the worker service token (Authorization: Bearer) or a UI session.
-  if (resource === 'scans' && segments[2] === 'findings') {
-    if (method !== 'POST') return METHOD_NOT_ALLOWED;
+  // Only POST is the sink; GET /scans/:id/findings is a dashboard read and must
+  // fall through to the dashboard router below (otherwise the run-detail view's
+  // findings list 405s).
+  if (resource === 'scans' && segments[2] === 'findings' && method === 'POST') {
     const scanId = segments[1];
     if (!scanId) return NOT_FOUND;
     return handleIngestFindings(scanId, body, cookieHeader, authHeader);

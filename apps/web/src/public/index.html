@@ -457,8 +457,8 @@ body {
         </div>
         <div class="detail-actions">
           <div class="scan-zip">
-            <input type="file" id="scanZip" accept=".zip,application/zip">
-            <span class="hint">Attach source .zip (for projects with no connected repo)</span>
+            <input type="file" id="scanZip" accept=".zip,application/zip" onchange="onScanZipPick()">
+            <span class="hint" id="scanZipHint">Attach source .zip (for projects with no connected repo)</span>
           </div>
           <button class="btn btn-primary btn-sm" id="triggerScanBtn" onclick="triggerScan()">Run scan</button>
         </div>
@@ -730,6 +730,23 @@ function renderScanCard(s) {
 }
 
 // Read a File as base64 (strips the `data:...;base64,` prefix the API does not want).
+function onScanZipPick() {
+  const input = document.getElementById('scanZip');
+  const hint = document.getElementById('scanZipHint');
+  if (!input || !hint) return;
+  const file = input.files && input.files[0];
+  if (!file) {
+    hint.textContent = 'Attach source .zip (for projects with no connected repo)';
+    hint.style.color = '';
+    return;
+  }
+  const kb = file.size < 1024 * 1024
+    ? Math.round(file.size / 1024) + ' KB'
+    : (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+  hint.textContent = 'Attached: ' + file.name + ' (' + kb + ')';
+  hint.style.color = 'var(--accent)';
+}
+
 function readFileAsBase64(file) {
   return new Promise(function (resolve, reject) {
     const reader = new FileReader();
@@ -758,8 +775,9 @@ async function triggerScan() {
       body = { zip: zip, zipFilename: file.name };
     }
     await api('POST', '/projects/' + state.currentProject.id + '/scan', body);
-    showToast('Scan triggered', 'success');
+    showToast(file ? 'Scan triggered with ' + file.name : 'Scan triggered', 'success');
     if (zipInput) zipInput.value = '';
+    onScanZipPick();
     loadScans(state.currentProject.id);
   } catch (err) {
     showToast(err.message, 'error');
