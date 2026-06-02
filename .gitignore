@@ -31,3 +31,6 @@ notes/
 
 # Internal design / research / planning docs — local-only, not pushed
 docs/
+
+# Local acceptance/test runs (repos, .env, evidence)
+.acceptance/
