@@ -47,7 +47,9 @@ export interface FindingRecord {
 export interface FindingsSinkPayload {
 	findings: FindingRecord[];
 	attackSurface?: Record<string, unknown>;
-	status: "completed" | "failed";
+	// `running` is used for incremental mid-run posts (findings accrue in the DB
+	// as agents finish); the sink only transitions the scan on completed/failed.
+	status: "completed" | "failed" | "running";
 }
 
 /** The five vulnerability categories the pipeline produces queues for. */

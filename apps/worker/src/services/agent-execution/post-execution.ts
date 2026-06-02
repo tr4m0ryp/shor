@@ -117,22 +117,60 @@ export async function writeStructuredOutput(
 		return;
 	}
 
-	// The agent should have written the queue itself; accept it if it parses.
+	// The agent should have written the queue itself; accept it if it parses,
+	// else try to salvage it (flash sometimes wraps JSON in prose / ```json
+	// fences or leaves a trailing comma) before degrading to an empty queue.
 	if (await fs.pathExists(queuePath)) {
-		try {
-			const parsed: unknown = JSON.parse(await fs.readFile(queuePath, "utf8"));
-			if (parsed && typeof parsed === "object" && Array.isArray((parsed as { vulnerabilities?: unknown }).vulnerabilities)) {
-				logger.info(`Using agent-written queue ${queueFilename}`);
-				return;
-			}
-			logger.warn(`Queue ${queueFilename} malformed; replacing with empty queue`);
-		} catch {
-			logger.warn(`Queue ${queueFilename} is not valid JSON; replacing with empty queue`);
+		const raw = await fs.readFile(queuePath, "utf8");
+		const salvaged = parseQueue(raw);
+		if (salvaged) {
+			// Rewrite canonicalized so downstream validation reads clean JSON.
+			await fs.writeFile(queuePath, JSON.stringify(salvaged, null, 2), "utf8");
+			logger.info(`Using agent-written queue ${queueFilename} (${salvaged.vulnerabilities.length} entries)`);
+			return;
 		}
+		logger.warn(`Queue ${queueFilename} unsalvageable; replacing with empty queue`);
 	} else {
 		logger.warn(`Queue ${queueFilename} missing; writing empty queue (no findings)`);
 	}
 	await fs.writeFile(queuePath, JSON.stringify({ vulnerabilities: [] }, null, 2), "utf8");
+}
+
+/** A parsed queue: `{ vulnerabilities: [...] }`. */
+interface ParsedQueue {
+	vulnerabilities: unknown[];
+}
+
+/**
+ * Best-effort parse of a hand-written queue. Tries strict JSON first, then
+ * salvages: strips ```json fences and prose, slices the outermost `{...}`, and
+ * drops trailing commas. Returns null only when no `vulnerabilities` array can
+ * be recovered.
+ */
+function parseQueue(raw: string): ParsedQueue | null {
+	const tryParse = (s: string): ParsedQueue | null => {
+		try {
+			const v: unknown = JSON.parse(s);
+			if (v && typeof v === "object" && Array.isArray((v as { vulnerabilities?: unknown }).vulnerabilities)) {
+				return { vulnerabilities: (v as ParsedQueue).vulnerabilities };
+			}
+		} catch {
+			/* fall through */
+		}
+		return null;
+	};
+
+	const direct = tryParse(raw);
+	if (direct) return direct;
+
+	// Strip code fences, then slice from the first `{` to the last `}`.
+	let body = raw.replace(/```(?:json)?/gi, "");
+	const start = body.indexOf("{");
+	const end = body.lastIndexOf("}");
+	if (start === -1 || end <= start) return null;
+	body = body.slice(start, end + 1);
+
+	return tryParse(body) ?? tryParse(body.replace(/,(\s*[}\]])/g, "$1"));
 }
 
 /**

@@ -1,5 +1,9 @@
 URL: {{WEB_URL}}
 
+Live reachability — READ BEFORE CONCLUDING ANYTHING IS UNREACHABLE:
+- {{WEB_URL}} is the externally reachable origin. When it serves a single-page app (SPA), the backend API is almost always reverse-proxied on the SAME origin under a path prefix. ALWAYS probe `{{WEB_URL}}/api/`, `{{WEB_URL}}/api/v1/`, `{{WEB_URL}}/api/health`, `{{WEB_URL}}/graphql` (and any prefixes the recon/source analysis surfaced) before deciding the backend is isolated.
+- A direct backend port being closed (e.g. :8000, :3000, :80) does NOT mean the API is unreachable — the proxied path on this public origin is the real, testable attack surface. Validate every finding against that proxied path; only mark a finding VALIDATION_BLOCKED after the proxied `/api` paths have been tried and confirmed non-responsive.
+
 Filesystem:
 - {{REPO_PATH}}/ (read only)
 - {{REPO_PATH}}/.storron/deliverables/ (read-write)

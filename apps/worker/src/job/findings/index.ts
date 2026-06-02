@@ -86,7 +86,7 @@ export function collectFindings(
 export async function reportFindings(
 	deliverablesPath: string,
 	scanId: string,
-	status: "completed" | "failed",
+	status: "completed" | "failed" | "running",
 	logger: ActivityLogger,
 ): Promise<boolean> {
 	const sink = readSinkConfig(scanId);

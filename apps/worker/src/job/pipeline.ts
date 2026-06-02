@@ -22,6 +22,7 @@ import { ALL_AGENTS, type AgentName } from "../types/agents.js";
 import type { ActivityLogger } from "../types/activity-logger.js";
 import type { SessionMetadata } from "../types/audit.js";
 import type { ScanJobParams } from "./env.js";
+import { reportFindings } from "./findings/index.js";
 import { ProgressEmitter } from "./progress/index.js";
 
 /** Canonical agent execution order (pre-recon → … → attack-surface). */
@@ -97,6 +98,11 @@ export async function runScanPipeline(
 		completedAgents.push({ agent: agentName, durationMs });
 		await progress.completed_(agentName, durationMs);
 		logger.info(`Completed agent ${agentName}`, { durationMs });
+
+		// Incrementally push cumulative findings (status stays `running`) so a
+		// timeout/OOM kill never loses a run's results — the dashboard already
+		// has everything found up to the last completed agent.
+		await reportFindings(deliverablesPath, params.scanId, "running", logger);
 	}
 
 	return { scanId: params.scanId, completedAgents };

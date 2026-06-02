@@ -14,6 +14,8 @@ Your analysis must begin by reading and fully comprehending the initial intellig
 URL: {{WEB_URL}}
 {{DESCRIPTION}}
 
+Live reachability (CRITICAL for an accurate map): {{WEB_URL}} is the externally reachable origin. If it serves a single-page app, the backend API is almost certainly reverse-proxied on the SAME origin under a path prefix — probe `{{WEB_URL}}/api/`, `/api/v1/`, `/api/health`, `/graphql` and map every API route you find in source against that proxied origin. A closed direct backend port (:8000/:3000/:80) does NOT mean the API is unreachable; the proxied `/api` path is the real attack surface. Record the reachable API base path explicitly in your map so the exploitation agents target it instead of giving up.
+
 Filesystem:
 - {{REPO_PATH}}/ (read only)
 - {{REPO_PATH}}/.storron/deliverables/ (read-write)
