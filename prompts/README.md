@@ -1,13 +1,29 @@
 # prompts/ — category system prompts (ported from storron)
 
-Ported from `storron/apps/worker/prompts/` (kept rich and detailed), with two
-changes:
+Ported from `storron/apps/worker/prompts/` (kept rich and detailed), with three
+deliberate changes:
 
-1. **Drop the onion variant** (`pre-recon-onion`) and onion template selection.
-2. **Add a `<tool_skills>` section** to each category prompt that references the
-   relevant skills by name (see `../skills/`).
+1. **Dropped the onion variant** (`pre-recon-onion.txt`) and its template
+   selection. No Tor/onion references remain (clearnet only).
+2. **Added a `<tool_skills>` section** to each category prompt that references
+   the relevant per-tool skills by name (see `../skills/`, ADR-035). Placed
+   right after each prompt's existing `<cli_tools>` block.
+3. **Inverted the attack-surface prompt** (`attack-surface.txt`): its
+   `<claude_code_prompt_template>` changed from an *attack/reproduce* template
+   ("reproduce the reported behavior at `<url>`") to a **remediation/fix**
+   template that targets the connected repository and resolves the issue at its
+   root cause, built from each finding's `vulnerable_code_location` (file:line)
+   and `missing_defense` (ADR-010, LAUNCH-SPEC §6.2, research/output-schema.md
+   §3). The JSON field name `claude_code_prompt` is unchanged for dashboard
+   compatibility — only the template content changed.
 
-Files to port: `pre-recon-code`, `recon`, `vuln-{injection,xss,auth,authz,ssrf}`,
-`exploit-{injection,xss,auth,authz,ssrf}`, `report-executive`, plus the
-`shared/_*.txt` includes. Keep the `@include(...)` mechanism from the
-prompt-manager.
+Ported files: `pre-recon-code`, `recon`, `vuln-{injection,xss,auth,authz,ssrf}`,
+`exploit-{injection,xss,auth,authz,ssrf}`, `attack-surface`, `report-executive`,
+plus the `shared/_*.txt` includes. The `@include(...)` mechanism from the
+prompt-manager is preserved (`shared/_vuln-scope.txt`, `_exploit-scope.txt`,
+`_target.txt`, `_rules.txt`).
+
+`<tool_skills>` is present on every category agent prompt (recon, pre-recon, and
+all `vuln-*` / `exploit-*`). It is intentionally omitted from `attack-surface`
+(pure synthesis) and `report-executive` (reporting) — neither runs offensive
+tools.
