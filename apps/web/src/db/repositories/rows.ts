@@ -101,6 +101,7 @@ export interface ProjectRow {
   mode: string;
   schedule: string | null;
   auth_config: Record<string, unknown> | null;
+  share_slug: string | null;
   created_at: unknown;
 }
 
@@ -115,6 +116,7 @@ export function toProject(r: ProjectRow): Project {
     mode: r.mode === 'whitebox' ? 'whitebox' : 'blackbox',
     schedule: r.schedule,
     authConfig: r.auth_config,
+    shareSlug: r.share_slug ?? null,
     createdAt: ts(r.created_at),
   };
 }

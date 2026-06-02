@@ -427,6 +427,18 @@ body {
 .arsenal-chip.static-analysis .dot { background: var(--green); }
 .arsenal-empty { font-size: 12px; color: var(--text-muted); }
 
+/* Guest (shared read-only) mode */
+body.guest .owner-only { display: none !important; }
+body.guest .sidebar nav { display: none; }
+.guest-banner {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+  padding: 11px 16px; border-radius: var(--radius-sm); font-size: 13px;
+  color: var(--accent); background: rgba(242,100,25,.10); border: 1px solid rgba(242,100,25,.3);
+}
+.guest-banner svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.guest-banner b { font-weight: 600; }
+.sidebar .guest-tag { margin-top: 10px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+
 /* === Findings tab === */
 .findings-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .findings-filter-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; align-self: center; }
@@ -558,6 +570,10 @@ body {
   </aside>
 
   <main class="main">
+    <div id="guestBanner" class="guest-banner" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span>You're viewing a <b>shared, read-only</b> dashboard. Sign-in is not required; you can browse results but can't edit or run scans.</span>
+    </div>
     <!-- ===================== Targets page ===================== -->
     <div id="pageTargets" class="page">
       <div class="page-header">
@@ -565,7 +581,7 @@ body {
         <p class="tagline">Every secret rests on a problem assumed hard.</p>
       </div>
 
-      <div class="new-run-card">
+      <div class="new-run-card owner-only">
         <h2>New Dashboard</h2>
         <div class="new-run-grid">
           <div>
@@ -625,7 +641,7 @@ body {
     <!-- ===================== Project detail (scans list) ===================== -->
     <div id="pageProjectDetail" class="page" style="display:none">
       <div class="page-header detail-header">
-        <button class="btn btn-ghost btn-sm" onclick="showPage('targets')">
+        <button class="btn btn-ghost btn-sm owner-only" onclick="showPage('targets')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="15 18 9 12 15 6"/></svg>
           Dashboards
         </button>
@@ -635,7 +651,11 @@ body {
         </div>
         <div class="detail-actions">
           <span class="mode-badge" id="projModeBadge"></span>
-          <button class="btn btn-primary btn-sm" id="triggerScanBtn" onclick="triggerScan()">Run scan</button>
+          <button class="btn btn-ghost btn-sm owner-only" id="shareBtn" onclick="shareProject()" title="Share a read-only link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Share
+          </button>
+          <button class="btn btn-primary btn-sm owner-only" id="triggerScanBtn" onclick="triggerScan()">Run scan</button>
         </div>
       </div>
       <div class="stats-row" id="projStats"></div>
@@ -780,6 +800,23 @@ async function api(method, path, body) {
   }
   return json;
 }
+
+// ===================== Guest (shared read-only) =====================
+
+var guestSlug = null;
+
+// Map an authed read path to its public /share/<slug>/... equivalent (guest mode).
+function gx(path) {
+  if (!guestSlug) return path;
+  if (/^\/projects\/[^/]+\/scans$/.test(path)) return '/share/' + guestSlug + '/scans';
+  if (/^\/projects\/[^/]+$/.test(path)) return '/share/' + guestSlug + '/project';
+  const m = path.match(/^\/scans\/([^/]+)(\/.*)?$/);
+  if (m) return '/share/' + guestSlug + '/scans/' + m[1] + (m[2] || '');
+  return path;
+}
+
+// GET helper that routes through the share plane when in guest mode.
+function gapi(method, path, body) { return api(method, gx(path), body); }
 
 // ===================== Auth / identity =====================
 
@@ -1076,7 +1113,7 @@ async function createProject() {
 
 async function openProject(id) {
   try {
-    const data = await api('GET', '/projects/' + id);
+    const data = await gapi('GET', '/projects/' + id);
     state.currentProject = data.project;
     document.getElementById('projDetailTitle').textContent = data.project.name;
     const repoPart = data.project.repoFullName ? '  ·  ' + data.project.repoFullName : '';
@@ -1097,7 +1134,7 @@ function scanNo(n) { return '#' + String(n).padStart(5, '0'); }
 async function loadScans(projectId) {
   const container = document.getElementById('scansContainer');
   try {
-    const data = await api('GET', '/projects/' + projectId + '/scans');
+    const data = await gapi('GET', '/projects/' + projectId + '/scans');
     const scans = data.scans || [];
     document.getElementById('scanCount').textContent = String(scans.length);
     // Number scans oldest=#00001; the list is newest-first, so the first card
@@ -1146,7 +1183,7 @@ async function renderProjectStats(scans) {
   const latestWithData = completed[0] || last;
   if (latestWithData) {
     try {
-      const fd = await api('GET', '/scans/' + latestWithData.id + '/findings');
+      const fd = await gapi('GET', '/scans/' + latestWithData.id + '/findings');
       const findings = fd.findings || [];
       findingsTotal = findings.length;
       findings.forEach(function (f) {
@@ -1188,11 +1225,40 @@ async function triggerScan() {
   }
 }
 
+// Owner: generate (or reuse) a read-only share link and copy it.
+async function shareProject() {
+  if (!state.currentProject) return;
+  try {
+    const r = await api('POST', '/projects/' + state.currentProject.id + '/share', {});
+    const url = location.origin + '/?share=' + r.shareSlug;
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('Read-only share link copied', 'success');
+    } catch (_) {
+      window.prompt('Read-only share link:', url);
+    }
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// Guest: enter read-only mode for a shared slug and open its dashboard.
+async function enterGuestMode(slug) {
+  guestSlug = slug;
+  document.body.classList.add('guest');
+  document.getElementById('guestBanner').style.display = 'flex';
+  document.getElementById('navTargets').classList.remove('active');
+  try {
+    await openProject('shared'); // gx() ignores the id and resolves via the slug
+  } catch (err) {
+    document.querySelector('.main').innerHTML =
+      '<div class="empty-state"><p>This shared link is invalid or was revoked.</p></div>';
+  }
+}
+
 // ===================== Scan detail =====================
 
 async function openScan(scanId) {
   try {
-    const data = await api('GET', '/scans/' + scanId);
+    const data = await gapi('GET', '/scans/' + scanId);
     state.currentScan = data.scan;
     const num = state.scanNumbers[data.scan.id];
     document.getElementById('scanDetailTitle').textContent = 'Scan ' + (num ? scanNo(num) : data.scan.id.slice(0, 8));
@@ -1264,7 +1330,7 @@ function startScanPolling(scanId) {
 async function pollScan(scanId) {
   if (!state.currentScan || state.currentScan.id !== scanId) { stopScanPolling(); return; }
   try {
-    const data = await api('GET', '/scans/' + scanId);
+    const data = await gapi('GET', '/scans/' + scanId);
     const prev = state.currentScan.status;
     state.currentScan = data.scan;
     const statusEl = document.getElementById('scanStatus');
@@ -1294,7 +1360,7 @@ function fmtDur(ms) {
 async function loadScanProgress(scanId) {
   const panel = document.getElementById('panelActivity');
   try {
-    const data = await api('GET', '/scans/' + scanId + '/progress');
+    const data = await gapi('GET', '/scans/' + scanId + '/progress');
     renderProgress(data.progress);
   } catch (err) {
     panel.innerHTML = '<div class="panel-empty">Progress unavailable</div>';
@@ -1466,7 +1532,7 @@ async function loadScanFindings(scanId) {
   const panel = document.getElementById('panelFindings');
   panel.innerHTML = '<div class="panel-empty"><span class="spinner"></span></div>';
   try {
-    const data = await api('GET', '/scans/' + scanId + '/findings');
+    const data = await gapi('GET', '/scans/' + scanId + '/findings');
     state.findingsCache = (data.findings || []).map((f) => f.data || f);
     document.getElementById('findingsCount').textContent = String(state.findingsCache.length);
     renderFindings();
@@ -1551,7 +1617,7 @@ function toggleFinding(i) {
 async function loadScanAttackSurface(scanId) {
   const panel = document.getElementById('panelAttackSurface');
   try {
-    const data = await api('GET', '/scans/' + scanId + '/attack-surface');
+    const data = await gapi('GET', '/scans/' + scanId + '/attack-surface');
     state.attackSurfaceCache = data.attackSurface || { scenarios: [] };
     const scenarios = Array.isArray(state.attackSurfaceCache.scenarios) ? state.attackSurfaceCache.scenarios : [];
     document.getElementById('attackSurfaceCount').textContent = String(scenarios.length);
@@ -1626,7 +1692,7 @@ async function copyFixPrompt(scenarioId) {
 async function loadScanDiff(scanId) {
   const panel = document.getElementById('panelDiff');
   try {
-    const data = await api('GET', '/scans/' + scanId + '/diff');
+    const data = await gapi('GET', '/scans/' + scanId + '/diff');
     const diff = data.diff || { transitions: [], counts: {}, priorScanId: null };
     const counts = diff.counts || {};
     const total = (diff.transitions || []).length;
@@ -1701,12 +1767,16 @@ function renderUserRow(u) {
 (async function boot() {
   // GitHub OAuth callback landed here (?gh=connected|error). If we're the popup,
   // tell the opener and close; otherwise (full-page fallback) toast + go to Settings.
-  const gh = new URLSearchParams(location.search).get('gh');
+  const params = new URLSearchParams(location.search);
+  const gh = params.get('gh');
   if (gh && window.opener && !window.opener.closed) {
     window.opener.postMessage({ aegis: 'gh', status: gh === 'connected' ? 'connected' : 'error' }, location.origin);
     window.close();
     return;
   }
+  // Shared read-only link → guest mode (no session, no owner controls).
+  const share = params.get('share');
+  if (share) { await enterGuestMode(share); return; }
   await loadMe();
   if (gh) {
     history.replaceState({}, '', location.pathname);

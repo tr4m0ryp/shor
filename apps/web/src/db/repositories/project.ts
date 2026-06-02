@@ -96,4 +96,28 @@ export const projectRepo = {
   async delete(tenantId: TenantId, id: ProjectId): Promise<void> {
     await query('DELETE FROM project WHERE tenant_id = $1 AND id = $2', [tenantId, id]);
   },
+
+  /**
+   * Set (or clear, with null) the read-only guest-link slug on a project;
+   * tenant-scoped so an owner can only share their own project. Returns the
+   * updated project, or null when no project matched the tenant + id.
+   */
+  async setShareSlug(tenantId: TenantId, id: ProjectId, slug: string | null): Promise<Project | null> {
+    const { rows } = await query<ProjectRow>(
+      'UPDATE project SET share_slug = $3 WHERE tenant_id = $1 AND id = $2 RETURNING *',
+      [tenantId, id, slug],
+    );
+    return rows[0] ? toProject(rows[0]) : null;
+  },
+
+  /**
+   * Resolve a project by its share slug — NO tenant scope: the slug itself is
+   * the access key (the partial unique index guarantees at most one match). Used
+   * exclusively by the unauthenticated public share routes. Returns null when no
+   * project carries the slug (or it is shared by no one).
+   */
+  async findByShareSlug(slug: string): Promise<Project | null> {
+    const { rows } = await query<ProjectRow>('SELECT p.* FROM project p WHERE p.share_slug = $1', [slug]);
+    return rows[0] ? toProject(rows[0]) : null;
+  },
 };

@@ -87,6 +87,12 @@ export interface Project {
   readonly schedule: string | null;
   /** Target auth config (login flow, headers, ROE) — opaque JSON blob. */
   readonly authConfig: Record<string, unknown> | null;
+  /**
+   * Opaque read-only guest-link slug, or null when not shared. When set, anyone
+   * holding the slug can READ this one project's data with no auth (ADR-share).
+   * Globally unique; the slug is the access key.
+   */
+  readonly shareSlug: string | null;
   readonly createdAt: Timestamp;
 }
 
@@ -252,7 +258,7 @@ export interface AttackSurface {
 export type NewTenant = Omit<Tenant, 'id' | 'createdAt'> & Partial<Pick<Tenant, 'plan'>>;
 export type NewUser = Omit<User, 'id' | 'createdAt'>;
 export type NewProviderKey = Omit<ProviderKey, 'id' | 'createdAt'>;
-export type NewProject = Omit<Project, 'id' | 'createdAt' | 'repoFullName' | 'mode'> &
+export type NewProject = Omit<Project, 'id' | 'createdAt' | 'shareSlug' | 'repoFullName' | 'mode'> &
   Partial<Pick<Project, 'repoFullName' | 'mode'>>;
 export type NewCodebaseVersion = Omit<CodebaseVersion, 'id' | 'createdAt'>;
 export type NewScan = Omit<Scan, 'id' | 'startedAt' | 'finishedAt' | 'progress'> &

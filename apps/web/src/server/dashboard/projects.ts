@@ -9,6 +9,7 @@
  * tenant's project.
  */
 
+import { randomBytes } from 'node:crypto';
 import { projectRepo, scanRepo } from '../../db/repositories/index.js';
 import type { NewProject, ProjectId, ProjectMode } from '../../domain/types.js';
 import type { ApiResponse } from '../router.js';
@@ -174,6 +175,46 @@ export async function listProjectScans(id: ProjectId, cookieHeader: string | und
     if (!project) return notFound('project not found');
     const scans = await scanRepo.listByProject(g.tenantId, id);
     return ok({ scans });
+  } catch (err) {
+    return serverError(err);
+  }
+}
+
+/**
+ * `POST /projects/:id/share` — mint (or return the existing) read-only guest
+ * link slug for a project. Idempotent: a project that is already shared returns
+ * its current slug so re-clicking "Share" never rotates a live link. The slug is
+ * a URL-safe 16-char random token (12 bytes → base64url), opaque and
+ * unguessable; it is the sole access key the public `/share/:slug/...` routes
+ * resolve.
+ */
+export async function shareProject(id: ProjectId, cookieHeader: string | undefined): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return g.response;
+  try {
+    const project = await projectRepo.findById(g.tenantId, id);
+    if (!project) return notFound('project not found');
+    if (project.shareSlug) return ok({ shareSlug: project.shareSlug });
+    const slug = randomBytes(12).toString('base64url');
+    const updated = await projectRepo.setShareSlug(g.tenantId, id, slug);
+    if (!updated) return notFound('project not found');
+    return ok({ shareSlug: updated.shareSlug });
+  } catch (err) {
+    return serverError(err);
+  }
+}
+
+/**
+ * `DELETE /projects/:id/share` — revoke a project's guest link (clears the
+ * slug). Any outstanding `?share=<slug>` URL stops resolving immediately.
+ */
+export async function unshareProject(id: ProjectId, cookieHeader: string | undefined): Promise<ApiResponse> {
+  const g = gate(cookieHeader);
+  if (!g.ok) return g.response;
+  try {
+    const updated = await projectRepo.setShareSlug(g.tenantId, id, null);
+    if (!updated) return notFound('project not found');
+    return ok({ ok: true });
   } catch (err) {
     return serverError(err);
   }

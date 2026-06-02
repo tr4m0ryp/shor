@@ -14,6 +14,7 @@ import { handleIngestFindings, handleSarifExport } from '../findings/index.js';
 import { handleIngestProgress } from '../scan-progress/index.js';
 import { routeDashboard } from './dashboard/index.js';
 import { getGithubConfig, githubOauthCallback, startGithubOauth } from './dashboard/settings.js';
+import { routeShare } from './share.js';
 
 /** Standard response envelope: HTTP status, JSON body, optional `Set-Cookie`. */
 export interface ApiResponse {
@@ -93,6 +94,15 @@ export async function apiRouter(
       };
       return githubOauthCallback(query, cookieHeader);
     }
+  }
+
+  // Public read-only share plane: /share/:slug/... — NO auth, NO cookie. The
+  // slug is the access key; resolves exactly one project's read data. Returns
+  // null when the path is not a share route. Wired before the dashboard
+  // delegation so it is never gated.
+  if (resource === 'share') {
+    const shared = await routeShare(method, segments);
+    if (shared) return shared;
   }
 
   // Dashboard data plane (Phase 5): projects, scans, findings/attack-surface,

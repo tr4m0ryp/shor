@@ -13,6 +13,8 @@
  *   DELETE /projects/:id              delete project
  *   GET    /projects/:id/scans        list a project's scans
  *   POST   /projects/:id/scan         ingest + trigger a scan
+ *   POST   /projects/:id/share        mint/return read-only guest-link slug
+ *   DELETE /projects/:id/share        revoke the guest link
  *   GET    /scans/:id                 scan header + finding count
  *   GET    /scans/:id/findings        scan's findings (GET; POST is the sink)
  *   GET    /scans/:id/attack-surface  scan's attack-surface doc (fix prompts)
@@ -31,7 +33,16 @@
 import { getScanProgress } from '../../scan-progress/index.js';
 import type { ApiResponse } from '../router.js';
 import { methodNotAllowed, notFound } from './auth-util.js';
-import { createProject, deleteProject, getProject, listProjectScans, listProjects, updateProject } from './projects.js';
+import {
+  createProject,
+  deleteProject,
+  getProject,
+  listProjectScans,
+  listProjects,
+  shareProject,
+  unshareProject,
+  updateProject,
+} from './projects.js';
 import { getScan, getScanAttackSurface, getScanDiff, listScanFindings } from './scans.js';
 import { connectGithub, disconnectGithub, getGithubSettings, listGithubRepos } from './settings.js';
 import { triggerScan } from './trigger.js';
@@ -97,12 +108,17 @@ async function routeProjects(
     return methodNotAllowed;
   }
 
-  // Sub-resources: /projects/:id/scans, /projects/:id/scan
+  // Sub-resources: /projects/:id/scans, /projects/:id/scan, /projects/:id/share
   if (sub === 'scans') {
     return method === 'GET' ? listProjectScans(id, cookieHeader) : methodNotAllowed;
   }
   if (sub === 'scan') {
     return method === 'POST' ? triggerScan(id, body, cookieHeader) : methodNotAllowed;
+  }
+  if (sub === 'share') {
+    if (method === 'POST') return shareProject(id, cookieHeader);
+    if (method === 'DELETE') return unshareProject(id, cookieHeader);
+    return methodNotAllowed;
   }
   if (sub) return notFound('unknown project sub-resource');
 
