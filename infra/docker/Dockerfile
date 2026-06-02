@@ -63,9 +63,10 @@ RUN retry go install -v github.com/ffuf/ffuf/v2@latest && \
     retry go install -v github.com/Emoe/kxss@latest && \
     retry go install -v github.com/lc/gau/v2/cmd/gau@latest && \
     retry go install -v github.com/tomnomnom/waybackurls@latest
+# trufflehog dropped: its go.mod uses `replace` directives, which `go install
+# <mod>@latest` rejects. gitleaks already covers secret scanning, so it is redundant.
 RUN retry go install -v github.com/zricethezav/gitleaks/v8@latest && \
-    retry go install -v github.com/google/osv-scanner/v2/cmd/osv-scanner@latest && \
-    retry go install -v github.com/trufflesecurity/trufflehog/v3@latest
+    retry go install -v github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
 
 # --- naabu needs CGO + libpcap ---
 ENV CGO_ENABLED=1
