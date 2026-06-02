@@ -12,6 +12,7 @@ import type { DistributedConfig } from "../../types/config.js";
 import { handlePromptError, PentestError } from "../error-handling.js";
 import { processIncludes } from "./includes.js";
 import { interpolateVariables } from "./interpolation.js";
+import { recommendedSkillsSection } from "./skill-recommendations.js";
 import { selectPreReconTemplate } from "./template-selection.js";
 import type { PromptVariables } from "./types.js";
 
@@ -72,14 +73,16 @@ export async function loadPrompt(
 		// 4. Process @include directives
 		template = await processIncludes(template, basePromptsDir);
 
-		// 5. Interpolate variables and return final prompt
-		return await interpolateVariables(
+		// 5. Interpolate variables, then append this agent's recommended-skills
+		//    footer (soft scoping — steers tool choice without restricting).
+		const interpolated = await interpolateVariables(
 			template,
 			enhancedVariables,
 			config,
 			logger,
 			basePromptsDir,
 		);
+		return interpolated + recommendedSkillsSection(promptName);
 	} catch (error) {
 		if (error instanceof PentestError) {
 			throw error;
