@@ -311,9 +311,17 @@ body {
 }
 .pending-agent__detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 .pending-detail-h { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: 6px 0 4px; }
-.pending-subs { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 3px 10px; }
-.pending-sub { font-size: 12px; color: var(--text-secondary); padding-left: 12px; position: relative; }
-.pending-sub::before { content: '·'; position: absolute; left: 2px; color: var(--text-muted); }
+.pending-subs { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 10px; }
+.pending-sub { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+.pending-sub__dot { width: 7px; height: 7px; border-radius: 9999px; background: var(--border); flex: 0 0 auto; }
+.pending-sub__status { margin-left: auto; font-size: 9px; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted); }
+.pending-sub--completed .pending-sub__dot { background: var(--green); }
+.pending-sub--completed .pending-sub__status { color: var(--green); }
+.pending-sub--failed .pending-sub__dot { background: var(--red); }
+.pending-sub--failed .pending-sub__status { color: var(--red); }
+.pending-sub--in_progress .pending-sub__dot { background: var(--accent); animation: pendingPulse 1.6s ease-in-out infinite; }
+.pending-sub--in_progress .pending-sub__status { color: var(--accent); }
+.pending-sub--skipped { opacity: .5; }
 .pending-detail-empty { font-size: 11px; color: var(--text-muted); }
 .pending-status-pill {
   font-size: 9px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600;
@@ -1045,8 +1053,16 @@ function renderProgressAgent(agent) {
   const chips = skills.slice(0, 4).map(skillChip).join('');
   let detail = '';
   if (open) {
+    // Sub-tasks aren't individually tracked at runtime, so each inherits the
+    // agent's status (done when the agent completed, failed if it failed, etc.).
+    const subStatus = agent.status === 'completed' ? 'completed'
+      : agent.status === 'failed' ? 'failed'
+      : agent.status === 'in_progress' ? 'in_progress'
+      : agent.status === 'skipped' ? 'skipped' : 'pending';
     const subs = (agent.subtasks || []).map(function (s) {
-      return '<li class="pending-sub">' + escapeHtml(s) + '</li>';
+      return '<li class="pending-sub pending-sub--' + subStatus + '">' +
+        '<span class="pending-sub__dot"></span>' + escapeHtml(s) +
+        '<span class="pending-sub__status">' + (PILL_LABELS[subStatus] || subStatus) + '</span></li>';
     }).join('');
     const allSkills = skills.length
       ? '<div class="pending-skills">' + skills.map(skillChip).join('') + '</div>'

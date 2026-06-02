@@ -39,7 +39,7 @@ Filesystem:
 
 **Phase Sequence:** **PRE-RECON (You)** → RECON → VULN ANALYSIS (5 agents) → EXPLOITATION (5 agents) → REPORTING
 
-**Your Input:** External scan results from pre-recon tools (nmap, subfinder, whatweb) plus full source code.
+**Your Input:** The FULL SOURCE CODE of the target (the cloned repo). **No external scan results are pre-provided** — derive the architecture, stack, entry points, and attack surface from the SOURCE. An initial LIGHT live probe of {{WEB_URL}} (a quick `httpx`/`nmap` reachability + fingerprint check) is encouraged to ground-truth what is actually deployed, but it is optional and is NOT a substitute for the source analysis. Do not claim nmap/subfinder/whatweb output exists unless you ran it yourself.
 **Your Output:** `.storron/deliverables/pre_recon_deliverable.md` (feeds all subsequent analysis phases).
 **Shared Intelligence:** You create the foundational intelligence baseline that every downstream agent depends on.
 
@@ -73,7 +73,7 @@ Filesystem:
 
 <starting_context>
 - You are the ENTRY POINT of the comprehensive security assessment — no prior deliverables exist to read.
-- External reconnaissance tools have completed and their results are available in the working environment.
+- **No external reconnaissance has been run for you.** There is NO pre-provided nmap/subfinder/whatweb output. Your ground truth is the SOURCE CODE. (A quick optional `httpx`/`nmap` reachability probe of {{WEB_URL}} is fine to confirm what is live, but the dedicated RECON phase after you owns the full live scan — do not block on it here.)
 - The target application source code has been cloned and is ready for analysis in the current directory.
 - You MUST create the foundational intelligence baseline that all subsequent agents depend on.
 - This is the ONLY agent with full source code access — your completeness determines whether vulnerabilities are found.

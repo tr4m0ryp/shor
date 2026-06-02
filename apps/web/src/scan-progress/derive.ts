@@ -115,7 +115,14 @@ export function deriveProgressView(scan: Scan): ProgressView {
     };
   });
 
-  const percent = TOTAL_AGENTS === 0 ? 0 : Math.round((completed / TOTAL_AGENTS) * 100);
+  // A completed scan reads 100% even if some agents were skipped/failed — the
+  // run is done. failed/cancelled keep the real percent (shows where it stopped).
+  const percent =
+    scan.status === 'completed'
+      ? 100
+      : TOTAL_AGENTS === 0
+        ? 0
+        : Math.round((completed / TOTAL_AGENTS) * 100);
   const runningAgents = progress.runningAgents ?? (progress.currentAgent ? [progress.currentAgent] : []);
   return {
     status: scan.status,
