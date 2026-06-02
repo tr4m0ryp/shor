@@ -51,7 +51,10 @@ export function readScanJobParams(): ScanJobParams {
 	const scanId = required("AEGIS_SCAN_ID");
 	const targetUrl = required("AEGIS_TARGET_URL");
 	const repoGcsUri = required("AEGIS_REPO_GCS_URI");
-	const repoPath = optional("AEGIS_REPO_PATH") ?? `/workspace/${scanId}/repo`;
+	// AEGIS_REPO_PATH is the prepared repo location. On the Cloud Run Job it is
+	// `/work/repo` (the writable target into which the GCS snapshot at `/gcs` is
+	// materialized — see job/repo.ts). Absent/empty falls back to that default.
+	const repoPath = optional("AEGIS_REPO_PATH") ?? "/work/repo";
 
 	const params: ScanJobParams = {
 		scanId,
