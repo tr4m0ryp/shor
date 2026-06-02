@@ -412,3 +412,24 @@ Built and pushed the locally-verifiable foundation via `/flow:readyforlaunch`
 - `paramspider` reclassified pip→git-clone (not on PyPI, build-proven).
 
 **Deferred (need live GCP — separate `/readyforlaunch` runs):** Phase 2 orchestration (Cloud Run Job/Temporal Cloud), Phase 3 multi-tenant identity/secrets, Phase 4 project model/storage/ingest, Phase 5 findings datastore + dashboard, Phase 6 guardrail hardening.
+
+### 2026-06-02 — Cloud / multi-tenant build (Phases 2-6) — pushed `origin/main`
+
+Built Phases 2-6 via worktree-isolated agents (Group A foundation → Group B → Group C, in waves), merged per wave; both packages `tsc`-green throughout. `apps/web` is the Cloud Run service (backend); `apps/worker` is the per-scan job.
+
+**Completed**
+- **010 foundation (4/5)** — GCP client wrappers (Secret Manager, GCS, Cloud SQL pool, Temporal Cloud, Identity Platform), env config, Postgres schema + migrations + pgMemento, typed tenant-scoped repositories, domain types.
+- **011 auth (3)** — Identity Platform verify, server-minted HTTP-only session cookie, `{tenantId,role}` claims, 4-role RBAC, tenant scoping.
+- **012 secrets (3)** — Secret Manager per-(tenant,user,provider), per-run injection manifest (file-mount + scoped identity), engine de-plaintexted (ADR-050).
+- **013 orchestration (2)** — scan = Temporal Cloud workflow → Cloud Run Job per scan; cancel = kill switch; worker job entrypoint.
+- **014 ingest (4)** — GitHub App installation tokens, installation-scoped clone (SSRF gate), zip ingest, CodebaseVersion → GCS.
+- **015 findings (5)** — stable-fingerprint sink, scan-to-scan diff (new/open/fixed/regressed), SARIF 2.1.0 export.
+- **016 dashboard (5)** — storron UI look reused, Targets / multi-user / diff views, "Copy fix prompt" flip; tenant-scoped routes.
+- **017 guardrails (6)** — ROE scope check, per-host rate limit, default-deny egress (metadata/internal blocked), secret redaction, kill switch, audit tee; worker network-guard.
+- **Integration** — orchestration/ingest/findings/guardrails wired into the package root; full build green.
+
+**Acceptance verdict: YELLOW.** Both packages `tsc`-build green end-to-end; module smokes pass (fingerprint determinism, SARIF structure, RBAC/tenant 401/403, egress blocks `169.254.169.254`, redaction). Live gate **BLOCKED** — needs a provisioned GCP project (Identity Platform, Temporal Cloud, Cloud SQL, GCS, Secret Manager, Cloud Run) + an Anthropic key + an authorized target. No RED.
+
+**Known runtime-wiring follow-ups (blocked on live, not compile):** worker → findings-sink POST on scan completion; per-tool-call ROE/egress guard at every network action (module + one call site in place); `.storron`→`.aegis` deliverable-path rename; GCP IAM / service-account / provisioning (Terraform).
+
+All 7 phases now have code on `main`. The platform compiles end-to-end; what remains is a live GCP project to deploy against + the runtime-wiring/acceptance pass.
