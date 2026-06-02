@@ -262,7 +262,8 @@ ENV VENV=/opt/aegis/venv
 #    from the Wolfi runtime-staging stage. These are glibc-ABI by construction.
 COPY --from=runtime-staging /usr/ /usr/
 COPY --from=runtime-staging /etc/ssl/ /etc/ssl/
-COPY --from=runtime-staging /etc/nmap/ /etc/nmap/
+# nmap's runtime data lives in /usr/share/nmap (already copied via /usr/); there is
+# no /etc/nmap in Wolfi without the (nonexistent) nmap-scripts package.
 COPY --from=runtime-staging /etc/fonts/ /etc/fonts/
 
 # 2) Go tool binaries → /usr/local/bin (single PATH entry).
