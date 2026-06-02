@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shor</title>
 <meta name="description" content="Shor -- AI web-pentest platform. Dashboards, scans, findings, attack surface, and scan-to-scan diffs.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237D4698' stroke-width='1.5'%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4'/%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4' transform='rotate(60 12 12)'/%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4' transform='rotate(120 12 12)'/%3E%3Ccircle cx='12' cy='12' r='2.1' fill='%237D4698' stroke='none'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F26419' stroke-width='1.5'%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4'/%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4' transform='rotate(60 12 12)'/%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4' transform='rotate(120 12 12)'/%3E%3Ccircle cx='12' cy='12' r='2.1' fill='%23F26419' stroke='none'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
@@ -25,8 +25,8 @@
   --text: #000000;
   --text-secondary: #595959;
   --text-muted: #999999;
-  --accent: #7D4698;
-  --accent-hover: #9A5FB8;
+  --accent: #F26419;
+  --accent-hover: #F47B3C;
   --green: #10A651;
   --red: #E53E3E;
   --yellow: #D69E2E;
@@ -239,12 +239,12 @@ body {
 .repo-disabled select { opacity: .45; pointer-events: none; }
 /* white/black-box label */
 .mode-badge { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 9999px; white-space: nowrap; }
-.mode-badge.whitebox { color: var(--accent); background: #F3ECF8; }
+.mode-badge.whitebox { color: var(--accent); background: #FDEEE3; }
 .mode-badge.blackbox { color: var(--text-secondary); background: var(--card-hover); border: 1px solid var(--border-light); }
 /* GitHub settings — token input */
 .gh-connect-row { display: flex; gap: 10px; align-items: stretch; }
 .gh-input-wrap { flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: #FAFAFA; border: 1px solid var(--border); border-radius: var(--radius-sm); transition: border-color .15s, box-shadow .15s; }
-.gh-input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(125,70,152,.12); }
+.gh-input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(242,100,25,.12); }
 .gh-input-wrap svg { width: 15px; height: 15px; color: var(--text-muted); flex: 0 0 auto; }
 .gh-connect-row input { flex: 1; border: none; background: transparent; outline: none; padding: 11px 0; font-size: 13px; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--text); letter-spacing: .02em; }
 .gh-connect-row input::placeholder { font-family: var(--font); letter-spacing: 0; color: var(--text-muted); }
@@ -485,11 +485,11 @@ body {
 <div class="app">
   <aside class="sidebar">
     <div class="logo">
-      <svg class="logo-mark" viewBox="0 0 24 24" fill="none" stroke="#7D4698" stroke-width="1.5">
+      <svg class="logo-mark" viewBox="0 0 24 24" fill="none" stroke="#F26419" stroke-width="1.5">
         <ellipse cx="12" cy="12" rx="10" ry="4.4"/>
         <ellipse cx="12" cy="12" rx="10" ry="4.4" transform="rotate(60 12 12)"/>
         <ellipse cx="12" cy="12" rx="10" ry="4.4" transform="rotate(120 12 12)"/>
-        <circle cx="12" cy="12" r="2.1" fill="#7D4698" stroke="none"/>
+        <circle cx="12" cy="12" r="2.1" fill="#F26419" stroke="none"/>
       </svg>
       <span class="wordmark">Sh<span class="accent">or</span></span>
     </div>
