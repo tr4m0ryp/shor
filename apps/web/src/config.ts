@@ -105,6 +105,23 @@ export interface SecretsConfig {
   readonly prefix: string;
 }
 
+/**
+ * GitHub App connection config (ADR-039/040/041).
+ *
+ * One Aegis App, per-tenant installation. The numeric `appId` is non-secret
+ * config; the App private key (PEM) is NEVER held here — it lives in Secret
+ * Manager and is read on demand via `privateKeySecretRef`. Installation tokens
+ * are short-lived and minted per scan.
+ */
+export interface GithubAppConfig {
+  /** Numeric GitHub App id (non-secret). Empty disables github ingest. */
+  readonly appId: string;
+  /** Secret Manager reference holding the App private key PEM (NO key in env/DB). */
+  readonly privateKeySecretRef: string;
+  /** Default clone depth for github ingest (ADR-040). */
+  readonly cloneDepth: number;
+}
+
 export interface AegisConfig {
   readonly env: 'development' | 'production' | 'test';
   readonly gcp: GcpConfig;
@@ -114,6 +131,7 @@ export interface AegisConfig {
   readonly identity: IdentityConfig;
   readonly session: SessionConfig;
   readonly secrets: SecretsConfig;
+  readonly github: GithubAppConfig;
 }
 
 let cached: AegisConfig | undefined;
@@ -172,6 +190,11 @@ export function getConfig(): AegisConfig {
     secrets: {
       projectId: env('SECRET_MANAGER_PROJECT_ID', projectId),
       prefix: env('SECRET_MANAGER_PREFIX', 'aegis'),
+    },
+    github: {
+      appId: env('GITHUB_APP_ID'),
+      privateKeySecretRef: env('GITHUB_APP_PRIVATE_KEY_SECRET_REF', 'aegis/github-app/private-key'),
+      cloneDepth: envInt('GITHUB_CLONE_DEPTH', 1),
     },
   };
 
