@@ -152,6 +152,28 @@ References:
 - **Bash tool.** Use for `mkdir -p`, `cp`, `git ls-files`, and other shell utilities. NEVER use it to cat/grep through source code — that is the Task agent's job.
 </cli_tools>
 
+<tool_skills>
+This is the whitebox, read-only pre-recon (SAST) phase. Preinstalled static-
+analysis per-tool skills (ADR-035) — progressive-disclosure usage guides auto-
+discovered by the Agent SDK; invoke a skill by name to load its flags and one
+safe invocation. These corroborate and broaden the Task-Agent code review; they
+do NOT replace it.
+
+- `semgrep` — taint/pattern SAST across the repo. Your fastest way to enumerate
+  candidate source->sink flows for every category (injection, XSS, SSRF, weak
+  auth, missing authz) and to feed Section-level sink inventories.
+- `gitleaks` — scan the working tree AND git history for committed secrets
+  (keys, tokens, signing secrets) that widen the attack surface.
+- `trufflehog` — secret discovery with live provider verification, to rank
+  which leaked credentials are actually live.
+- `osv-scanner` — dependency CVEs via OSV (SCA); flag vulnerable libraries that
+  introduce category risk (e.g. a deserialization or SSRF CVE in a dependency).
+
+Run these read-only against the cloned repo only; never against a live host.
+Honor the secret-redaction rule — never echo a discovered secret into the
+deliverable or logs; reference its location and type instead.
+</tool_skills>
+
 <task_agent_strategy>
 **MANDATORY PHASED ANALYSIS:**
 

@@ -98,6 +98,25 @@ A flow is **NOT** a vulnerability when scheme, host, IP, port, and redirect cont
 - **TodoWrite Tool:** Create one todo per SSRF sink from pre-recon Section 10. Mark `in_progress` on entry, `completed` on verdict.
 </cli_tools>
 
+<tool_skills>
+This is the analysis (whitebox, read-only) phase. Preinstalled per-tool skills
+(ADR-035) — progressive-disclosure usage guides auto-discovered by the Agent
+SDK; invoke a skill by name to load its flags and one safe invocation.
+
+Static-analysis skill you MAY run here to corroborate a user-input -> HTTP-
+client flow (supplements, never replaces, the Task-Agent code reading):
+- `semgrep` — SAST for outbound-request sinks (`requests.get`, `urlopen`,
+  `fetch`, `http.Get`, image/preview fetchers, webhook dispatchers) fed by
+  user-controlled URLs, and for validation that is bypassable (post-validation
+  mutation, missing DNS-rebind protection).
+
+Your `ssrf_exploitation_queue.json` feeds the live exploit phase, whose skills
+are: `ssrfmap` (bounded internal/metadata exploitation, the PoC ceiling) and
+`interactsh-client` (OOB/OAST confirmation of blind SSRF). For each sink, record
+whether it is full/semi-blind/blind so the exploit agent wires the right
+confirmation channel. Do NOT fire outbound probes in this analysis-only phase.
+</tool_skills>
+
 <data_format_specifications>
 
 <exploitation_queue_format>

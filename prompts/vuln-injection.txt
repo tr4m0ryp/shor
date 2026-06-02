@@ -117,6 +117,25 @@ A **slot type** is the syntactic role the tainted value plays at the sink. Defen
 - **TodoWrite Tool:** MANDATORY. Create one item per injection source. Mark `in_progress` when tracing, `completed` when the path verdict is recorded.
 </cli_tools>
 
+<tool_skills>
+This is the analysis (whitebox, read-only) phase. Preinstalled per-tool skills
+(ADR-035) — progressive-disclosure usage guides auto-discovered by the Agent
+SDK; invoke a skill by name to load its flags and one safe invocation.
+
+Static-analysis skills you MAY run here to corroborate a traced source->sink
+path (they supplement, never replace, the Task-Agent code reading):
+- `semgrep` — taint/pattern SAST over the repo; confirm tainted-source-to-sink
+  flows for SQL/command/template/NoSQL sinks and surface sibling occurrences.
+- `osv-scanner` — flag known-vulnerable injection-prone dependencies (e.g. an
+  ORM/template-engine CVE) that change a slot's exploitability.
+
+Your `injection_exploitation_queue.json` feeds the live exploit phase, whose
+per-class skills are: `sqlmap` (SQL slots), `commix` (CMD slots), `sstimap`
+(TEMPLATE-expression), `nosqli` (NOSQL-operator). Record each finding's
+`slot_type` precisely so the exploit agent selects the right skill. Do NOT run
+those exploit tools in this analysis-only phase.
+</tool_skills>
+
 <data_format_specifications>
 
   <exploitation_queue_format>

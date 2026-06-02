@@ -107,6 +107,25 @@ A **sufficient guard** MUST satisfy ALL of the following:
 - **TodoWrite Tool:** Use this to create and manage your analysis task list. Create a todo item for each endpoint that needs authorization analysis. Mark items as "in_progress" when working on them and "completed" when done.
 </cli_tools>
 
+<tool_skills>
+This is the analysis (whitebox, read-only) phase. Preinstalled per-tool skills
+(ADR-035) — progressive-disclosure usage guides auto-discovered by the Agent
+SDK; invoke a skill by name to load its flags and one safe invocation.
+
+Static-analysis skill you MAY run here to corroborate a missing/mismatched
+guard (supplements, never replaces, the Task-Agent code reading):
+- `semgrep` — SAST for missing authorization decorators/middleware, routes
+  lacking ownership/tenant checks, and IDOR-prone direct-object lookups; use it
+  to surface every sibling route that shares an unguarded pattern.
+
+Your `authz_exploitation_queue.json` feeds the live exploit phase, which is
+driven by the `authz-recipe` procedure (role x endpoint matrix + A/B session
+replay + `ffuf` object-ID enumeration) — there is no headless authz CLI. For
+each finding, record the high-priv vs low-priv identities and the object-ID
+shape so the recipe can A/B-replay precisely. Do NOT perform live cross-identity
+replay in this analysis-only phase.
+</tool_skills>
+
 <data_format_specifications>
 
 <exploitation_queue_format>

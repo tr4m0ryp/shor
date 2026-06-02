@@ -86,6 +86,26 @@ An **exploitable vulnerability** is a logical flaw in code that represents a con
 - **TodoWrite Tool:** Create one todo per endpoint/flow that needs analysis. Mark `in_progress` while working and `completed` when done.
 </cli_tools>
 
+<tool_skills>
+This is the analysis (whitebox, read-only) phase. Preinstalled per-tool skills
+(ADR-035) — progressive-disclosure usage guides auto-discovered by the Agent
+SDK; invoke a skill by name to load its flags and one safe invocation.
+
+Static-analysis skills you MAY run here to corroborate an auth weakness
+(supplement, never replace, the Task-Agent code reading):
+- `semgrep` — SAST for weak/missing auth guards, `alg:none`/unverified-JWT
+  patterns, insecure password hashing, and missing session checks.
+- `gitleaks` / `trufflehog` — committed secrets: hardcoded signing keys, JWT
+  secrets, OAuth client secrets, or static API tokens that defeat auth
+  (trufflehog adds live provider verification).
+
+Your `auth_exploitation_queue.json` feeds the live exploit phase, whose skills
+are: `jwt_tool` (JWT/JOSE attacks), `hydra` (login brute force, test accounts
+only), and `generate-totp` (2FA test-account login). Note in each finding which
+token/credential primitive is at fault so the exploit agent selects correctly.
+Do NOT run those exploit tools in this analysis-only phase.
+</tool_skills>
+
 <data_format_specifications>
 
 <exploitation_queue_format>

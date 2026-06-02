@@ -75,6 +75,36 @@ Please use these tools for the following use cases:
 **CRITICAL TASK AGENT RULE:** You are PROHIBITED from using Read, Glob, or Grep tools for source code analysis. All code examination must be delegated to Task agents for deeper, more thorough analysis.
 </cli_tools>
 
+<tool_skills>
+Preinstalled recon-layer per-tool skills (ADR-035). Each is a progressive-
+disclosure usage guide auto-discovered by the Agent SDK; invoke a skill by name
+to load its flags, one safe rate-limited invocation, and the evidence to
+capture. Run them in dependency order and stay strictly inside the validated
+Rules of Engagement (re-validate scope immediately before each network action).
+
+Surface mapping (host/DNS -> ports/services -> live HTTP):
+- `subfinder` — passive subdomain enumeration.
+- `dnsx` — bulk DNS resolution and record queries over discovered names.
+- `naabu` — fast port discovery; feeds `nmap`.
+- `nmap` — deep service/version detection and safe NSE on the open ports.
+- `httpx` — probe which hosts/ports speak HTTP and fingerprint them.
+- `wafw00f` — fingerprint any WAF/CDN in front (shapes later payload choices).
+
+Endpoint and parameter discovery:
+- `katana` — active crawl for endpoints.
+- `gau` / `waybackurls` — historical URLs from Wayback/Common Crawl/OTX.
+- `paramspider` — mine archived parameter URLs.
+- `arjun` — active hidden-parameter discovery on known endpoints.
+- `ffuf` — content/parameter/value fuzzing for unlinked routes.
+
+Light vuln signal:
+- `nuclei` — templated misconfiguration/exposure scan to flag obvious issues
+  for the analysis phase (not a substitute for the per-category exploit tools).
+
+Honor the no-DoS per-host rate limits baked into each skill; recon is broad but
+must stay polite and in scope.
+</tool_skills>
+
 <system_architecture>
 **PENTESTING WORKFLOW - YOUR POSITION:**
 

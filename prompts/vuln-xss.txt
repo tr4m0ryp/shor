@@ -102,6 +102,24 @@ An **exploitable vulnerability** is a confirmed source-to-sink path where encodi
 - **Bash tool:** Use for creating directories, copying files, and other shell commands as needed.
 </cli_tools>
 
+<tool_skills>
+This is the analysis (whitebox, read-only) phase. Preinstalled per-tool skills
+(ADR-035) — progressive-disclosure usage guides auto-discovered by the Agent
+SDK; invoke a skill by name to load its flags and one safe invocation.
+
+Static-analysis skill you MAY run here to corroborate a sink->context pairing
+(supplements, never replaces, the Task-Agent code reading):
+- `semgrep` — taint/pattern SAST for unescaped sinks (`innerHTML`,
+  `dangerouslySetInnerHTML`, `v-html`, template `| safe`/`{{{ }}}`, `eval`/
+  `Function`) and missing output-encoding; surfaces sibling occurrences.
+
+Your `xss_exploitation_queue.json` feeds the live exploit phase, whose skills
+are: `dalfox` (primary scan/verify), `xsstrike` (context-aware secondary),
+`kxss` (reflected-character triage), and `playwright` (execution proof). Record
+each finding's render context precisely so the exploit agent picks the right
+payload class. Do NOT run those exploit tools in this analysis-only phase.
+</tool_skills>
+
 <data_format_specifications>
 
 <exploitation_queue_format>
