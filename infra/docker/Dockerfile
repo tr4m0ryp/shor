@@ -242,7 +242,12 @@ RUN apk update && apk add --no-cache \
 # the prompts' playwright-cli skill drives the headless browser. Installed here
 # (wolfi has npm) so the runtime's `COPY --from=runtime-staging /usr/` brings
 # them in — glibc-dynamic has no npm of its own.
-RUN npm install -g @anthropic-ai/claude-code@2.1.84 @playwright/cli@0.1.1
+RUN npm install -g @anthropic-ai/claude-code@2.1.84 @playwright/cli@0.1.1 && \
+    # The Agent SDK's bundled native `claude` fails to launch on glibc-dynamic;
+    # drive the JS CLI instead. Resolve the real cli.js and pin it at a stable
+    # path (under /usr so it travels with `COPY --from=runtime-staging /usr/`).
+    CLI="$(npm root -g)/@anthropic-ai/claude-code/cli.js" && \
+    test -f "$CLI" && ln -sf "$CLI" /usr/lib/aegis-claude-cli.js
 
 # ---------------------------------------------------------------------------
 # Stage 4: runtime — minimal glibc-dynamic with binaries + venv copied in.
@@ -257,6 +262,9 @@ USER root
 ENV AEGIS_HOME=/opt/aegis
 ENV TOOLS_DIR=/opt/aegis/tools
 ENV VENV=/opt/aegis/venv
+# Drive the Claude Code JS CLI (resolved in runtime-staging) rather than the
+# Agent SDK's bundled native binary, which fails to exec on glibc-dynamic.
+ENV AEGIS_CLAUDE_CLI=/usr/lib/aegis-claude-cli.js
 
 # 1) Runtime OS closure (libs, nmap, chromium, python3.13, bash/git/curl, …)
 #    from the Wolfi runtime-staging stage. These are glibc-ABI by construction.

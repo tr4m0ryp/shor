@@ -76,6 +76,10 @@ export async function runClaudePrompt(
 	// Model override from providerConfig takes precedence over env-based resolveModel
 	const model =
 		providerConfig?.modelOverrides?.[modelTier] ?? resolveModel(modelTier);
+	// Point the SDK at the Claude Code JS CLI when provided (the runtime image
+	// sets AEGIS_CLAUDE_CLI). A `.js` path makes the SDK spawn `node <cli.js>`
+	// instead of its bundled native binary, which fails to exec on glibc-dynamic.
+	const claudeCli = process.env.AEGIS_CLAUDE_CLI;
 	const options = {
 		model,
 		maxTurns: 10_000,
@@ -84,6 +88,7 @@ export async function runClaudePrompt(
 		allowDangerouslySkipPermissions: true,
 		settingSources: ["user"] as ("user" | "project" | "local")[],
 		env: sdkEnv,
+		...(claudeCli && { pathToClaudeCodeExecutable: claudeCli }),
 		...(outputFormat && { outputFormat }),
 	};
 

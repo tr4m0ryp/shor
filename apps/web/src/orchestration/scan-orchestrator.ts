@@ -11,7 +11,7 @@
  */
 
 import { getConfig } from '../config.js';
-import { gsUri, objectPrefix } from '../cloud/storage.js';
+import { gsUri } from '../cloud/storage.js';
 import { scanRepo } from '../db/repositories/index.js';
 import type { CodebaseVersion, Project, Scan } from '../domain/types.js';
 import type { Roe, RoeHostRule } from '../guardrails/roe.js';
@@ -57,9 +57,11 @@ export async function startScan(
 ): Promise<Scan> {
   const cfg = getConfig();
 
-  const repoGcsUri = gsUri(
-    objectPrefix(manifest.tenantId, project.id, codebaseVersion.id),
-  );
+  // Use the version's STORED staging prefix — ingest stages the source under a
+  // freshly-minted UUID kept in `gcsPrefix`, which is NOT the DB row `id`.
+  // Recomputing from `id` points at an empty prefix and the worker materializes
+  // nothing.
+  const repoGcsUri = gsUri(codebaseVersion.gcsPrefix);
 
   // Per-run env applied as the run-time override on the worker Job execution.
   const runEnv: JobEnvVar[] = [
