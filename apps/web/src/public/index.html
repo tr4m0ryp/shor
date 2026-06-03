@@ -265,6 +265,21 @@ body {
 .custom-select__opt.selected .tag { color: rgba(255,255,255,.82); }
 .custom-select__opt.muted { color: var(--text-muted); cursor: default; }
 .custom-select__opt.muted:hover { background: none; }
+.custom-select__opt.active { background: #2A1D13; }
+.custom-select__opt.selected.active { background: var(--accent); }
+.custom-select__opt .hl { color: var(--accent); font-weight: 600; }
+.custom-select__opt.selected .hl { color: #fff; text-decoration: underline; }
+.custom-select__search {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; margin: -4px -4px 4px; background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.custom-select__search svg { width: 14px; height: 14px; color: var(--text-muted); flex: 0 0 auto; }
+.custom-select__search input {
+  flex: 1 1 auto; min-width: 0; background: transparent; border: none; outline: none;
+  color: var(--text); font-size: 13px; font-family: var(--font); padding: 4px 2px;
+}
+.custom-select__search input::placeholder { color: var(--text-muted); }
 /* white/black-box label */
 .mode-badge { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 9999px; white-space: nowrap; }
 .mode-badge.whitebox { color: var(--accent); background: #2A1D13; }
@@ -612,7 +627,13 @@ body.guest .sidebar nav { display: none; }
                 <span class="custom-select__value placeholder" id="projRepoLabel">— select a repo —</span>
                 <svg class="custom-select__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
-              <div class="custom-select__menu" id="projRepoMenu"></div>
+              <div class="custom-select__menu" id="projRepoMenu">
+                <div class="custom-select__search" id="projRepoSearchWrap">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="text" id="projRepoSearch" placeholder="Type to filter repos…" autocomplete="off" spellcheck="false" oninput="onRepoSearch()" onkeydown="onRepoSearchKey(event)" onclick="event.stopPropagation()">
+                </div>
+                <div class="custom-select__list" id="projRepoList"></div>
+              </div>
             </div>
             <input type="hidden" id="projRepo" value="">
             <div class="hint" id="projRepoHint">Connect GitHub in Settings to list your repos.</div>
@@ -864,6 +885,9 @@ function showPage(page) {
 // ===================== Settings / GitHub =====================
 
 var ghState = { connected: false, login: null, repos: [], oauthEnabled: false, patShown: false };
+// Repo-picker search state: current filter text, keyboard-highlighted row, and the
+// full-name list of currently-visible (filtered) rows for Enter-to-select.
+var repoFilter = '', repoActiveIdx = 0, repoVisible = [];
 
 async function loadGithubSettings() {
   try {
@@ -956,7 +980,86 @@ function toggleRepoMenu(e) {
   if (e) e.stopPropagation();
   const cs = document.getElementById('projRepoSelect');
   if (!cs || document.getElementById('projRepoWrap').classList.contains('repo-disabled')) return;
+  const willOpen = !cs.classList.contains('open');
   cs.classList.toggle('open');
+  if (willOpen) {
+    // Fresh filter on each open, then focus the search box so the user can type immediately.
+    repoFilter = '';
+    repoActiveIdx = 0;
+    const search = document.getElementById('projRepoSearch');
+    if (search) search.value = '';
+    renderRepoMenu();
+    if (search) setTimeout(function () { search.focus(); }, 0);
+  }
+}
+
+// Score `text` against a query as an ordered subsequence (fzf-style): every query
+// char must appear in order, with bonuses for consecutive runs and word-boundary
+// hits (start, or after / - _ . space). Returns null when the query doesn't match.
+function fuzzyScore(query, text) {
+  const q = query.toLowerCase();
+  const t = text.toLowerCase();
+  const positions = [];
+  let score = 0, from = 0, prev = -2, consec = 0;
+  function isBoundary(i) { return i === 0 || '/-_. '.indexOf(t[i - 1]) !== -1; }
+  for (let qi = 0; qi < q.length; qi++) {
+    const found = t.indexOf(q[qi], from);
+    if (found === -1) return null;
+    positions.push(found);
+    let s = 1;
+    if (found === prev + 1) { consec += 1; s += 5 + consec; } else { consec = 0; }
+    if (isBoundary(found)) s += 10;
+    score += s;
+    prev = found;
+    from = found + 1;
+  }
+  if (t.indexOf(q) !== -1) score += 15;            // contiguous substring bonus
+  const slash = t.indexOf('/');
+  if (slash !== -1 && positions[0] > slash) score += 6; // match falls in the repo name, not the owner
+  score -= t.length * 0.02;                         // tie-break toward shorter names
+  return { score: score, positions: positions };
+}
+
+// Escape `text` and wrap matched character indices in <span class="hl"> for highlighting.
+function highlightMatch(text, positions) {
+  if (!positions || !positions.length) return escapeHtml(text);
+  const hit = {};
+  positions.forEach(function (p) { hit[p] = true; });
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = escapeHtml(text[i]);
+    out += hit[i] ? '<span class="hl">' + ch + '</span>' : ch;
+  }
+  return out;
+}
+
+function onRepoSearch() {
+  repoFilter = document.getElementById('projRepoSearch').value;
+  repoActiveIdx = 0;
+  renderRepoMenu();
+}
+
+function onRepoSearchKey(e) {
+  const cs = document.getElementById('projRepoSelect');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (repoVisible.length) { repoActiveIdx = (repoActiveIdx + 1) % repoVisible.length; renderRepoMenu(); scrollRepoActiveIntoView(); }
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (repoVisible.length) { repoActiveIdx = (repoActiveIdx - 1 + repoVisible.length) % repoVisible.length; renderRepoMenu(); scrollRepoActiveIntoView(); }
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const fn = repoVisible[repoActiveIdx];
+    if (fn) selectRepo(fn, fn);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    if (cs) cs.classList.remove('open');
+  }
+}
+
+function scrollRepoActiveIntoView() {
+  const el = document.querySelector('#projRepoList .custom-select__opt.active');
+  if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
 }
 
 function selectRepo(value, label) {
@@ -965,22 +1068,54 @@ function selectRepo(value, label) {
   lab.textContent = label;
   lab.classList.toggle('placeholder', !value);
   document.getElementById('projRepoSelect').classList.remove('open');
+  repoFilter = '';
+  const search = document.getElementById('projRepoSearch');
+  if (search) search.value = '';
   renderRepoMenu(); // refresh the selected highlight
 }
 
 function renderRepoMenu() {
-  const menu = document.getElementById('projRepoMenu');
-  if (!menu) return;
+  const list = document.getElementById('projRepoList');
+  if (!list) return;
+  const searchWrap = document.getElementById('projRepoSearchWrap');
+  if (searchWrap) searchWrap.style.display = ghState.repos.length ? '' : 'none';
+
   const current = document.getElementById('projRepo').value;
   if (ghState.repos.length === 0) {
-    menu.innerHTML = '<div class="custom-select__opt muted">— no repos —</div>';
+    repoVisible = [];
+    list.innerHTML = '<div class="custom-select__opt muted">— no repos —</div>';
     return;
   }
-  menu.innerHTML = ghState.repos.map(function (r) {
+
+  const q = (repoFilter || '').trim();
+  let rows = ghState.repos.map(function (r) {
+    return { r: r, m: q ? fuzzyScore(q, r.fullName) : null };
+  });
+  if (q) {
+    rows = rows.filter(function (x) { return x.m; });
+    rows.sort(function (a, b) {
+      if (b.m.score !== a.m.score) return b.m.score - a.m.score;
+      return a.r.fullName.localeCompare(b.r.fullName);
+    });
+  }
+
+  if (rows.length === 0) {
+    repoVisible = [];
+    list.innerHTML = '<div class="custom-select__opt muted">— no matches —</div>';
+    return;
+  }
+  if (repoActiveIdx >= rows.length) repoActiveIdx = rows.length - 1;
+  if (repoActiveIdx < 0) repoActiveIdx = 0;
+  repoVisible = rows.map(function (x) { return x.r.fullName; });
+
+  list.innerHTML = rows.map(function (x, i) {
+    const r = x.r;
     const tags = [r.private ? 'private' : '', r.fork ? 'fork' : '', r.stargazed ? 'starred' : ''].filter(Boolean).join(' · ');
     const sel = r.fullName === current ? ' selected' : '';
-    return '<div class="custom-select__opt' + sel + '" onclick="selectRepo(\'' + escapeHtml(r.fullName) + '\', \'' + escapeHtml(r.fullName) + '\')">' +
-      '<span>' + escapeHtml(r.fullName) + '</span>' + (tags ? '<span class="tag">' + tags + '</span>' : '') +
+    const act = i === repoActiveIdx ? ' active' : '';
+    const name = q ? highlightMatch(r.fullName, x.m.positions) : escapeHtml(r.fullName);
+    return '<div class="custom-select__opt' + sel + act + '" onclick="selectRepo(\'' + escapeHtml(r.fullName) + '\', \'' + escapeHtml(r.fullName) + '\')">' +
+      '<span>' + name + '</span>' + (tags ? '<span class="tag">' + tags + '</span>' : '') +
     '</div>';
   }).join('');
 }
