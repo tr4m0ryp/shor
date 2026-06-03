@@ -37,8 +37,10 @@ import { isErr, type Result } from "../../types/result.js";
 import type { ConfigLoaderService } from "../config-loader.js";
 import type { Container } from "../container.js";
 import type { PentestError } from "../error-handling.js";
+import { runWithCoverage } from "./coverage-loop.js";
 import {
 	checkSpendingCap,
+	failOnHardMissing,
 	finalizeSuccess,
 	handleExecutionFailure,
 	validateDeliverable,
@@ -113,23 +115,38 @@ export class AgentExecutionService {
 		}
 		const { prompt } = preExecution.value;
 
-		// 5. Execute agent
+		// 5. Execute agent — with the coverage continuation loop. Round 0 is the
+		// normal one-shot run; if the agent stayed below its tool-breadth floor
+		// and rounds + budget remain, the same agent is re-invoked with a compact
+		// follow-up naming the untried tools (skillTracker accumulates usage
+		// across rounds). `outcome.result` is the FINAL round; steps 6/9/10 then
+		// run once on the converged state, unchanged.
 		const outputFormat = getOutputFormat(agentName);
-		const result: ClaudePromptResult = await runClaudePrompt(
-			prompt,
-			repoPath,
-			"", // context
-			agentName, // description
+		const deliverablesSubdir = path.relative(repoPath, deliverablesPath);
+		const outcome = await runWithCoverage({
 			agentName,
-			auditSession,
+			basePrompt: prompt,
+			deliverablesSubdir,
 			logger,
-			AGENTS[agentName].modelTier,
-			outputFormat,
-			apiKey,
-			path.relative(repoPath, deliverablesPath),
-			providerConfig,
-			undefined,
-		);
+			auditSession,
+			runRound: (roundPrompt) =>
+				runClaudePrompt(
+					roundPrompt,
+					repoPath,
+					"", // context
+					agentName, // description
+					agentName,
+					auditSession,
+					logger,
+					AGENTS[agentName].modelTier,
+					outputFormat,
+					apiKey,
+					deliverablesSubdir,
+					providerConfig,
+					undefined,
+				),
+		});
+		const result: ClaudePromptResult = outcome.result;
 
 		// 6. Spending cap check - defense-in-depth
 		const capResult = await checkSpendingCap(
@@ -170,6 +187,25 @@ export class AgentExecutionService {
 		);
 		if (validationFailure) {
 			return validationFailure;
+		}
+
+		// 9b. Last-resort coverage bridge (T4). If a REQUIRED tool was still not
+		// exercised after the final continuation round, surface a retryable
+		// OUTPUT_VALIDATION_FAILED via the existing failAgent machinery rather
+		// than inventing a new retry path. Dormant under the default policy
+		// (required = [] for every agent → hardMissing always empty), but wired
+		// so tightening a policy later needs no new plumbing.
+		const hardMissFailure = await failOnHardMissing(
+			agentName,
+			deliverablesPath,
+			auditSession,
+			logger,
+			attemptNumber,
+			result,
+			outcome.coverage,
+		);
+		if (hardMissFailure) {
+			return hardMissFailure;
 		}
 
 		// 10. Success - commit deliverables, then capture checkpoint hash
