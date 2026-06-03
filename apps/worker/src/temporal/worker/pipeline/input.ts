@@ -19,7 +19,7 @@ export function buildPipelineInput(
 	// workflow sandbox) so the deterministic workflow only reads the boolean.
 	// Default off — the key is omitted entirely unless explicitly enabled, so a
 	// disabled run's input is byte-identical to today.
-	const reconFanout = process.env.AEGIS_RECON_FANOUT === "1";
+	const reconFanout = process.env.SHOR_RECON_FANOUT === "1";
 
 	return {
 		webUrl: args.webUrl,

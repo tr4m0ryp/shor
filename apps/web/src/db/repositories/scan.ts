@@ -2,7 +2,7 @@
  * Scan repository (LAUNCH-SPEC §4.3, ADR-015/019).
  *
  * One scan = one pipeline run against a CodebaseVersion + live URL, backed by a
- * Temporal workflow (`aegis-<scanId>`). Hangs off `project`; queries join
+ * Temporal workflow (`shor-<scanId>`). Hangs off `project`; queries join
  * through `project` and filter by `tenant_id` for tenant scoping.
  */
 

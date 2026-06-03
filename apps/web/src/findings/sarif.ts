@@ -8,7 +8,7 @@
  *   - cwe        → reportingDescriptor.relationships (taxa) + a tag,
  *   - location   → physicalLocation (code) or a logical message (DAST),
  *   - partialFingerprints → result.partialFingerprints (verbatim),
- *   - fingerprint → result.fingerprints["aegis/v1"].
+ *   - fingerprint → result.fingerprints["shor/v1"].
  *
  * The schema is intentionally a minimal-but-valid SARIF log: a single run with
  * one tool driver, deduplicated rules, and one result per finding.
@@ -18,9 +18,9 @@ import type { Finding, FindingRecord, FindingSeverity } from '../domain/types.js
 
 const SARIF_VERSION = '2.1.0';
 const SARIF_SCHEMA = 'https://json.schemastore.org/sarif-2.1.0.json';
-const TOOL_NAME = 'Aegis';
+const TOOL_NAME = 'Shor';
 const TOOL_VERSION = '1.0.0';
-const INFORMATION_URI = 'https://github.com/aegis-security';
+const INFORMATION_URI = 'https://github.com/shor-security';
 
 /** SARIF result severity level. `info`/`low` map to note, `medium` to warning. */
 type SarifLevel = 'none' | 'note' | 'warning' | 'error';
@@ -89,7 +89,7 @@ const LEVEL: Readonly<Record<FindingSeverity, SarifLevel>> = {
 
 /** Stable SARIF rule id for a finding — its CWE (the diff/grouping axis). */
 function ruleIdFor(record: FindingRecord): string {
-  return record.cwe || record.category || 'aegis-finding';
+  return record.cwe || record.category || 'shor-finding';
 }
 
 function isPersistedFinding(value: Finding | FindingRecord): value is Finding {
@@ -147,7 +147,7 @@ function buildResult(record: FindingRecord): SarifResult {
     message: { text: record.evidence || record.category || record.cwe },
     locations: [buildLocation(record)],
     partialFingerprints: partial,
-    fingerprints: record.fingerprint ? { 'aegis/v1': record.fingerprint } : {},
+    fingerprints: record.fingerprint ? { 'shor/v1': record.fingerprint } : {},
     properties: {
       severity,
       confidence: record.confidence,

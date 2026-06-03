@@ -134,8 +134,8 @@ def build() -> dict:
 
     manifest = {
         "namespace": "pentest",
-        "name": "aegis-pentest-integration",
-        "description": "Manifest for the aegis two-way integration backend.",
+        "name": "shor-pentest-integration",
+        "description": "Manifest for the shor two-way integration backend.",
         "requiredResources": [
             {"type": "store", "namespace": "pentest", "name": "projects"},
             {"type": "connector", "namespace": "pentest", "name": "engine"},
@@ -178,15 +178,15 @@ def build() -> dict:
         "apiVersion": "sinas.co/v1",
         "kind": "SinasPackage",
         "package": {
-            "name": "aegis-pentest-integration",
+            "name": "shor-pentest-integration",
             "version": "0.1.0",
             "description": (
-                "Two-way aegis<->Sinas backend: projects store, bearer engine "
+                "Two-way shor<->Sinas backend: projects store, bearer engine "
                 "connector, engine-minted trigger_scan / create_project "
                 "functions."
             ),
-            "author": "Aegis Team",
-            "url": "https://github.com/keygraph/aegis",
+            "author": "Shor Team",
+            "url": "https://github.com/keygraph/shor",
         },
         "spec": {
             "variables": [
@@ -194,7 +194,7 @@ def build() -> dict:
                     "name": "ENGINE_BASE_URL",
                     "type": "text",
                     "description": (
-                        "Public base URL of the hosted aegis-web control plane."
+                        "Public base URL of the hosted shor-web control plane."
                     ),
                     "required": True,
                 },
@@ -202,7 +202,7 @@ def build() -> dict:
                     "name": "ENGINE_TRIGGER_TOKEN",
                     "type": "secret",
                     "description": (
-                        "Shared AEGIS_ENGINE_TRIGGER_TOKEN; Sinas->engine bearer "
+                        "Shared SHOR_ENGINE_TRIGGER_TOKEN; Sinas->engine bearer "
                         "credential the engine connector carries. Write-only; "
                         "set once (T7)."
                     ),

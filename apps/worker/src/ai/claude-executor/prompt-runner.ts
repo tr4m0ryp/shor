@@ -77,9 +77,9 @@ export async function runClaudePrompt(
 	const model =
 		providerConfig?.modelOverrides?.[modelTier] ?? resolveModel(modelTier);
 	// Point the SDK at the Claude Code JS CLI when provided (the runtime image
-	// sets AEGIS_CLAUDE_CLI). A `.js` path makes the SDK spawn `node <cli.js>`
+	// sets SHOR_CLAUDE_CLI). A `.js` path makes the SDK spawn `node <cli.js>`
 	// instead of its bundled native binary, which fails to exec on glibc-dynamic.
-	const claudeCli = process.env.AEGIS_CLAUDE_CLI;
+	const claudeCli = process.env.SHOR_CLAUDE_CLI;
 	const options = {
 		model,
 		maxTurns: 10_000,

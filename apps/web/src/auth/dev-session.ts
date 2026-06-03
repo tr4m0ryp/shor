@@ -1,8 +1,8 @@
 /**
- * Env-gated dev session (DEV ONLY — `AEGIS_DEV_LOGIN`).
+ * Env-gated dev session (DEV ONLY — `SHOR_DEV_LOGIN`).
  *
  * Lets the dashboard log in and load real data against the database WITHOUT
- * standing up the full Identity Platform browser flow. When `AEGIS_DEV_LOGIN`
+ * standing up the full Identity Platform browser flow. When `SHOR_DEV_LOGIN`
  * is true and `GET /auth/me` has no valid session, the route provisions a
  * seeded tenant + owner user and mints a normal session for that principal —
  * reusing the unchanged `session.ts` machinery. It deliberately seeds NO sample
@@ -23,13 +23,13 @@ import type { Principal } from './middleware.js';
 /** Stable natural keys for the seeded dev identity (no secrets — local only). */
 const DEV_TENANT_IDP_ID = 'dev';
 const DEV_TENANT_ORG = 'dev';
-const DEV_USER_EMAIL = 'dev@aegis.local';
+const DEV_USER_EMAIL = 'dev@shor.local';
 const DEV_USER_ROLE = 'owner' as const;
 
 /**
  * Idempotently provision the seeded dev tenant + owner user and return the
  * principal a session is minted for. Reuses existing rows when already present
- * (keyed by `idp_tenant_id='dev'` and `(tenant, email)='dev@aegis.local'`), so
+ * (keyed by `idp_tenant_id='dev'` and `(tenant, email)='dev@shor.local'`), so
  * repeated dev logins never duplicate rows.
  */
 export async function ensureDevSession(): Promise<Principal> {

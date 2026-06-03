@@ -8,7 +8,7 @@
  * Worker-side Rules of Engagement scope check (LAUNCH-SPEC §5.6, §3.3).
  *
  * The control plane authors + validates the RoE (`apps/web/.../guardrails/roe`)
- * and hands the worker the validated document via env (AEGIS_ROE). The worker
+ * and hands the worker the validated document via env (SHOR_ROE). The worker
  * only needs to ASK "is this URL in scope?" before each network action. This is
  * a self-contained copy of the scope predicate — the packages must not import
  * each other, and the RoE shape is the contract.

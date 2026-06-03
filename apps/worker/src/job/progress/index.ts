@@ -8,8 +8,8 @@
  * Live progress emitter for the Cloud Run Job pipeline (ADR-051).
  *
  * As the pipeline walks its agents it POSTs a snapshot to the dashboard:
- *   POST `${AEGIS_FINDINGS_SINK_URL}/scans/${AEGIS_SCAN_ID}/progress`
- *   Authorization: Bearer ${AEGIS_SINK_TOKEN}
+ *   POST `${SHOR_FINDINGS_SINK_URL}/scans/${SHOR_SCAN_ID}/progress`
+ *   Authorization: Bearer ${SHOR_SINK_TOKEN}
  *   body: { status, currentPhase, currentAgent, failedAgent, completedAgents }
  *
  * This is the activity-feed counterpart to the terminal findings POST. The

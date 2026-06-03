@@ -98,7 +98,7 @@ export default function App(props) {
   return React.createElement(
     "div",
     { style: { fontFamily: "system-ui, sans-serif", maxWidth: 820, margin: "0 auto", padding: 16 } },
-    React.createElement("h2", null, "Aegis — pentest showcase"),
+    React.createElement("h2", null, "Shor — pentest showcase"),
     error ? React.createElement("p", { style: { color: "#b00020" } }, `Error: ${error}`) : null,
     projects.length === 0 ? React.createElement("p", { style: { color: "#777" } }, "No projects yet.") : null,
     projects.map((p) => {

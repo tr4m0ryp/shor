@@ -4,8 +4,8 @@
  * `startScan` builds the per-run job env and DIRECTLY launches one execution of
  * the pre-created Cloud Run Job (`getConfig().scanJobName`) with env overrides —
  * no Temporal, no per-scan Job resource. The worker reads the overrides, runs the
- * scan, and POSTs findings back to `AEGIS_FINDINGS_SINK_URL` with the shared
- * `AEGIS_SINK_TOKEN`. The started execution's resource name is recorded on the
+ * scan, and POSTs findings back to `SHOR_FINDINGS_SINK_URL` with the shared
+ * `SHOR_SINK_TOKEN`. The started execution's resource name is recorded on the
  * scan (via `scanRepo.setWorkflowId`) so `cancelScan` can cancel it — the kill
  * switch. Clients are lazy; importing this needs no live GCP credentials.
  */
@@ -19,9 +19,9 @@ import type { InjectionManifest } from '../secrets/injection.js';
 import { cancelExecution, launchScanExecution } from './cloud-run-jobs.js';
 import type { JobEnvVar } from './job-spec.js';
 
-/** Per-scan Cloud Run Job id derived from the scan id (`aegis-scan-<scanId>`). */
+/** Per-scan Cloud Run Job id derived from the scan id (`shor-scan-<scanId>`). */
 export function scanJobId(scanId: string): string {
-  return `aegis-scan-${scanId}`;
+  return `shor-scan-${scanId}`;
 }
 
 /** Container path the staged repo is mounted/expanded at inside the worker. */
@@ -59,12 +59,12 @@ export async function startScan(
 
   // Per-run env applied as the run-time override on the worker Job execution.
   const runEnv: JobEnvVar[] = [
-    { name: 'AEGIS_SCAN_ID', value: scan.id },
-    { name: 'AEGIS_TARGET_URL', value: project.targetUrl },
-    { name: 'AEGIS_ROE', value: JSON.stringify(buildRoe(project.targetUrl)) },
-    { name: 'AEGIS_REPO_PATH', value: REPO_PATH },
-    { name: 'AEGIS_FINDINGS_SINK_URL', value: cfg.publicUrl },
-    { name: 'AEGIS_SINK_TOKEN', value: cfg.sinkToken },
+    { name: 'SHOR_SCAN_ID', value: scan.id },
+    { name: 'SHOR_TARGET_URL', value: project.targetUrl },
+    { name: 'SHOR_ROE', value: JSON.stringify(buildRoe(project.targetUrl)) },
+    { name: 'SHOR_REPO_PATH', value: REPO_PATH },
+    { name: 'SHOR_FINDINGS_SINK_URL', value: cfg.publicUrl },
+    { name: 'SHOR_SINK_TOKEN', value: cfg.sinkToken },
   ];
 
   // White-box only: point the worker at the staged repo. Use the version's
@@ -72,7 +72,7 @@ export async function startScan(
   // kept in `gcsPrefix`, which is NOT the DB row `id`. Black-box scans
   // (codebaseVersion === null) omit this so the worker materializes no code.
   if (codebaseVersion) {
-    runEnv.push({ name: 'AEGIS_REPO_GCS_URI', value: gsUri(codebaseVersion.gcsPrefix) });
+    runEnv.push({ name: 'SHOR_REPO_GCS_URI', value: gsUri(codebaseVersion.gcsPrefix) });
   }
 
   // When Sinas-mode is configured, forward the connection to the worker so the

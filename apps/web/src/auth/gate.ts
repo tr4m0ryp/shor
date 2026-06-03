@@ -1,7 +1,7 @@
 /**
  * App-wide passcode gate — a thin front lock ABOVE the session/dev-login auth.
  *
- * When `AEGIS_APP_PASSCODE` is set, every browser-facing request must first carry
+ * When `SHOR_APP_PASSCODE` is set, every browser-facing request must first carry
  * a valid gate cookie or it is blocked: a GET navigation gets the inline unlock
  * page, anything else gets `401 { error: 'locked' }`. The public read-only share
  * plane (`/share/*`), the gate route itself (`/gate`), and machine clients that
@@ -12,8 +12,8 @@
  * `/auth/*` + session flow runs unchanged. It does NOT read, mint, or verify the
  * session cookie and must never weaken the real auth path.
  *
- * Gate cookie (no extra secret): value = HMAC-SHA256(key = AEGIS_APP_PASSCODE,
- * msg = "aegis-gate-v1") in hex. An incoming cookie is verified by recomputing
+ * Gate cookie (no extra secret): value = HMAC-SHA256(key = SHOR_APP_PASSCODE,
+ * msg = "shor-gate-v1") in hex. An incoming cookie is verified by recomputing
  * that HMAC from the env passcode and comparing constant-time — unforgeable
  * without the passcode. Mirrors `auth/session.ts`' use of Node `crypto` +
  * `timingSafeEqual`; kept local so no session helper signature changes.
@@ -23,9 +23,9 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { getConfig } from '../config.js';
 
 /** Name of the gate cookie (distinct from the session cookie). */
-const GATE_COOKIE_NAME = 'aegis_gate';
+const GATE_COOKIE_NAME = 'shor_gate';
 /** Fixed HMAC message — the cookie carries no payload, only this signature. */
-const GATE_MESSAGE = 'aegis-gate-v1';
+const GATE_MESSAGE = 'shor-gate-v1';
 /** Gate cookie lifetime: 30 days in seconds. */
 const GATE_MAX_AGE = 2592000;
 
@@ -137,7 +137,7 @@ export function unlockPageHtml(error = false): string {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
-<title>Aegis — Private</title>
+<title>Shor — Private</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }

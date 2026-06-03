@@ -7,10 +7,10 @@
 /**
  * Local types for the findings-emission step (ADR-051 → dashboard contract).
  *
- * `FindingRecord` mirrors the Aegis web `FindingRecord` (LAUNCH-SPEC §6.1)
+ * `FindingRecord` mirrors the Shor web `FindingRecord` (LAUNCH-SPEC §6.1)
  * verbatim — the worker and the web sink share this exact shape. We redeclare
  * it here rather than import across the app boundary: the worker package does
- * not depend on `@aegis/web`.
+ * not depend on `@shor/web`.
  */
 
 export type FindingSeverity = "critical" | "high" | "medium" | "low" | "info";

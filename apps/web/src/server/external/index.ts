@@ -12,9 +12,9 @@
  *   GET  /external/scans/:id   -> { status, progress, ... }
  *   GET  /external/github/repos -> { repos: [...] }
  *
- * Auth: a single `Authorization: Bearer <AEGIS_ENGINE_TRIGGER_TOKEN>` guards the
+ * Auth: a single `Authorization: Bearer <SHOR_ENGINE_TRIGGER_TOKEN>` guards the
  * whole `/external/*` plane, validated EXACTLY like the findings/progress sink
- * validates `AEGIS_SINK_TOKEN` (constant-time compare, 401 on missing/mismatch,
+ * validates `SHOR_SINK_TOKEN` (constant-time compare, 401 on missing/mismatch,
  * the token is never logged). The token is scoped to start + create + read only;
  * nothing here deletes or mutates existing data.
  *
@@ -62,7 +62,7 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Authorize an `/external/*` request against `AEGIS_ENGINE_TRIGGER_TOKEN`. An
+ * Authorize an `/external/*` request against `SHOR_ENGINE_TRIGGER_TOKEN`. An
  * empty configured token disables the whole ingress (every request 401s) so a
  * misconfigured deployment can never be driven anonymously — exactly the sink's
  * `sinkToken !== ''` guard.

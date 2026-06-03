@@ -1,5 +1,5 @@
 /**
- * Aegis shared domain types.
+ * Shor shared domain types.
  *
  * The relational entities mirror LAUNCH-SPEC §4.3 (Cloud SQL schema) and the
  * `Finding` record mirrors §6.1 verbatim (the dashboard depends on this shape —
@@ -61,7 +61,7 @@ export interface ProviderKey {
   readonly tenantId: TenantId;
   readonly userId: UserId;
   readonly provider: Provider;
-  /** Secret Manager reference `aegis/<tenant>/<user>/<provider>`. NO key material in DB. */
+  /** Secret Manager reference `shor/<tenant>/<user>/<provider>`. NO key material in DB. */
   readonly secretRef: string;
   readonly createdAt: Timestamp;
 }
@@ -156,7 +156,7 @@ export interface Scan {
   readonly projectId: ProjectId;
   /** Scanned codebase version; null for black-box scans (no repo). */
   readonly codebaseVersionId: CodebaseVersionId | null;
-  /** Temporal workflow id (`aegis-<random>`); cancel = kill switch (ADR-019). */
+  /** Temporal workflow id (`shor-<random>`); cancel = kill switch (ADR-019). */
   readonly temporalWorkflowId: string | null;
   readonly status: ScanStatus;
   readonly startedAt: Timestamp | null;

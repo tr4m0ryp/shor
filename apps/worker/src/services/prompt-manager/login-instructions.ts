@@ -17,10 +17,10 @@ import { PentestError } from "../error-handling.js";
  * browser-driver), never baked into the prompt string a model can echo or log.
  */
 export const CREDENTIAL_SEAM = {
-	username: "{{AEGIS_LOGIN_USERNAME}}",
-	password: "{{AEGIS_LOGIN_PASSWORD}}",
-	totp: 'a generated TOTP code (from the run-injected secret, placeholder "{{AEGIS_LOGIN_TOTP}}")',
-	totpSecret: "{{AEGIS_LOGIN_TOTP_SECRET}}",
+	username: "{{SHOR_LOGIN_USERNAME}}",
+	password: "{{SHOR_LOGIN_PASSWORD}}",
+	totp: 'a generated TOTP code (from the run-injected secret, placeholder "{{SHOR_LOGIN_TOTP}}")',
+	totpSecret: "{{SHOR_LOGIN_TOTP_SECRET}}",
 } as const;
 
 /**

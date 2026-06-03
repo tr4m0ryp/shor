@@ -1,5 +1,5 @@
 /**
- * Aegis dashboard HTTP server entry (mirrors storron's framework-less Node
+ * Shor dashboard HTTP server entry (mirrors storron's framework-less Node
  * `http` server, `apps/web/src/index.ts`).
  *
  * Parses each request into `(method, url, body, cookieHeader)`, delegates to the
@@ -155,6 +155,6 @@ export function startDashboard(port = PORT): void {
   const server = createDashboardServer();
   server.listen(port, () => {
     // eslint-disable-next-line no-console
-    console.log(`Aegis dashboard: http://localhost:${port}`);
+    console.log(`Shor dashboard: http://localhost:${port}`);
   });
 }

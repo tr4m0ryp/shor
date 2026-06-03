@@ -1,5 +1,5 @@
 /**
- * Aegis cloud client wrappers — public surface.
+ * Shor cloud client wrappers — public surface.
  *
  * All clients are lazy: importing this module performs no I/O and needs no live
  * GCP/Temporal credentials.

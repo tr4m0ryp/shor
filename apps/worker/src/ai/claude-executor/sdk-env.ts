@@ -13,11 +13,11 @@ import type { ActivityLogger } from "../../types/activity-logger.js";
  * value) and points this at it; the engine reads the file at use time. Mirrors
  * `apps/web/src/secrets/injection.ts` (`PROVIDER_KEY_FILE_ENV`).
  */
-export const PROVIDER_KEY_FILE_ENV = "AEGIS_PROVIDER_KEY_FILE";
+export const PROVIDER_KEY_FILE_ENV = "SHOR_PROVIDER_KEY_FILE";
 
 /**
  * Read the provider API key from the file-mounted path named by
- * `AEGIS_PROVIDER_KEY_FILE`, if set and present. Returns the trimmed material,
+ * `SHOR_PROVIDER_KEY_FILE`, if set and present. Returns the trimmed material,
  * or undefined when the env var is unset / the file is missing or empty.
  *
  * Read at use time (not import time) so a rotated mount is picked up and so a

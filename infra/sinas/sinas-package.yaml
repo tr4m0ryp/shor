@@ -23,27 +23,27 @@
 apiVersion: sinas.co/v1
 kind: SinasPackage
 package:
-  name: aegis-pentest-integration
+  name: shor-pentest-integration
   version: 0.1.0
-  description: 'Two-way aegis<->Sinas backend: projects store, bearer engine connector, engine-minted
+  description: 'Two-way shor<->Sinas backend: projects store, bearer engine connector, engine-minted
     trigger_scan / create_project functions.'
-  author: Aegis Team
-  url: https://github.com/keygraph/aegis
+  author: Shor Team
+  url: https://github.com/keygraph/shor
 spec:
   variables:
   - name: ENGINE_BASE_URL
     type: text
-    description: Public base URL of the hosted aegis-web control plane.
+    description: Public base URL of the hosted shor-web control plane.
     required: true
   - name: ENGINE_TRIGGER_TOKEN
     type: secret
-    description: Shared AEGIS_ENGINE_TRIGGER_TOKEN; Sinas->engine bearer credential the engine
+    description: Shared SHOR_ENGINE_TRIGGER_TOKEN; Sinas->engine bearer credential the engine
       connector carries. Write-only; set once (T7).
     required: true
   manifests:
   - namespace: pentest
-    name: aegis-pentest-integration
-    description: Manifest for the aegis two-way integration backend.
+    name: shor-pentest-integration
+    description: Manifest for the shor two-way integration backend.
     requiredResources:
     - type: store
       namespace: pentest
@@ -70,7 +70,7 @@ spec:
   stores:
   - namespace: pentest
     name: projects
-    description: Mirror of aegis projects, keyed by engine-minted projectId. One state per
+    description: Mirror of shor projects, keyed by engine-minted projectId. One state per
       project; value carries updatedAt for last-writer-wins idempotency.
   connectors:
   - namespace: pentest
@@ -397,7 +397,7 @@ spec:
       \              ),\n            ),\n          ),\n        )\n      : null,\n    reposConnected\n\
       \      ? null\n      : React.createElement(\n          \"p\",\n          { style: {\
       \ color: \"#777\", fontSize: 12 } },\n          \"No GitHub repos connected \u2014 black-box\
-      \ only. Connect GitHub in the aegis app to enable white-box.\",\n        ),\n    React.createElement(\"\
+      \ only. Connect GitHub in the shor app to enable white-box.\",\n        ),\n    React.createElement(\"\
       button\", { type: \"submit\", disabled: busy }, busy ? \"Creating\u2026\" : \"Create\
       \ project\"),\n  );\n}\n\n\nexport default function App(props) {\n  const inputData\
       \ = (props && props.input_data) || {};\n  const [selected, setSelected] = useState(null);\n\
@@ -425,7 +425,7 @@ spec:
       \ projectId }));\n  const createProject = (payload) => guard(() => invokeFunction(FUNCTIONS.createProject,\
       \ payload));\n\n  return React.createElement(\n    \"div\",\n    { style: { fontFamily:\
       \ \"system-ui, sans-serif\", maxWidth: 820, margin: \"0 auto\", padding: 16 } },\n \
-      \   React.createElement(\"h2\", null, \"Aegis \u2014 pentest showcase\"),\n    error\
+      \   React.createElement(\"h2\", null, \"Shor \u2014 pentest showcase\"),\n    error\
       \ ? React.createElement(\"p\", { style: { color: \"#b00020\" } }, `Error: ${error}`)\
       \ : null,\n    projects.length === 0 ? React.createElement(\"p\", { style: { color:\
       \ \"#777\" } }, \"No projects yet.\") : null,\n    projects.map((p) => {\n      const\

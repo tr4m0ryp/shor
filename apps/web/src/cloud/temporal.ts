@@ -54,9 +54,9 @@ export function scanTaskQueue(): string {
   return getConfig().temporal.taskQueue;
 }
 
-/** Deterministic per-scan workflow id `aegis-<scanId>` (ADR-019). */
+/** Deterministic per-scan workflow id `shor-<scanId>` (ADR-019). */
 export function scanWorkflowId(scanId: string): string {
-  return `aegis-${scanId}`;
+  return `shor-${scanId}`;
 }
 
 /** Drop the memoized client (tests / reconnect). */

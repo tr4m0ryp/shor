@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
 <style>
-/* Aegis dashboard styles. The visual design language (color tokens, fonts,
+/* Shor dashboard styles. The visual design language (color tokens, fonts,
  * layout, sidebar, tabs, cards, badges, finding rows, attack-scenario blocks,
  * toast) is ported verbatim from storron's web UI to preserve look-and-feel. */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -776,8 +776,8 @@ body.guest .sidebar nav { display: none; }
 <div class="toast" id="toast"></div>
 
 <script>
-// ===================== Aegis dashboard client =====================
-// Drives the Aegis API (auth-gated, tenant-scoped). Mirrors storron's
+// ===================== Shor dashboard client =====================
+// Drives the Shor API (auth-gated, tenant-scoped). Mirrors storron's
 // framework-less, fetch-based client style.
 
 const state = {
@@ -914,12 +914,12 @@ function connectWithGithub() {
   const w = 640, h = 760;
   const x = window.screenX + (window.outerWidth - w) / 2;
   const y = window.screenY + (window.outerHeight - h) / 2;
-  window.open('/settings/github/start', 'aegis-gh-oauth',
+  window.open('/settings/github/start', 'shor-gh-oauth',
     'popup,width=' + w + ',height=' + h + ',left=' + x + ',top=' + y);
 }
 
 window.addEventListener('message', function (e) {
-  if (e.origin !== location.origin || !e.data || e.data.aegis !== 'gh') return;
+  if (e.origin !== location.origin || !e.data || e.data.shor !== 'gh') return;
   if (e.data.status === 'connected') { showToast('GitHub connected', 'success'); loadGithubSettings(); }
   else { showToast('GitHub connection failed', 'error'); }
 });
@@ -1905,7 +1905,7 @@ function renderUserRow(u) {
   const params = new URLSearchParams(location.search);
   const gh = params.get('gh');
   if (gh && window.opener && !window.opener.closed) {
-    window.opener.postMessage({ aegis: 'gh', status: gh === 'connected' ? 'connected' : 'error' }, location.origin);
+    window.opener.postMessage({ shor: 'gh', status: gh === 'connected' ? 'connected' : 'error' }, location.origin);
     window.close();
     return;
   }

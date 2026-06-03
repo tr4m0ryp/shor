@@ -20,7 +20,7 @@ function githubHeaders(pat: string): Record<string, string> {
   return {
     Authorization: `Bearer ${pat}`,
     Accept: 'application/vnd.github+json',
-    'User-Agent': 'aegis',
+    'User-Agent': 'shor',
     'X-GitHub-Api-Version': '2022-11-28',
   };
 }

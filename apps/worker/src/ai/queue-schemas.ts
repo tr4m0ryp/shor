@@ -137,11 +137,11 @@ const VULN_AGENT_QUEUE_FILENAMES: Partial<Record<AgentName, string>> = {
  * and `ensureQueueFile` backstops a missing/garbled file with an empty queue, so
  * a flash hiccup degrades to "no findings" rather than crashing the pipeline.
  *
- * Set `AEGIS_STRUCTURED_OUTPUT=1` to re-enable the SDK schema enforcement (only
+ * Set `SHOR_STRUCTURED_OUTPUT=1` to re-enable the SDK schema enforcement (only
  * worthwhile on a model that reliably emits structured output, e.g. a pro tier).
  */
 export function getOutputFormat(agentName: AgentName): JsonSchemaOutputFormat | undefined {
-	if (process.env.AEGIS_STRUCTURED_OUTPUT !== "1") return undefined;
+	if (process.env.SHOR_STRUCTURED_OUTPUT !== "1") return undefined;
 	return VULN_AGENT_OUTPUT_FORMAT[agentName];
 }
 

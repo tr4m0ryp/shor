@@ -1,16 +1,16 @@
-# Aegis — Project Notes for Claude
+# Shor — Project Notes for Claude
 
-Aegis (brand name "Shor") is a multi-tenant web-security scanning platform:
-- `apps/web` → the `aegis-web` Cloud Run **service** (dashboard + control-plane API; serves the static UI from `apps/web/src/public/`).
-- `apps/worker` → the `aegis-scan-worker` Cloud Run **Job** that runs the per-scan agent pipeline.
-- Postgres on Cloud SQL (`aegis-db`); migrations via the `aegis-migrate` Job.
+Shor is a multi-tenant web-security scanning platform:
+- `apps/web` → the `shor-web` Cloud Run **service** (dashboard + control-plane API; serves the static UI from `apps/web/src/public/`).
+- `apps/worker` → the `shor-scan-worker` Cloud Run **Job** that runs the per-scan agent pipeline.
+- Postgres on Cloud SQL (`shor-db`); migrations via the `shor-migrate` Job.
 
 Deploy/build specifics (image split, commands, GCP project) live in per-session memory — do not duplicate them here.
 
 ## Deferred work — do NOT improvise these; they land in their own sessions
 
 ### 1. Real authentication architecture (today's auth is a prototype placeholder)
-The hosted dashboard runs with `AEGIS_DEV_LOGIN=true`. In that mode any session-less `GET /auth/me` auto-provisions a fixed dev tenant + owner user (`apps/web/src/auth/dev-session.ts`) and mints a normal session cookie — **there is no real login**. This is scaffolding, not the auth model.
+The hosted dashboard runs with `SHOR_DEV_LOGIN=true`. In that mode any session-less `GET /auth/me` auto-provisions a fixed dev tenant + owner user (`apps/web/src/auth/dev-session.ts`) and mints a normal session cookie — **there is no real login**. This is scaffolding, not the auth model.
 
 - Treat dev-login as a shortcut to be **removed**, not extended. Do not build features that lean on it.
 - A proper authentication architecture must be **designed and implemented deliberately** (the Identity Platform flow is partially wired in `apps/web/src/auth/*`). Keep auth code clean, explicit, and well-factored — no sloppy shortcuts layered on the dev hack.

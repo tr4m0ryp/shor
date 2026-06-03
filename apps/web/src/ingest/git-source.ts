@@ -47,7 +47,7 @@ export async function ingestGithub(input: GithubIngestInput): Promise<CodebaseVe
 
   const versionId = randomUUID();
   const prefix = objectPrefix(input.tenantId, input.project.id, versionId);
-  const workdir = mkdtempSync(join(tmpdir(), 'aegis-clone-'));
+  const workdir = mkdtempSync(join(tmpdir(), 'shor-clone-'));
   const checkout = join(workdir, 'repo');
 
   try {
