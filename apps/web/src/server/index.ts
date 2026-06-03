@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isGateExempt, isUnlocked } from '../auth/gate.js';
 import { getConfig } from '../config.js';
 import { apiRouter } from './router.js';
 
@@ -78,10 +79,22 @@ export function createDashboardServer(): ReturnType<typeof createServer> {
     }
 
     try {
+      // App-wide passcode gate: when locked, a navigation must NOT receive any
+      // static asset (the SPA must not load while locked), so the gate decision
+      // runs BEFORE static serving. Exempt paths (`/share/*`, `/gate`, Bearer
+      // clients) and the disabled case fall straight through to normal serving.
+      // The actual unlock page / 401 is produced by `apiRouter` below so all
+      // gate logic stays in one place.
+      const pathname = new URL(url, 'http://localhost').pathname;
+      const gateParts = pathname.split('/').filter(Boolean);
+      // Mirror the router's `/api`-prefix strip so the exempt check matches.
+      const gateSegments = gateParts[0] === 'api' ? gateParts.slice(1) : gateParts;
+      const gateLocked = !isGateExempt(gateSegments, req.headers.authorization) && !isUnlocked(req.headers.cookie);
+
       // Static assets (the ported dashboard UI) for GET requests to `/` or an
-      // asset path; extension-less GETs fall through to the API router.
-      if (method === 'GET') {
-        const pathname = new URL(url, 'http://localhost').pathname;
+      // asset path; extension-less GETs fall through to the API router. Skipped
+      // when the gate is locked so the unlock page is served instead.
+      if (method === 'GET' && !gateLocked) {
         const file = serveStatic(pathname);
         if (file) {
           const headers: Record<string, string> = { 'Content-Type': file.mime };
@@ -94,15 +107,33 @@ export function createDashboardServer(): ReturnType<typeof createServer> {
       }
 
       const body = method === 'POST' || method === 'PUT' ? await parseBody(req) : {};
-      const result = await apiRouter(method, url, body, req.headers.cookie, req.headers.authorization);
-      // Browser-redirect responses (GitHub OAuth): emit a 302 to `Location`
-      // instead of the JSON body, carrying any `Set-Cookie` along.
+      const result = await apiRouter(
+        method,
+        url,
+        body,
+        req.headers.cookie,
+        req.headers.authorization,
+        req.headers.accept,
+      );
+      // Browser-redirect responses (GitHub OAuth + gate unlock): emit a 302 to
+      // `Location` instead of the JSON body, carrying any `Set-Cookie` along.
       if (result.redirect) {
         res.writeHead(302, {
           Location: result.redirect,
           ...(result.setCookie ? { 'Set-Cookie': result.setCookie } : {}),
         });
         res.end();
+        return;
+      }
+      // Inline HTML responses (the passcode gate's unlock page) — served as
+      // `text/html`, never cached so a stale lock screen cannot stick.
+      if (result.html !== undefined) {
+        res.writeHead(result.status, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store, must-revalidate',
+          ...(result.setCookie ? { 'Set-Cookie': result.setCookie } : {}),
+        });
+        res.end(result.html);
         return;
       }
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };

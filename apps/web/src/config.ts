@@ -232,6 +232,15 @@ export interface AegisConfig {
    * flow. Strictly additive and flag-gated; MUST stay false in production.
    */
   readonly devLogin: boolean;
+  /**
+   * App-wide passcode gate (`AEGIS_APP_PASSCODE`, empty/unset ⇒ gate disabled).
+   *
+   * A thin front lock ABOVE the session/dev-login auth: when set, every
+   * browser-facing request must carry a valid gate cookie before the normal
+   * `/auth/*` flow runs (the public `/share/*` plane + Bearer-authed machine
+   * clients are exempt). The value comes ONLY from env — never hard-coded.
+   */
+  readonly appPasscode: string;
   readonly gcp: GcpConfig;
   readonly sql: CloudSqlConfig;
   readonly storage: StorageConfig;
@@ -270,6 +279,8 @@ export function getConfig(): AegisConfig {
     env: resolvedEnv,
     // Env-gated dev login (default OFF). Never enable in production.
     devLogin: envBool('AEGIS_DEV_LOGIN', false),
+    // App-wide passcode gate; empty/unset disables the gate (local dev). Env only.
+    appPasscode: env('AEGIS_APP_PASSCODE'),
     // Direct Cloud Run Job launch + findings sink (ADR-051).
     scanJobName: env('CLOUD_RUN_SCAN_JOB', 'aegis-scan-worker'),
     sinkToken: env('AEGIS_SINK_TOKEN'),
