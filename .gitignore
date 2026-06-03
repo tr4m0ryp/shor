@@ -35,3 +35,7 @@ docs/
 # Local acceptance/test runs (repos, .env, evidence)
 .acceptance/
 research/
+
+# Python bytecode
+__pycache__/
+*.pyc
