@@ -79,8 +79,16 @@ export async function materializeRepo(
 	const { repoPath } = params;
 
 	if (!params.repoGcsUri) {
+		// Black-box: no repo to copy, but the agent subprocess still runs with
+		// `repoPath` as its cwd and writes deliverables under it. The Cloud Run
+		// Job's `/work/repo` does not exist until something creates it, and
+		// spawning with a missing cwd fails instantly with ENOENT (surfaced by
+		// the Agent SDK as "executable … exists but failed to launch"). Create
+		// the empty writable workdir so target-only scans can run.
+		await fs.promises.mkdir(repoPath, { recursive: true });
 		logger.info("Black-box scan: no repo to materialize; running target-only", {
 			scanId: params.scanId,
+			repoPath,
 		});
 		return;
 	}
