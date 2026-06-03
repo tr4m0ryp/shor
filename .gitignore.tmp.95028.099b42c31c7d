@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+.turbo/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+credentials.*
+# .npmrc can carry registry auth tokens — keep local only (see npmrc.recommended)
+.npmrc
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code harness state (agent worktrees, acceptance artifacts)
+.claude/
+
+# Flow scaffolding (local-only build plumbing)
+tasks/
+notes/
+
+# Internal design / research / planning docs — local-only, not pushed
+docs/
+
+# Local acceptance/test runs (repos, .env, evidence)
+.acceptance/
+research/
+
+# Python bytecode
+__pycache__/
+*.pyc
