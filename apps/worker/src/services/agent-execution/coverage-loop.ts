@@ -30,8 +30,8 @@
  *     failure handling (service step 7) classify it.
  */
 
-import type { AuditSession } from "../../audit/index.js";
 import type { ClaudePromptResult } from "../../ai/claude-executor.js";
+import type { AuditSession } from "../../audit/index.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import type { AgentName } from "../../types/agents.js";
 import { isSpendingCapBehavior } from "../../utils/billing-detection.js";
