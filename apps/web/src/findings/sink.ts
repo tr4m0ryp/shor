@@ -25,6 +25,7 @@ import type {
   ScanStatus,
   TenantId,
 } from '../domain/types.js';
+import { mirrorFindings, mirrorScan } from '../sinas/mirror.js';
 import { withFingerprints } from './fingerprint.js';
 import { validateFinding } from './validate.js';
 
@@ -79,10 +80,12 @@ export async function ingestFindings(
   });
 
   const fingerprints: string[] = [];
+  const records: FindingRecord[] = [];
   for (const candidate of valid) {
     const record = withFingerprints(asFindingRecord(candidate));
     const persisted = await upsertFinding(tenantId, scanId, record);
     fingerprints.push(persisted.fingerprint);
+    records.push(record);
   }
 
   if (attackSurface !== undefined) {
@@ -91,6 +94,11 @@ export async function ingestFindings(
       await attackSurfaceRepo.create({ scanId, data: attackSurface });
     }
   }
+
+  // Best-effort hub->Sinas mirror of the fingerprinted findings (keyed by the
+  // canonical fingerprint, overlapping the worker's finalize push idempotently);
+  // self-swallowing, never affects this ingest's result.
+  await mirrorFindings(scanId, records);
 
   return { scanId, persisted: fingerprints.length, fingerprints, ...(skipped > 0 && { skipped }) };
 }
@@ -214,7 +222,9 @@ export async function handleIngestFindings(
     const result = await ingestFindings(tenantId, scanId, findings, attackSurface);
     const status = asSinkStatus(body.status);
     if (status) {
-      await scanRepo.setStatus(tenantId, scanId, status);
+      const updated = await scanRepo.setStatus(tenantId, scanId, status);
+      // Best-effort hub->Sinas mirror of the terminal scan state; self-swallowing.
+      if (updated) await mirrorScan(updated);
     }
     return { status: 200, body: { ...result, ...(status ? { scanStatus: status } : {}) } };
   } catch (err) {
