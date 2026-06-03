@@ -1,0 +1,36 @@
+name: skill-issue
+
+on:
+  push:
+    paths:
+      - 'skills/**'
+      - '.github/workflows/skill-issue.yml'
+  pull_request:
+    paths:
+      - 'skills/**'
+      - '.github/workflows/skill-issue.yml'
+
+jobs:
+  lint-skills:
+    name: Lint skill frontmatter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Run skill-issue (fail on errors only)
+        run: |
+          bunx @misha_misha/skill-issue skills/ --json | tee skill-issue-report.json
+          errors=$(cat skill-issue-report.json | bun -e "
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('/dev/stdin','utf8'));
+            process.stdout.write(String(data.errors ?? 0));
+          ")
+          echo "skill-issue errors: $errors"
+          if [ "$errors" -gt 0 ]; then
+            echo "skill-issue found $errors error(s) — fix them before merging."
+            exit 1
+          fi
