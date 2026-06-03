@@ -9,6 +9,7 @@
  * `auth` middleware before touching a repository (ADR-044).
  */
 
+import { blockedResponse, handleGate, isGateExempt, isUnlocked } from '../auth/gate.js';
 import { handleLogout, handleMe, handleSessionLogin } from '../auth/routes.js';
 import { handleIngestFindings, handleSarifExport } from '../findings/index.js';
 import { handleIngestProgress } from '../scan-progress/index.js';
@@ -28,6 +29,12 @@ export interface ApiResponse {
    * still emitted on the redirect response.
    */
   readonly redirect?: string;
+  /**
+   * When set, the server writes this string as `text/html` (HTTP `status`)
+   * instead of the JSON body — used by the app-wide passcode gate's unlock page.
+   * `redirect` still takes precedence when both are present.
+   */
+  readonly html?: string;
 }
 
 const METHOD_NOT_ALLOWED: ApiResponse = { status: 405, body: { error: 'Method not allowed' } };
@@ -39,6 +46,7 @@ export async function apiRouter(
   body: Record<string, unknown>,
   cookieHeader: string | undefined,
   authHeader?: string | undefined,
+  acceptHeader?: string | undefined,
 ): Promise<ApiResponse> {
   const parsed = new URL(url, 'http://localhost');
   const parts = parsed.pathname.split('/').filter(Boolean);
@@ -47,6 +55,18 @@ export async function apiRouter(
 
   const resource = segments[0];
   const action = segments[1];
+
+  // App-wide passcode gate (a thin front lock ABOVE the session/auth layer).
+  // Runs before any dispatch; it only decides locked vs unlocked and never
+  // touches the session. Disabled (everything passes) when AEGIS_APP_PASSCODE is
+  // unset — `isGateExempt` returns true in that case. EXEMPT: `/share/*`, the
+  // `/gate` route, and Bearer-authed machine clients (worker sink, `/external`).
+  if (resource === 'gate') {
+    return handleGate(method, body);
+  }
+  if (!isGateExempt(segments, authHeader) && !isUnlocked(cookieHeader)) {
+    return blockedResponse(acceptHeader);
+  }
 
   if (resource === 'auth') {
     return routeAuth(method, action, body, cookieHeader);
