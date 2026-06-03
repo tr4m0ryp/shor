@@ -43,7 +43,7 @@ import {
   unshareProject,
   updateProject,
 } from './projects.js';
-import { getScan, getScanAttackSurface, getScanDiff, listScanFindings } from './scans.js';
+import { getScan, getScanAttackSurface, getScanDiff, getScanReport, listScanFindings } from './scans.js';
 import { connectGithub, disconnectGithub, getGithubSettings, listGithubRepos } from './settings.js';
 import { triggerScan } from './trigger.js';
 import { listUsers } from './users.js';
@@ -149,6 +149,9 @@ async function routeScans(
   }
   if (sub === 'diff') {
     return method === 'GET' ? getScanDiff(id, cookieHeader) : methodNotAllowed;
+  }
+  if (sub === 'report') {
+    return method === 'GET' ? getScanReport(id, cookieHeader) : methodNotAllowed;
   }
   if (sub) return null;
 

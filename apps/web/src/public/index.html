@@ -319,6 +319,19 @@ body {
 .needs-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .needs-tag { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(242,100,25,.10); border: 1px solid rgba(242,100,25,.35); border-radius: 4px; padding: 2px 7px; cursor: pointer; transition: background .15s; }
 .needs-tag:hover { background: rgba(242,100,25,.22); }
+.finding-field dd code, .field-value code, .attack-chain code, .report-body code { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; background: #1B1E23; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+.md-code { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; line-height: 1.5; background: #0F1115; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin: 6px 0; white-space: pre; overflow-x: auto; color: var(--text-secondary); }
+.finding-field dd strong, .field-value strong, .attack-chain strong, .report-body strong { color: var(--text); font-weight: 600; }
+.finding-field dd ul, .finding-field dd ol, .field-value ul, .field-value ol, .report-body ul, .report-body ol { margin: 4px 0 4px 18px; padding: 0; }
+.report-body { max-width: 900px; }
+.report-body h2 { font-size: 19px; margin: 4px 0 6px; }
+.report-body .report-meta { font-size: 13px; color: var(--text-secondary); margin: 0 0 4px; }
+.report-section { margin: 18px 0; }
+.report-section h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: 0 0 8px; }
+.report-finding { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 10px; background: var(--card); }
+.report-finding-head { font-size: 14px; margin-bottom: 8px; }
+.report-kv { font-size: 13px; margin-top: 6px; }
+.report-kv > span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted); margin-bottom: 2px; }
 .detail-grid { display: grid; grid-template-columns: 200px 1fr; gap: 8px 16px; font-size: 13px; }
 .detail-grid dt { color: var(--text-muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; align-self: center; }
 .detail-grid dd { color: var(--text); word-break: break-all; }
@@ -742,11 +755,13 @@ body.guest .sidebar nav { display: none; }
         <button class="detail-tab" data-tab="findings" onclick="showScanTab('findings')">Findings <span class="count" id="findingsCount">0</span></button>
         <button class="detail-tab" data-tab="attackSurface" onclick="showScanTab('attackSurface')">Attack Surface <span class="count" id="attackSurfaceCount">0</span></button>
         <button class="detail-tab" data-tab="diff" onclick="showScanTab('diff')">Diff <span class="count" id="diffCount">0</span></button>
+        <button class="detail-tab" data-tab="report" onclick="showScanTab('report')">Report</button>
       </div>
       <div class="detail-panel" id="panelActivity"></div>
       <div class="detail-panel" id="panelFindings" style="display:none"></div>
       <div class="detail-panel" id="panelAttackSurface" style="display:none"></div>
       <div class="detail-panel" id="panelDiff" style="display:none"></div>
+      <div class="detail-panel" id="panelReport" style="display:none"></div>
     </div>
 
     <!-- ===================== Settings page ===================== -->
@@ -839,6 +854,37 @@ function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Safe mini-markdown → HTML for finding/report prose: fenced code blocks, inline
+// code, bold, and -/1. lists. Everything is HTML-escaped first, so it is XSS-safe
+// (the LLM-authored text is never trusted as HTML).
+function mdToHtml(text) {
+  var src = String(text == null ? '' : text);
+  // 1) Lift fenced code blocks out before escaping (restored at the end).
+  var blocks = [];
+  src = src.replace(/```[a-zA-Z0-9_-]*\n?([\s\S]*?)```/g, function (_m, code) {
+    blocks.push(code.replace(/\n+$/, ''));
+    return ' B' + (blocks.length - 1) + ' ';
+  });
+  // 2) Escape, then apply inline code + bold (operands are already escaped).
+  src = escapeHtml(src)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // 3) Line pass: group -/* and 1. runs into lists; other lines get <br>.
+  var lines = src.split('\n'), html = '', ul = false, ol = false;
+  function closeLists() { if (ul) { html += '</ul>'; ul = false; } if (ol) { html += '</ol>'; ol = false; } }
+  for (var i = 0; i < lines.length; i++) {
+    var ln = lines[i];
+    var mu = ln.match(/^\s*[-*]\s+(.*)$/), mo = ln.match(/^\s*\d+\.\s+(.*)$/);
+    if (mu) { if (ol) closeLists(); if (!ul) { html += '<ul>'; ul = true; } html += '<li>' + mu[1] + '</li>'; }
+    else if (mo) { if (ul) closeLists(); if (!ol) { html += '<ol>'; ol = true; } html += '<li>' + mo[1] + '</li>'; }
+    else { closeLists(); html += (ln.trim() === '' ? '' : ln + '<br>'); }
+  }
+  closeLists();
+  // 4) Restore code blocks.
+  html = html.replace(/ B(\d+) (?:<br>)?/g, function (_m, n) { return '<pre class="md-code">' + escapeHtml(blocks[+n]) + '</pre>'; });
+  return html;
 }
 
 let toastTimer = null;
@@ -1526,6 +1572,8 @@ function showScanTab(tab) {
   document.getElementById('panelFindings').style.display = tab === 'findings' ? 'block' : 'none';
   document.getElementById('panelAttackSurface').style.display = tab === 'attackSurface' ? 'block' : 'none';
   document.getElementById('panelDiff').style.display = tab === 'diff' ? 'block' : 'none';
+  document.getElementById('panelReport').style.display = tab === 'report' ? 'block' : 'none';
+  if (tab === 'report' && state.currentScan) loadScanReport(state.currentScan.id);
 }
 
 // ----- Activity (live run progress) -----
@@ -1843,7 +1891,7 @@ function renderFindingRow(f, i) {
   const push = (label, value, highlight) => {
     if (!value) return;
     detailRows.push('<div class="finding-field' + (highlight ? ' highlight' : '') + '"><dt>' +
-      escapeHtml(label) + '</dt><dd>' + escapeHtml(value) + '</dd></div>');
+      escapeHtml(label) + '</dt><dd>' + mdToHtml(value) + '</dd></div>');
   };
   push('ID', String(f.displayId || ''));
   push('CWE', cwe);
@@ -1907,7 +1955,7 @@ function renderAttackScenario(scenario, index) {
   const fixPrompt = String(scenario.claude_code_prompt || '');
 
   const chainHtml = killChain.length > 0
-    ? '<ol class="attack-chain">' + killChain.map((step) => '<li>' + escapeHtml(String(step)) + '</li>').join('') + '</ol>'
+    ? '<ol class="attack-chain">' + killChain.map((step) => '<li>' + mdToHtml(String(step)) + '</li>').join('') + '</ol>'
     : '';
 
   const sections = [];
@@ -1919,7 +1967,7 @@ function renderAttackScenario(scenario, index) {
       }).join('') + '</div></div>');
   }
   if (scenario.business_impact) {
-    sections.push('<div class="attack-scenario-section"><div class="field-label">Business impact</div><div class="field-value">' + escapeHtml(String(scenario.business_impact)) + '</div></div>');
+    sections.push('<div class="attack-scenario-section"><div class="field-label">Business impact</div><div class="field-value">' + mdToHtml(String(scenario.business_impact)) + '</div></div>');
   }
   if (chainHtml) {
     sections.push('<div class="attack-scenario-section"><div class="field-label">Kill chain</div>' + chainHtml + '</div>');
@@ -2029,6 +2077,53 @@ function openFindingFromDiff(fp) {
     const el = document.getElementById('findingDetail' + idx);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+}
+
+// ----- Report (Sinas-finalized executive report) -----
+
+async function loadScanReport(scanId) {
+  const panel = document.getElementById('panelReport');
+  panel.innerHTML = '<div class="panel-empty"><span class="spinner"></span></div>';
+  try {
+    const data = await gapi('GET', '/scans/' + scanId + '/report');
+    if (!data.report) {
+      panel.innerHTML = '<div class="panel-empty">No finalized report yet. Sinas generates the consolidated report at the end of a scan.</div>';
+      return;
+    }
+    renderScanReport(data.report);
+  } catch (err) {
+    panel.innerHTML = '<div class="panel-empty">' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+function renderScanReport(r) {
+  const panel = document.getElementById('panelReport');
+  const counts = r.severity_counts || {};
+  const order = ['critical', 'high', 'medium', 'low', 'info'];
+  const chips = order.map(function (k) { return '<span class="diff-badge severity-' + k + '">' + k + ' ' + (counts[k] || 0) + '</span>'; }).join('');
+  const meta = [];
+  if (r.target) meta.push('Target: ' + escapeHtml(String(r.target)));
+  if (r.overall_risk) meta.push('Overall risk: <strong class="severity-' + escapeHtml(String(r.overall_risk).toLowerCase()) + '">' + escapeHtml(String(r.overall_risk)) + '</strong>');
+  let html = '<div class="report-body">';
+  html += '<h2>' + escapeHtml(String(r.report_title || 'Security Assessment Report')) + '</h2>';
+  if (meta.length) html += '<p class="report-meta">' + meta.join(' &middot; ') + '</p>';
+  html += '<div class="findings-filters" style="margin:8px 0 16px">' + chips + '</div>';
+  if (r.executive_summary) html += '<div class="report-section"><h3>Executive summary</h3><div>' + mdToHtml(String(r.executive_summary)) + '</div></div>';
+  const fs = Array.isArray(r.findings) ? r.findings : [];
+  if (fs.length) {
+    html += '<div class="report-section"><h3>Key findings</h3>';
+    html += fs.map(function (f) {
+      const sev = String(f.severity || 'info').toLowerCase();
+      let s = '<div class="report-finding"><div class="report-finding-head"><span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span> <strong>' + escapeHtml(String(f.id || '')) + '</strong> — ' + escapeHtml(String(f.title || '')) + '</div>';
+      if (f.evidence) s += '<div class="report-kv"><span>Evidence</span><div>' + mdToHtml(String(f.evidence)) + '</div></div>';
+      if (f.remediation) s += '<div class="report-kv"><span>Remediation</span><div>' + mdToHtml(String(f.remediation)) + '</div></div>';
+      if (f.fix_prompt) s += '<div class="report-kv"><span>Fix prompt</span><div>' + mdToHtml(String(f.fix_prompt)) + '</div></div>';
+      return s + '</div>';
+    }).join('');
+    html += '</div>';
+  }
+  html += '</div>';
+  panel.innerHTML = html;
 }
 
 // ===================== Team (multi-user) =====================

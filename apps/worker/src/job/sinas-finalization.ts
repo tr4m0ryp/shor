@@ -267,12 +267,11 @@ export async function finalizeViaSinas(
 		const markdown = renderMarkdown(report);
 		await fsp.writeFile(path.join(deliverablesPath, REPORT_FILENAME), markdown);
 
-		await sinasFetch(
-			conn,
-			"PUT",
-			`/stores/${conn.namespace}/reports/states/${scanId}`,
-			{ value: report },
-		).catch(() => undefined);
+		// POST {key,value} — the PUT-by-key path 404s on this Sinas instance.
+		await sinasFetch(conn, "POST", `/stores/${conn.namespace}/reports/states`, {
+			key: scanId,
+			value: report,
+		}).catch(() => undefined);
 
 		logger.info("Sinas finalization complete; report overwritten", { scanId });
 	} catch (err) {
