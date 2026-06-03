@@ -13,6 +13,11 @@ RUN pnpm --filter @shor/web build
 
 FROM node:22-slim AS runtime
 WORKDIR /app
+# White-box ingest shells out to `git` to clone the selected repo (ingest/git-source.ts).
+# node:*-slim ships no git, so the clone fails with "spawn git ENOENT" → 500. Install it.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/web ./apps/web
 COPY --from=build /app/package.json /app/pnpm-workspace.yaml ./
