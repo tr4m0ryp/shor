@@ -1,8 +1,8 @@
-# Aegis: An Autonomous Multi-Tenant AI Pentester for Web Apps and APIs
+# Shor: An Autonomous Multi-Tenant AI Pentester for Web Apps and APIs
 
-Aegis (product brand **Shor**) is a hosted platform that turns a large-language-model
+**Shor** is a hosted platform that turns a large-language-model
 agent into a working web-application penetration tester. A customer connects a target —
-a **live URL** plus the **source repository** behind it — and Aegis runs a staged agent
+a **live URL** plus the **source repository** behind it — and Shor runs a staged agent
 pipeline that finds, *proves*, and explains vulnerabilities, then hands back a one-click
 prompt to fix each one in the connected repo.
 
@@ -17,7 +17,7 @@ that reasons like a tester (chains recon into exploitation, reads the source to 
 finding, writes a working proof-of-concept) **and** behaves like a product (multi-tenant,
 re-runnable on every push, diff-aware across scans, safe by construction).
 
-Aegis is that tool. It drives roughly **30 preinstalled offensive CLI tools** (sqlmap,
+Shor is that tool. It drives roughly **30 preinstalled offensive CLI tools** (sqlmap,
 dalfox, nuclei, ffuf, semgrep, and more) through a **rich system prompt plus one loadable
 skill per tool**, executed via shell inside an isolated, per-scan sandbox. Each agent works
 a single OWASP category; every finding is **validated by running a harmless, reproducible
@@ -31,12 +31,12 @@ The engine is a hardened, multi-tenant rebuild of a proven single-user pentest a
 onto **Google Cloud** (Identity Platform, Temporal Cloud, Cloud Run, Cloud SQL, Secret
 Manager, GCS) and wrapped in a **code-enforced safety layer** — rules-of-engagement scope
 checks, per-host rate limits, a default-deny egress allowlist, secret redaction, and a kill
-switch. All Tor/onion machinery from the original engine has been removed; Aegis runs **direct
+switch. All Tor/onion machinery from the original engine has been removed; Shor runs **direct
 clearnet egress only**.
 
 ## Core Architecture / How It Works
 
-Aegis splits into two deployable units plus managed cloud services. The **control plane** (a
+Shor splits into two deployable units plus managed cloud services. The **control plane** (a
 long-running web service) owns identity, data, secrets, and orchestration; the **data plane**
 (one ephemeral job per scan) runs the actual agent pipeline in isolation.
 
@@ -45,7 +45,7 @@ long-running web service) owns identity, data, secrets, and orchestration; the *
          |  HTTPS (session cookie)
          v
   +-----------------------------------------------+
-  |  Cloud Run SERVICE  -  aegis-web              |
+  |  Cloud Run SERVICE  -  shor-web              |
   |  dashboard UI + control-plane API             |
   |  (serves the static UI; auth, data, secrets,  |
   |   ingest, findings, guardrails, orchestration)|
@@ -59,7 +59,7 @@ long-running web service) owns identity, data, secrets, and orchestration; the *
                       | start job
                       v
   +-----------------------------------------------+
-  |  Cloud Run JOB per scan  -  aegis-scan-worker |
+  |  Cloud Run JOB per scan  -  shor-scan-worker |
   |  gVisor sandbox, per-run service identity      |
   |                                               |
   |  Claude Agent SDK pipeline (via shell):        |
@@ -68,7 +68,7 @@ long-running web service) owns identity, data, secrets, and orchestration; the *
   +--+---------------+----------------+------------+
      | findings      | artifacts      | egress (firewalled)
      v               v                v
-  aegis-web       GCS bucket       Target ROE hosts
+  shor-web       GCS bucket       Target ROE hosts
   HTTP sink       per-tenant       + GitHub hosts only
                   prefix           (169.254.169.254 blocked)
 
@@ -166,10 +166,10 @@ the **minimum-impact PoC**; redact secrets/PII in evidence; git-clone tools are 
 ## Repository Layout
 
 ```
-apps/web/      Cloud Run SERVICE (aegis-web): auth, data repositories, secrets,
+apps/web/      Cloud Run SERVICE (shor-web): auth, data repositories, secrets,
                orchestration, ingest, findings/diff/SARIF, guardrails, share plane,
                and the static dashboard (apps/web/src/public/)
-apps/worker/   Cloud Run JOB (aegis-scan-worker): the Claude Agent SDK pipeline,
+apps/worker/   Cloud Run JOB (shor-scan-worker): the Claude Agent SDK pipeline,
                session/agent definitions, audit + metrics, guardrails
 skills/        31 per-tool skills loaded by the worker at runtime (progressive disclosure)
 infra/docker/  Wolfi/glibc multi-stage toolkit image (~30 tools) + tools.lock;
@@ -187,7 +187,7 @@ native `linux/amd64` builder.
 
 ```bash
 pnpm install
-pnpm build          # turbo: builds @aegis/web and @aegis/worker
+pnpm build          # turbo: builds @shor/web and @shor/worker
 pnpm check          # type-check both packages (tsc --noEmit)
 ```
 
@@ -200,7 +200,7 @@ shortcut, enable the env-gated dev login (provisions a seeded dev tenant + user;
 off in production**):
 
 ```bash
-export AEGIS_DEV_LOGIN=true
+export SHOR_DEV_LOGIN=true
 pnpm dashboard:dev          # tsx apps/web/src/index.ts  (hot path)
 # or, after pnpm build:
 pnpm dashboard              # node apps/web/dist/index.js
@@ -214,10 +214,10 @@ The server listens on `WEB_PORT` (default `8080`) and serves the UI from
 <summary><b>Apply database migrations</b></summary>
 
 Migrations are idempotent SQL applied by a small runner; in production they run as the
-`aegis-migrate` Cloud Run Job. Locally, point `CLOUD_SQL_*` at a Postgres instance and:
+`shor-migrate` Cloud Run Job. Locally, point `CLOUD_SQL_*` at a Postgres instance and:
 
 ```bash
-pnpm --filter @aegis/web build
+pnpm --filter @shor/web build
 node apps/web/dist/db/migrate.js
 ```
 
@@ -228,18 +228,18 @@ is absent (local dev).
 </details>
 
 <details>
-<summary><b>Build the dashboard image (aegis-web)</b></summary>
+<summary><b>Build the dashboard image (shor-web)</b></summary>
 
 Small Node image, no offensive toolkit. **Build context is the repo root** (it copies the
 workspace manifests):
 
 ```bash
-docker build -f infra/docker/Dockerfile.web -t aegis-web:latest .
+docker build -f infra/docker/Dockerfile.web -t shor-web:latest .
 ```
 </details>
 
 <details>
-<summary><b>Build the offensive-toolkit image (aegis-scan-worker)</b></summary>
+<summary><b>Build the offensive-toolkit image (shor-scan-worker)</b></summary>
 
 A 4-stage Wolfi/**glibc** build (`go-builder -> py-builder -> runtime-staging -> runtime`)
 producing a minimal, shell-less runtime with ~30 tools and a shared Python venv. **Build
@@ -252,7 +252,7 @@ docker build \
   --build-arg SSTIMAP_SHA=...  --build-arg XSSTRIKE_SHA=... \
   --build-arg SSRFMAP_SHA=...  --build-arg JWT_TOOL_SHA=... \
   --build-arg NOSQLI_SHA=...   --build-arg PARAMSPIDER_SHA=... \
-  -t aegis-toolkit:latest \
+  -t shor-toolkit:latest \
   infra/docker
 
 docker build --check infra/docker        # lint all stages, no build
@@ -329,7 +329,7 @@ The **Finding** record (the contract the dashboard depends on) carries: `categor
 service account, secret access scoped to that tenant only. **Secrets** — mounted as volume
 files (not env vars, to avoid `/proc/environ` leakage); only the one provider key for that run
 is injected. **Filesystem** — ephemeral per-run workdir + per-tenant GCS prefix. **Network** —
-per-tenant VPC egress firewall. **Temporal** — per-scan workflow IDs (`aegis-<random>`) so
+per-tenant VPC egress firewall. **Temporal** — per-scan workflow IDs (`shor-<random>`) so
 concurrent tenants never collide.
 
 ### Stack
@@ -355,12 +355,12 @@ operationally important variables:
 | `TEMPORAL_ADDRESS` / `_NAMESPACE` / `_TASK_QUEUE` / mTLS or `_API_KEY` | Temporal Cloud client |
 | `CLOUD_RUN_SCAN_JOB`, `CLOUD_RUN_WORKER_IMAGE`, `CLOUD_RUN_*` | Per-scan job launch (identity template, CPU/memory, timeout, VPC egress) |
 | `IDENTITY_PLATFORM_*`, `SESSION_SIGNING_SECRET` | Auth + the HMAC-signed session cookie (**set a strong secret in prod**) |
-| `AEGIS_PUBLIC_URL`, `AEGIS_SINK_TOKEN` | Dashboard base URL + shared token the worker uses to post findings (**secret in prod**) |
+| `SHOR_PUBLIC_URL`, `SHOR_SINK_TOKEN` | Dashboard base URL + shared token the worker uses to post findings (**secret in prod**) |
 | `GITHUB_APP_ID`, `GITHUB_OAUTH_CLIENT_ID` / `_SECRET` | GitHub App ingest + "Connect with GitHub" OAuth |
-| `AEGIS_DEV_LOGIN` | Local login shortcut — **must be `false` in production** |
+| `SHOR_DEV_LOGIN` | Local login shortcut — **must be `false` in production** |
 
-The per-scan job additionally reads `AEGIS_SCAN_ID`, `AEGIS_TARGET_URL`, `AEGIS_REPO_GCS_URI`
-(absent for black-box), and `AEGIS_PROVIDER_KEY_FILE` (the file path of the mounted key).
+The per-scan job additionally reads `SHOR_SCAN_ID`, `SHOR_TARGET_URL`, `SHOR_REPO_GCS_URI`
+(absent for black-box), and `SHOR_PROVIDER_KEY_FILE` (the file path of the mounted key).
 
 ## Status and Roadmap
 
@@ -371,7 +371,7 @@ authorized target, and an Anthropic API key.
 Planned / not yet complete:
 
 - **Real authentication.** The hosted dashboard currently runs behind the **dev-login
-  prototype** (`AEGIS_DEV_LOGIN`), a flag-gated placeholder that auto-provisions a fixed dev
+  prototype** (`SHOR_DEV_LOGIN`), a flag-gated placeholder that auto-provisions a fixed dev
   tenant. The deliberate **Identity Platform** flow is partially wired and is finished in its
   own work; dev-login is to be removed, never extended.
 - **Guest share-access credential.** The read-only per-project share plane exists; the team's
@@ -386,7 +386,7 @@ Planned / not yet complete:
 
 ## Disclaimer / Responsible Use
 
-Aegis is built for **defensive security and authorized testing only**. It must be pointed
+Shor is built for **defensive security and authorized testing only**. It must be pointed
 exclusively at systems you own or are explicitly contracted to test, within a defined scope.
 The platform enforces this in code — rules-of-engagement scope checks before every network
 action, per-host rate limits, a default-deny egress allowlist, minimum-impact proofs-of-concept,
