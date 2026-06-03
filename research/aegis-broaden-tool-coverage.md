@@ -367,3 +367,49 @@ Dependency-ordered; phases 1-2 are independent and can run in parallel.
 - **Phase 6 -- Optional planner fan-out (recon only, default off).** Per-tool parallel
   recon sub-runs behind a flag, inserted at the `vuln-exploit.ts:183` seam / a new
   activity.
+
+## Implementation Log
+
+Built via `/readyforlaunch` on 2026-06-03 (8 tasks, 3 groups, worktree-isolated agents).
+Landed on `main` and pushed to origin (`1203992`). Acceptance verdict: **YELLOW** — every
+static/unit/wiring criterion PASS with evidence; the live end-to-end scan is BLOCKED on local
+runtime provisioning (tool binaries + tsx absent locally), to be run in the worker image.
+
+What shipped (all under `apps/worker/`):
+- **Coverage module** `services/coverage/` — `CoveragePolicy`/`CoverageResult`, agentName<->
+  promptName reconciliation over the `AGENTS` registry with a load-time drift assertion,
+  `COVERAGE_POLICY` (candidates derived from the now-exported `RECOMMENDED`), `evaluateCoverage`,
+  `MAX_COVERAGE_ROUNDS`. 21 unit tests.
+- **Coverage gate + continuation** `services/agent-execution/coverage-loop.ts` + `service.ts`
+  step-5 wrap + dormant hard-miss->OUTPUT_VALIDATION_FAILED bridge in `post-execution.ts`.
+- **Breadth footer** upgraded `recommendedSkillsSection()` to a TodoWrite checklist +
+  breadth-before-depth + justify-every-skip.
+- **Observability** additive `coverage` field on the progress snapshot.
+- **Discovery preflight** `services/preflight/tooling-discovery.ts` (+ `skill-catalog.ts`,
+  `TOOLING_MISSING`): skills-discovered + binaries-on-PATH, hard-fail in image / warn in dev.
+- **Canary** unit canary + guarded local-scan harness `scripts/coverage-canary.ts`.
+- **Hygiene/CI** first repo GitHub workflow runs skill-issue; all 31 SKILL.md already carried
+  "Use when" triggers (0 edits). **Vitest** introduced as the worker test runner (62 tests).
+
+Deviations from the spec, with rationale:
+- **T8 `required` defaulted to `[]`** for every agent (not "exploit category tool required").
+  Each exploit category has several valid tools, and a false hard-fail burns a retry; breadth
+  is driven by `minCount` + continuation, and the hard-fail->retry bridge is wired but dormant
+  (operators opt in by promoting a tool to `required`).
+- **002 sequenced after 001** (not parallel as the Build Plan suggested): deriving policy
+  candidates from `RECOMMENDED` required exporting it from `skill-recommendations.ts`, the same
+  file 002 edits — sequencing avoids a worktree merge conflict.
+- **Fan-out seam corrected:** the spec's `vuln-exploit.ts:183` is the *exploit* phase; recon
+  actually dispatches at `workflows/index.ts`. Implemented there behind `AEGIS_RECON_FANOUT`
+  (default off, flag-off path byte-identical, 8 tests). The fan-out ON-path is **scaffold only**
+  and deliberately descoped: a correct version additionally needs per-tool prompt scoping and a
+  synthesis merge of the N per-tool recon deliverables — non-trivial, left as a documented
+  follow-up.
+- **Environment:** the global `WorktreeCreate` hook was pointed at an observer-only `ledger.sh`
+  that returned no path, so Agent worktree isolation failed; rewired to a robust creator that
+  handles both payload shapes, writes the same ledger, and no-ops on unknown shapes (original
+  settings backed up).
+
+Open follow-ups: run the live canary in the provisioned worker image to clear the BLOCKED
+criterion; finish or remove the recon fan-out ON-path; (optional) tune thresholds in the policy
+map. Acceptance artifacts: `.claude/acceptance/aegis-broaden-tool-coverage/report.md`.
