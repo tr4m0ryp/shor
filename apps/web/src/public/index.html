@@ -315,6 +315,10 @@ body {
 .stat-card.sev-medium .stat-val { color: var(--yellow); }
 .stat-card.sev-low .stat-val { color: var(--text-secondary); }
 .stat-card.stat-date .stat-val { font-size: 15px; white-space: nowrap; }
+.vuln-num { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(242,100,25,.12); border: 1px solid rgba(242,100,25,.35); border-radius: 4px; padding: 1px 5px; margin-right: 4px; }
+.needs-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.needs-tag { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(242,100,25,.10); border: 1px solid rgba(242,100,25,.35); border-radius: 4px; padding: 2px 7px; cursor: pointer; transition: background .15s; }
+.needs-tag:hover { background: rgba(242,100,25,.22); }
 .detail-grid { display: grid; grid-template-columns: 200px 1fr; gap: 8px 16px; font-size: 13px; }
 .detail-grid dt { color: var(--text-muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; align-self: center; }
 .detail-grid dd { color: var(--text); word-break: break-all; }
@@ -1750,11 +1754,57 @@ async function loadScanFindings(scanId) {
   try {
     const data = await gapi('GET', '/scans/' + scanId + '/findings');
     state.findingsCache = (data.findings || []).map((f) => f.data || f);
+    assignFindingNumbers(state.findingsCache);
     document.getElementById('findingsCount').textContent = String(state.findingsCache.length);
     renderFindings();
   } catch (err) {
     panel.innerHTML = '<div class="panel-empty">' + escapeHtml(err.message) + '</div>';
   }
+}
+
+// Short per-class code for the human-readable finding id (e.g. XSS-01).
+var VULN_CODE = { injection: 'INJ', xss: 'XSS', auth: 'AUTH', ssrf: 'SSRF', authz: 'AUTHZ' };
+function vulnCode(category) {
+  var c = String(category || '').toLowerCase().trim();
+  if (VULN_CODE[c]) return VULN_CODE[c];
+  var t = (c.replace(/[^a-z0-9]+/g, ' ').trim().split(' ')[0] || 'vuln');
+  return t.slice(0, 4).toUpperCase();
+}
+// Assign a stable per-scan id (XSS-01, AUTH-02, …) to each finding, grouped by
+// class in the order they arrive. Mutates the finding objects (sets displayId).
+function assignFindingNumbers(findings) {
+  var counters = {};
+  (findings || []).forEach(function (f) {
+    if (!f) return;
+    var code = vulnCode(f.category);
+    counters[code] = (counters[code] || 0) + 1;
+    f.displayId = code + '-' + String(counters[code]).padStart(2, '0');
+  });
+}
+
+// Heuristically map an attack-surface scenario to the findings it relies on:
+// match CWE ids and category keywords from the scenario text to the scan's
+// findings, returning their {id, fingerprint} for clickable "requires" tags.
+function relatedFindingIds(scenario) {
+  var findings = state.findingsCache || [];
+  var parts = [scenario.title, scenario.business_impact].concat(Array.isArray(scenario.kill_chain) ? scenario.kill_chain : []);
+  var text = parts.join(' ').toLowerCase();
+  var cweSet = {};
+  (text.match(/cwe-\d+/g) || []).forEach(function (c) { cweSet[c] = true; });
+  var out = [], seen = {};
+  findings.forEach(function (f) {
+    if (!f || !f.displayId) return;
+    var fcwe = String(f.cwe || '').toLowerCase();
+    var fcat = String(f.category || '').toLowerCase();
+    var hit = (fcwe && cweSet[fcwe]) || (fcat && text.indexOf(fcat) !== -1)
+      || (fcat === 'xss' && text.indexOf('xss') !== -1)
+      || (fcat === 'injection' && (text.indexOf('sql') !== -1 || text.indexOf('injection') !== -1 || text.indexOf('rce') !== -1))
+      || (fcat === 'ssrf' && text.indexOf('ssrf') !== -1)
+      || (fcat === 'authz' && (text.indexOf('idor') !== -1 || text.indexOf('bola') !== -1 || text.indexOf('access control') !== -1 || text.indexOf('authorization') !== -1))
+      || (fcat === 'auth' && (text.indexOf('session') !== -1 || text.indexOf('token') !== -1 || text.indexOf('login') !== -1 || text.indexOf('credential') !== -1 || text.indexOf('authentication') !== -1 || text.indexOf('brute') !== -1));
+    if (hit && !seen[f.displayId]) { seen[f.displayId] = true; out.push({ id: f.displayId, fp: f.fingerprint }); }
+  });
+  return out;
 }
 
 function setSeverityFilter(sev) { state.severityFilter = sev; renderFindings(); }
@@ -1795,6 +1845,7 @@ function renderFindingRow(f, i) {
     detailRows.push('<div class="finding-field' + (highlight ? ' highlight' : '') + '"><dt>' +
       escapeHtml(label) + '</dt><dd>' + escapeHtml(value) + '</dd></div>');
   };
+  push('ID', String(f.displayId || ''));
   push('CWE', cwe);
   push('OWASP', String(f.owasp_category || ''));
   push('Location', locStr);
@@ -1810,7 +1861,7 @@ function renderFindingRow(f, i) {
   return (
     '<div class="finding-row" onclick="toggleFinding(' + i + ')">' +
       '<span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span>' +
-      '<span class="finding-id">' + escapeHtml(cat) + '</span>' +
+      '<span class="finding-id">' + (f.displayId ? '<span class="vuln-num">' + escapeHtml(f.displayId) + '</span> ' : '') + escapeHtml(cat) + '</span>' +
       '<span class="finding-summary">' + escapeHtml(summary) + '</span>' +
       '<span class="finding-badges">' + confBadge + '</span>' +
       '<span class="finding-chevron">&rsaquo;</span>' +
@@ -1860,6 +1911,13 @@ function renderAttackScenario(scenario, index) {
     : '';
 
   const sections = [];
+  const needs = relatedFindingIds(scenario);
+  if (needs.length) {
+    sections.push('<div class="attack-scenario-section"><div class="field-label">Requires vulnerabilities</div><div class="needs-tags">' +
+      needs.map(function (n) {
+        return '<span class="needs-tag" title="Open ' + escapeHtml(n.id) + '" onclick="openFindingFromDiff(\'' + escapeHtml(n.fp) + '\')">' + escapeHtml(n.id) + '</span>';
+      }).join('') + '</div></div>');
+  }
   if (scenario.business_impact) {
     sections.push('<div class="attack-scenario-section"><div class="field-label">Business impact</div><div class="field-value">' + escapeHtml(String(scenario.business_impact)) + '</div></div>');
   }
@@ -1939,7 +1997,7 @@ async function loadScanDiff(scanId) {
       const to = String(t.to || 'open');
       const fp = String(t.fingerprint || '');
       const f = byFp[fp];
-      const title = f ? String(f.category || 'Finding') : 'Resolved finding (prior scan)';
+      const title = f ? ((f.displayId ? f.displayId + ' · ' : '') + String(f.category || 'Finding')) : 'Resolved finding (prior scan)';
       const sev = f ? String(f.severity || 'info').toLowerCase() : '';
       const sevBadge = sev ? '<span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span>' : '';
       const transition = (t.from ? escapeHtml(String(t.from)) + ' &rarr; ' : '') + escapeHtml(to) + ' &middot; ' + escapeHtml(fp.slice(0, 12));

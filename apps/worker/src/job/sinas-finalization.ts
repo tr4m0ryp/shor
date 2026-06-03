@@ -106,11 +106,48 @@ async function pushFindings(
 	return pushed;
 }
 
+const SEV_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+
+/**
+ * Build the finalizer message with the findings INLINE. The finalizer agent
+ * otherwise retrieves findings via parallel `store_search` tool calls, which the
+ * OpenRouter->Anthropic proxy rejects with "tool_use ids must be unique". Feeding
+ * the data inline (and forbidding tools) sidesteps that, and listing only the
+ * top-N severest findings keeps the response under the agent's max_tokens (the
+ * full list is already in the dashboard).
+ */
+function buildFinalizerMessage(scanId: string, target: string, findings: FindingRecord[]): string {
+	const counts: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+	for (const f of findings) counts[f.severity] = (counts[f.severity] ?? 0) + 1;
+	const compact = findings
+		.map((f) => ({
+			id: f.id,
+			category: f.category,
+			severity: f.severity,
+			confidence: f.confidence,
+			cwe: f.cwe,
+			location: `${f.vulnerable_code_location?.file ?? ""}:${f.vulnerable_code_location?.line ?? ""}`,
+			evidence: String(f.evidence ?? "").slice(0, 300),
+			remediation: String(f.remediation ?? "").slice(0, 200),
+		}))
+		.sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
+	const top = compact.slice(0, 10);
+	return (
+		`Produce the finalized executive security report for scan ${scanId} (target ${target}).\n` +
+		`Do NOT call any tools and do NOT read from the store — use ONLY the data in this message.\n` +
+		`There are ${findings.length} findings total. Use EXACTLY these severity_counts: ${JSON.stringify(counts)}.\n` +
+		`The report's "findings" array must contain ONLY the ${top.length} highest-severity findings listed below (the dashboard shows the full list). ` +
+		`Keep each finding's evidence/remediation/fix_prompt to one short sentence and executive_summary under 130 words; set overall_risk.\n\n` +
+		`TOP FINDINGS JSON:\n${JSON.stringify(top)}`
+	);
+}
+
 /** Drive the finalizer agent over the chat stream and return its structured report. */
 async function runFinalizer(
 	conn: SinasConnection,
 	scanId: string,
 	target: string,
+	findings: FindingRecord[],
 ): Promise<SinasReport> {
 	const chatRes = await sinasFetch(
 		conn,
@@ -126,16 +163,22 @@ async function runFinalizer(
 		conn,
 		"POST",
 		`/chats/${chat.id}/messages/stream`,
-		{ content: `Produce the finalized report for scan ${scanId}.` },
+		{ content: buildFinalizerMessage(scanId, target, findings) },
 	);
 	if (!msgRes.ok) throw new Error(`finalizer message failed: ${msgRes.status}`);
 
 	return parseFinalizerStream(await msgRes.text());
 }
 
-/** Parse the SSE stream: surface provider errors, return the last JSON message. */
+/**
+ * Parse the SSE stream. The finalizer streams its JSON report as many small
+ * `content` string deltas, so accumulate them and parse the assembled object at
+ * the end. A whole-object `content` (non-streamed) is still handled. Surfaces
+ * provider errors verbatim.
+ */
 function parseFinalizerStream(stream: string): SinasReport {
-	let last: SinasReport | null = null;
+	let buf = "";
+	let whole: SinasReport | null = null;
 	for (const line of stream.split("\n")) {
 		const trimmed = line.trim();
 		if (!trimmed.startsWith("data:")) continue;
@@ -147,13 +190,18 @@ function parseFinalizerStream(stream: string): SinasReport {
 		}
 		if (evt.type === "error") throw new Error(`finalizer error: ${evt.error}`);
 		const content = evt.content;
-		if (typeof content === "object" && content !== null) {
-			last = content as SinasReport;
-		} else if (typeof content === "string") {
+		if (typeof content === "string") buf += content;
+		else if (typeof content === "object" && content !== null) whole = content as SinasReport;
+	}
+	let last = whole;
+	if (!last && buf) {
+		const s = buf.indexOf("{");
+		const e = buf.lastIndexOf("}");
+		if (s !== -1 && e > s) {
 			try {
-				last = JSON.parse(content) as SinasReport;
+				last = JSON.parse(buf.slice(s, e + 1)) as SinasReport;
 			} catch {
-				/* not JSON yet */
+				/* truncated/invalid */
 			}
 		}
 	}
@@ -215,7 +263,7 @@ export async function finalizeViaSinas(
 		const pushed = await pushFindings(conn, findings);
 		logger.info("Pushed findings to Sinas", { pushed });
 
-		const report = await runFinalizer(conn, scanId, targetUrl);
+		const report = await runFinalizer(conn, scanId, targetUrl, findings);
 		const markdown = renderMarkdown(report);
 		await fsp.writeFile(path.join(deliverablesPath, REPORT_FILENAME), markdown);
 
