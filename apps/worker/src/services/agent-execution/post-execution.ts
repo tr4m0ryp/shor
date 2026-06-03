@@ -27,6 +27,7 @@ import { ErrorCode } from "../../types/errors.js";
 import { ok, type Result } from "../../types/result.js";
 import { isSpendingCapBehavior } from "../../utils/billing-detection.js";
 import { failAgent } from "../agent-execution-internal.js";
+import type { CoverageResult } from "../coverage/index.js";
 import type { PentestError } from "../error-handling.js";
 import { commitGitSuccess, getGitCommitHash } from "../git-manager.js";
 
@@ -206,6 +207,40 @@ export async function validateDeliverable(
 			agentName,
 			deliverableFilename: AGENTS[agentName].deliverableFilename,
 		},
+	});
+}
+
+/**
+ * T4 last-resort coverage bridge.
+ *
+ * After the coverage loop converges and the deliverable validates, fail the
+ * agent (retryably) when a REQUIRED tool was still never exercised. Reuses the
+ * `OUTPUT_VALIDATION_FAILED` failAgent path so no new retry mechanism is added.
+ * Returns `null` (continue to success) when there are no hard misses — the
+ * default policy has `required = []`, so this is normally a no-op.
+ */
+export async function failOnHardMissing(
+	agentName: AgentName,
+	deliverablesPath: string,
+	auditSession: AuditSession,
+	logger: ActivityLogger,
+	attemptNumber: number,
+	result: ClaudePromptResult,
+	coverage: CoverageResult,
+): Promise<Result<AgentEndResult, PentestError> | null> {
+	if (coverage.hardMissing.length === 0) {
+		return null;
+	}
+	const missing = coverage.hardMissing.join(", ");
+	return failAgent(agentName, deliverablesPath, auditSession, logger, {
+		attemptNumber,
+		result,
+		rollbackReason: "required coverage tools missing",
+		errorMessage: `Agent ${agentName} skipped required tools: ${missing}`,
+		errorCode: ErrorCode.OUTPUT_VALIDATION_FAILED,
+		category: "validation",
+		retryable: true,
+		context: { agentName, hardMissing: coverage.hardMissing },
 	});
 }
 
