@@ -20,6 +20,7 @@ import type { ProjectId, Provider } from '../../domain/types.js';
 import { ingestForScan } from '../../ingest/index.js';
 import { startScan } from '../../orchestration/index.js';
 import { buildInjectionManifest } from '../../secrets/index.js';
+import { mirrorScan } from '../../sinas/mirror.js';
 import type { ApiResponse } from '../router.js';
 import { badRequest, gate, notFound, ok, serverError } from './auth-util.js';
 
@@ -66,6 +67,10 @@ export async function triggerScan(
 
     const manifest = buildInjectionManifest(g.tenantId, g.principal.uid, provider);
     const started = await startScan(scan, project, codebaseVersion, manifest);
+
+    // Best-effort hub->Sinas mirror of the freshly-started scan (enriched with the
+    // project's live target); self-swallowing, never affects the response.
+    await mirrorScan(started, { target: project.targetUrl });
 
     return ok({ scan: started, codebaseVersion });
   } catch (err) {
