@@ -1930,21 +1930,46 @@ async function loadScanDiff(scanId) {
       panel.innerHTML = summary + priorNote + '<div class="panel-empty">No findings to diff.</div>';
       return;
     }
+    // Map fingerprint -> finding (loaded on scan open) so each diff row can show
+    // the vulnerability title + severity and open its detail. `fixed` findings
+    // live in the PRIOR scan, so they won't be in this scan's cache.
+    const byFp = {};
+    (state.findingsCache || []).forEach((f) => { if (f && f.fingerprint) byFp[String(f.fingerprint)] = f; });
     const rows = transitions.map((t) => {
       const to = String(t.to || 'open');
-      const from = t.from ? escapeHtml(String(t.from)) + ' &rarr; ' : '';
+      const fp = String(t.fingerprint || '');
+      const f = byFp[fp];
+      const title = f ? String(f.category || 'Finding') : 'Resolved finding (prior scan)';
+      const sev = f ? String(f.severity || 'info').toLowerCase() : '';
+      const sevBadge = sev ? '<span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span>' : '';
+      const transition = (t.from ? escapeHtml(String(t.from)) + ' &rarr; ' : '') + escapeHtml(to) + ' &middot; ' + escapeHtml(fp.slice(0, 12));
       return (
-        '<div class="finding-row" style="cursor:default">' +
+        '<div class="finding-row"' + (f ? ' onclick="openFindingFromDiff(\'' + escapeHtml(fp) + '\')"' : ' style="cursor:default"') + '>' +
           '<span class="diff-badge diff-' + escapeHtml(to) + '">' + escapeHtml(to) + '</span>' +
-          '<span class="finding-id">' + escapeHtml(String(t.fingerprint).slice(0, 16)) + '</span>' +
-          '<span class="finding-summary">' + from + escapeHtml(to) + '</span>' +
-          '<span class="finding-badges"></span><span></span>' +
+          '<span class="finding-id">' + escapeHtml(title) + '</span>' +
+          '<span class="finding-summary">' + transition + '</span>' +
+          '<span class="finding-badges">' + sevBadge + '</span>' +
+          (f ? '<span class="finding-chevron">&rsaquo;</span>' : '<span></span>') +
         '</div>'
       );
     }).join('');
     panel.innerHTML = summary + priorNote + rows;
   } catch (err) {
     panel.innerHTML = '<div class="panel-empty">' + escapeHtml(err.message) + '</div>';
+  }
+}
+
+// Jump from a diff row to the matching finding: switch to the Findings tab,
+// clear the severity filter, expand the finding, and scroll it into view.
+function openFindingFromDiff(fp) {
+  state.severityFilter = 'all';
+  showScanTab('findings');
+  renderFindings();
+  const idx = (state.findingsCache || []).findIndex((f) => f && String(f.fingerprint) === String(fp));
+  if (idx >= 0) {
+    toggleFinding(idx);
+    const el = document.getElementById('findingDetail' + idx);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 }
 
