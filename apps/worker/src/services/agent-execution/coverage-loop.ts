@@ -30,7 +30,6 @@
  *     failure handling (service step 7) classify it.
  */
 
-import type { ModelTier } from "../../ai/models.js";
 import type { AuditSession } from "../../audit/index.js";
 import type { ClaudePromptResult } from "../../ai/claude-executor.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
@@ -69,8 +68,11 @@ export interface CoverageLoopInput {
 	readonly basePrompt: string;
 	/** Relative path the agent writes/reads its deliverables under. */
 	readonly deliverablesSubdir: string;
-	readonly modelTier: ModelTier;
-	/** Runs one round; the loop only varies the prompt between rounds. */
+	/**
+	 * Runs one round; the loop only varies the prompt between rounds, so the
+	 * caller bakes the fixed args (repoPath, agentName, auditSession, modelTier,
+	 * outputFormat) into this closure.
+	 */
 	readonly runRound: PromptRunner;
 	readonly logger: ActivityLogger;
 	/** Audit session — referenced only for documentation parity, not mutated here. */
