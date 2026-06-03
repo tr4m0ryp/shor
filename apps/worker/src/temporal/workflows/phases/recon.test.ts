@@ -48,10 +48,14 @@ function makeActivitySpies() {
 /** Build a minimal PipelineContext over the activity spies. */
 function makeCtx(
 	a: ReturnType<typeof makeActivitySpies>,
-	reconFanout: boolean,
+	reconFanout?: boolean,
 ): PipelineContext {
 	return {
-		input: { webUrl: "http://t", repoPath: "/r", reconFanout },
+		input: {
+			webUrl: "http://t",
+			repoPath: "/r",
+			...(reconFanout !== undefined && { reconFanout }),
+		},
 		workflowId: "wf-1",
 		state: {
 			status: "running",
@@ -99,10 +103,9 @@ describe("runReconPhase — flag OFF (default, must match today)", () => {
 		expect(ctx.state.completedAgents).toEqual(["recon"]);
 	});
 
-	it("treats reconFanout undefined the same as off", async () => {
-		const ctx = makeCtx(a, false);
-		// biome-ignore lint/performance/noDelete: exercising the undefined case.
-		delete (ctx.input as { reconFanout?: boolean }).reconFanout;
+	it("treats reconFanout absent the same as off", async () => {
+		// No reconFanout key at all — the production default.
+		const ctx = makeCtx(a);
 		await runReconPhase(ctx);
 		expect(a.runReconAgent).toHaveBeenCalledTimes(1);
 		expect(a.resolveReconCandidates).not.toHaveBeenCalled();
