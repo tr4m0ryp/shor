@@ -57,6 +57,10 @@ export function classifyByErrorCode(
 		case ErrorCode.REPO_NOT_FOUND:
 			return { type: "ConfigurationError", retryable: false };
 
+		// Missing skills / tool binaries — needs an image rebuild, never self-heals.
+		case ErrorCode.TOOLING_MISSING:
+			return { type: "ConfigurationError", retryable: false };
+
 		case ErrorCode.AUTH_FAILED:
 			return { type: "AuthenticationError", retryable: false };
 
