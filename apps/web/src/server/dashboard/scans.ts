@@ -23,23 +23,32 @@ import { gate, notFound, ok, serverError } from './auth-util.js';
  * Returns `{ report: null }` (not 404) when Sinas is unconfigured or no report
  * has been finalized yet.
  */
+/**
+ * Fetch the Sinas-finalized report for `scanId` from the `<ns>/reports` store,
+ * or `null` when Sinas is unconfigured / no report exists. Server-side only (the
+ * browser never holds the Sinas key). Shared by the authed and the share routes;
+ * the CALLER is responsible for the scan-ownership/tenant check.
+ */
+export async function fetchSinasReport(scanId: string): Promise<unknown | null> {
+  const { sinasUrl, sinasApiKey, sinasNamespace } = getConfig().sinas;
+  if (!sinasUrl || !sinasApiKey) return null;
+  const base = sinasUrl.replace(/\/+$/, '');
+  const ns = sinasNamespace || 'pentest';
+  const res = await fetch(`${base}/stores/${ns}/reports/states/${encodeURIComponent(scanId)}`, {
+    headers: { 'X-API-Key': sinasApiKey },
+  });
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { value?: unknown } | null;
+  return body && typeof body === 'object' ? (body.value ?? body) : null;
+}
+
 export async function getScanReport(scanId: ScanId, cookieHeader: string | undefined): Promise<ApiResponse> {
   const g = gate(cookieHeader);
   if (!g.ok) return g.response;
   try {
     const scan = await scanRepo.findById(g.tenantId, scanId);
     if (!scan) return notFound('scan not found');
-    const { sinasUrl, sinasApiKey, sinasNamespace } = getConfig().sinas;
-    if (!sinasUrl || !sinasApiKey) return ok({ report: null });
-    const base = sinasUrl.replace(/\/+$/, '');
-    const ns = sinasNamespace || 'pentest';
-    const res = await fetch(`${base}/stores/${ns}/reports/states/${encodeURIComponent(scanId)}`, {
-      headers: { 'X-API-Key': sinasApiKey },
-    });
-    if (!res.ok) return ok({ report: null });
-    const body = (await res.json().catch(() => null)) as { value?: unknown } | null;
-    const report = body && typeof body === 'object' ? (body.value ?? body) : null;
-    return ok({ report });
+    return ok({ report: await fetchSinasReport(scanId) });
   } catch (err) {
     return serverError(err);
   }

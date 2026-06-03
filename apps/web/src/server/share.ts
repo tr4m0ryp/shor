@@ -22,6 +22,7 @@ import { attackSurfaceRepo, findingRepo, projectRepo, scanRepo } from '../db/rep
 import type { DiffResult } from '../findings/index.js';
 import { diffFingerprints } from '../findings/index.js';
 import { deriveProgressView } from '../scan-progress/index.js';
+import { fetchSinasReport } from './dashboard/scans.js';
 import type { ApiResponse } from './router.js';
 
 const methodNotAllowed: ApiResponse = { status: 405, body: { error: 'Method not allowed' } };
@@ -117,6 +118,10 @@ async function routeShareScan(
 
   if (sub === 'progress') {
     return ok({ progress: deriveProgressView(scan) });
+  }
+
+  if (sub === 'report') {
+    return ok({ report: await fetchSinasReport(scanId) });
   }
 
   return notFound;
