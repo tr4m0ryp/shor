@@ -23,7 +23,7 @@ const RECON = [
 ];
 const STATIC = ["semgrep", "gitleaks", "osv-scanner", "trufflehog"];
 
-const RECOMMENDED: Readonly<Record<string, readonly string[]>> = {
+export const RECOMMENDED: Readonly<Record<string, readonly string[]>> = {
 	"pre-recon-code": STATIC,
 	recon: RECON,
 	"vuln-injection": ["sqlmap", "commix", "nosqli", "arjun", "paramspider", "ffuf", "semgrep", "interactsh-client"],
