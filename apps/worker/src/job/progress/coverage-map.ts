@@ -13,8 +13,8 @@
  */
 
 import { evaluateCoverage } from "../../services/coverage/evaluate.js";
-import type { AgentName } from "../../types/agents.js";
 import type { CoverageResult } from "../../services/coverage/types.js";
+import type { AgentName } from "../../types/agents.js";
 
 /** The slice of CoverageResult surfaced in the progress snapshot. */
 export interface CoverageSummary {
