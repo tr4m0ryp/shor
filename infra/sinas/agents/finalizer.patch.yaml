@@ -1,0 +1,25 @@
+# Copyright (C) 2025 Keygraph, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License version 3
+# as published by the Free Software Foundation.
+#
+# Finalizer agent model swap (Decisions Made For You).
+#
+# The pentest/finalizer agent already exists on via-12 with an enforced
+# output_schema and reads pentest/findings. This is a MINIMAL PATCH: change ONLY
+# the model from deepseek/deepseek-v4-pro to anthropic/claude-sonnet-4.6. Leave
+# output_schema, system_prompt, enabled_stores, and every other field UNCHANGED.
+#
+# via-12's OpenRouter provider is funded and its default_model is
+# anthropic/claude-sonnet-4.6 (F6), so this slug returns real output at no extra
+# cost. The runbook applies this via PATCH on the Management API (agents do NOT
+# hit the component PUT/DELETE hang).
+#
+# Apply (see README): PATCH /api/v1/agents/pentest/finalizer  { "model": ... }
+# Do NOT recreate the agent — that would require re-supplying the output_schema.
+
+namespace: pentest
+name: finalizer
+patch:
+  model: anthropic/claude-sonnet-4.6

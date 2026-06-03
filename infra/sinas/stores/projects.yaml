@@ -1,0 +1,22 @@
+# Copyright (C) 2025 Keygraph, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License version 3
+# as published by the Free Software Foundation.
+#
+# Sinas state store: pentest/projects (NET-NEW).
+#
+# The fourth mirror store, alongside the existing scans / findings / reports
+# (T2). One state per project, keyed by the engine-minted projectId; the value
+# carries updatedAt so a late write never downgrades a newer one (T3). Written
+# by create_project (Sinas side) and by the web-layer mirror (engine side);
+# read by the report-view component (sibling task).
+#
+# This fragment is the store's canonical source. It is also embedded under
+# spec.stores in sinas-package.yaml; keep the two in sync.
+
+namespace: pentest
+name: projects
+description: >-
+  Mirror of aegis projects, keyed by engine-minted projectId. One state per
+  project; value carries updatedAt for last-writer-wins idempotency.
