@@ -68,8 +68,9 @@ function resolveSinasConnection(): SinasConnection | null {
 	const url = process.env.SINAS_URL;
 	const apiKey = process.env.SINAS_API_KEY;
 	const namespace = process.env.SINAS_NAMESPACE ?? "pentest";
+	const finalizerAgent = process.env.SINAS_FINALIZER_AGENT ?? "finalizer";
 	if (!enabled || !url || !apiKey) return null;
-	return { url: url.replace(/\/+$/, ""), apiKey, namespace };
+	return { url: url.replace(/\/+$/, ""), apiKey, namespace, finalizerAgent };
 }
 
 async function sinasFetch(
