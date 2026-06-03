@@ -18,7 +18,7 @@ import { getConfig } from '../config.js';
 import { tenantRepo } from '../db/repositories/tenant.js';
 import { userRepo } from '../db/repositories/user.js';
 import type { Tenant, User } from '../domain/types.js';
-import { ensureDevSession, seedDevProject } from './dev-session.js';
+import { ensureDevSession } from './dev-session.js';
 import { authenticate, type Principal } from './middleware.js';
 import { buildClearCookie, buildSessionCookie, mintSession, type SessionClaims } from './session.js';
 
@@ -102,15 +102,18 @@ export async function handleMe(cookieHeader: string | undefined): Promise<AuthRo
 }
 
 /**
- * Dev-only `/auth/me` fallback: provision the seeded dev principal + sample
- * project, mint a session, and return it with the session cookie. Errors fall
- * back to a 500 so the normal (non-dev) path is never affected.
+ * Dev-only `/auth/me` fallback: provision the seeded dev principal, mint a
+ * session, and return it with the session cookie. Errors fall back to a 500 so
+ * the normal (non-dev) path is never affected.
+ *
+ * NOTE: this intentionally does NOT seed a sample project. A seed here recreates
+ * itself on every session-less `/auth/me`, so a user-deleted demo project would
+ * reappear on the next page load. The dashboard handles an empty list fine.
  */
 async function devLoginResponse(): Promise<AuthRouteResponse> {
   let principal: Principal;
   try {
     principal = await ensureDevSession();
-    await seedDevProject(principal.tenantId);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { status: 500, body: { error: msg } };

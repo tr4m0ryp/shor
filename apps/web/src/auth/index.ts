@@ -6,7 +6,7 @@
  * never reaches the browser; only the HTTP-only signed cookie does.
  */
 
-export { ensureDevSession, seedDevProject } from './dev-session.js';
+export { ensureDevSession } from './dev-session.js';
 export type { AuthResult, Principal } from './middleware.js';
 export { authenticate, requireAuth, requireMinRole, requireRole } from './middleware.js';
 export type { AuthRouteResponse } from './routes.js';
