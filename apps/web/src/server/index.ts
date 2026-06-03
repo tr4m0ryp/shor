@@ -55,6 +55,12 @@ function parseBody(req: IncomingMessage): Promise<Record<string, unknown>> {
     req.on('end', () => {
       const raw = Buffer.concat(chunks).toString('utf8');
       if (!raw) return resolve({});
+      const contentType = (req.headers['content-type'] ?? '').toLowerCase();
+      if (contentType.includes('application/x-www-form-urlencoded')) {
+        const form: Record<string, unknown> = {};
+        for (const [k, v] of new URLSearchParams(raw)) form[k] = v;
+        return resolve(form);
+      }
       try {
         const parsed: unknown = JSON.parse(raw);
         resolve(typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {});
