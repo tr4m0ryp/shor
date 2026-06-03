@@ -1,4 +1,4 @@
--- Aegis initial schema (LAUNCH-SPEC §4.3, Cloud SQL for PostgreSQL, ADR-020).
+-- Shor initial schema (LAUNCH-SPEC §4.3, Cloud SQL for PostgreSQL, ADR-020).
 --
 -- Project model (ADR-015):
 --   tenant -< project -< codebase_ver -< scan -< { finding, attack_surface }
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS provider_key (
     tenant_id  UUID NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
     user_id    UUID NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
     provider   TEXT NOT NULL,
-    secret_ref TEXT NOT NULL,                     -- aegis/<tenant>/<user>/<provider>
+    secret_ref TEXT NOT NULL,                     -- shor/<tenant>/<user>/<provider>
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (tenant_id, user_id, provider)
 );
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS scan (
     id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id           UUID NOT NULL REFERENCES project(id) ON DELETE CASCADE,
     codebase_ver_id      UUID NOT NULL REFERENCES codebase_ver(id) ON DELETE CASCADE,
-    temporal_workflow_id TEXT,                    -- aegis-<scanId>; cancel = kill switch
+    temporal_workflow_id TEXT,                    -- shor-<scanId>; cancel = kill switch
     status               TEXT NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
     started_at           TIMESTAMPTZ,

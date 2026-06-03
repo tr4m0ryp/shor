@@ -58,7 +58,7 @@ export async function apiRouter(
 
   // App-wide passcode gate (a thin front lock ABOVE the session/auth layer).
   // Runs before any dispatch; it only decides locked vs unlocked and never
-  // touches the session. Disabled (everything passes) when AEGIS_APP_PASSCODE is
+  // touches the session. Disabled (everything passes) when SHOR_APP_PASSCODE is
   // unset — `isGateExempt` returns true in that case. EXEMPT: `/share/*`, the
   // `/gate` route, and Bearer-authed machine clients (worker sink, `/external`).
   if (resource === 'gate') {
@@ -118,7 +118,7 @@ export async function apiRouter(
   }
 
   // External Sinas->engine ingress: /external/... — bearer-authed (NO session),
-  // guarded by AEGIS_ENGINE_TRIGGER_TOKEN. Lets Sinas start/create/read; the
+  // guarded by SHOR_ENGINE_TRIGGER_TOKEN. Lets Sinas start/create/read; the
   // engine mints all ids. Returns null when the path is not an external route.
   if (resource === 'external') {
     const external = await routeExternal(method, segments, body, authHeader);

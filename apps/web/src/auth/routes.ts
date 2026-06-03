@@ -83,7 +83,7 @@ export function handleLogout(): AuthRouteResponse {
 /**
  * `GET /auth/me` — return the current principal, or `401` when unauthenticated.
  *
- * When `AEGIS_DEV_LOGIN` is on AND there is no valid session, a seeded dev
+ * When `SHOR_DEV_LOGIN` is on AND there is no valid session, a seeded dev
  * tenant/user/project is provisioned (idempotently), a session is minted, and
  * the response carries the `Set-Cookie` so the dashboard proceeds without the
  * Identity Platform browser flow. When the flag is off (prod default) this is

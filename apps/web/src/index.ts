@@ -1,5 +1,5 @@
 /**
- * @aegis/web — cloud + data foundation public surface (Task 010) plus the
+ * @shor/web — cloud + data foundation public surface (Task 010) plus the
  * dashboard HTTP server entry (Phase 3).
  *
  * This is the shared substrate Phase 2-5 tasks import: env config, lazy cloud
@@ -18,7 +18,7 @@ import { startDashboard } from './server/index.js';
 export * as auth from './auth/index.js';
 export * as cloud from './cloud/index.js';
 export type {
-  AegisConfig,
+  ShorConfig,
   CloudSqlConfig,
   GcpConfig,
   IdentityConfig,

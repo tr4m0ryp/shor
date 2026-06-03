@@ -6,7 +6,7 @@
  *
  *   1. The SINGLE `secretRef` to file-mount — only the one provider key chosen
  *      for the run, never the user's whole keyring.
- *   2. The mount path + the env var (`AEGIS_PROVIDER_KEY_FILE`) the engine reads
+ *   2. The mount path + the env var (`SHOR_PROVIDER_KEY_FILE`) the engine reads
  *      at use time. Secrets are mounted as VOLUME FILES, not env values, so the
  *      key cannot leak via `/proc/<pid>/environ` (ADR-045).
  *   3. The scoped service-identity binding contract: the per-run identity may be
@@ -23,9 +23,9 @@ import type { Provider, TenantId, UserId } from '../domain/types.js';
 
 /**
  * The env var the engine reads to locate the file-mounted provider key
- * (ADR-050). Mirrors `apps/worker/.../sdk-env.ts` (`AEGIS_PROVIDER_KEY_FILE`).
+ * (ADR-050). Mirrors `apps/worker/.../sdk-env.ts` (`SHOR_PROVIDER_KEY_FILE`).
  */
-export const PROVIDER_KEY_FILE_ENV = 'AEGIS_PROVIDER_KEY_FILE';
+export const PROVIDER_KEY_FILE_ENV = 'SHOR_PROVIDER_KEY_FILE';
 
 /** Container path the provider-key secret volume is mounted at. */
 export const PROVIDER_KEY_MOUNT_DIR = '/secrets/provider';
@@ -54,7 +54,7 @@ export interface SecretAccessBinding {
 
 /** A secret to file-mount into the run container. */
 export interface FileMountSecret {
-  /** Logical secret reference (`aegis/<tenant>/<user>/<provider>`). */
+  /** Logical secret reference (`shor/<tenant>/<user>/<provider>`). */
   readonly secretRef: string;
   /** Secret Manager secret id. */
   readonly secretId: string;

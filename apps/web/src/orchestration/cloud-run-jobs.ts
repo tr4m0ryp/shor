@@ -73,7 +73,7 @@ export async function launchScanExecution(
 }
 
 export interface RunScanJobArgs {
-  /** Stable per-scan Job id (`aegis-scan-<scanId>`); names the Job resource. */
+  /** Stable per-scan Job id (`shor-scan-<scanId>`); names the Job resource. */
   readonly jobId: string;
   /** Per-run secret mount + scoped identity binding. */
   readonly manifest: InjectionManifest;

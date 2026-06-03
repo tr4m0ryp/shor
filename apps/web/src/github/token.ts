@@ -2,7 +2,7 @@
  * Per-user GitHub Personal Access Token (PAT) storage.
  *
  * One PAT per (tenant, user), stored under the `github` provider slot in Secret
- * Manager (`aegis/<tenant>/<user>/github`). The Postgres `provider_key` row holds
+ * Manager (`shor/<tenant>/<user>/github`). The Postgres `provider_key` row holds
  * only the `secretRef` — the token material lives ONLY in Secret Manager
  * (ADR-017/050). The token authenticates repo listing and white-box clones.
  *

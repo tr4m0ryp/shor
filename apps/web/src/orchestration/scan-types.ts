@@ -11,7 +11,7 @@ import type { JobEnvVar } from './job-spec.js';
 
 /** Input to `scanWorkflow` and `runScanJobActivity`. Fully serializable. */
 export interface ScanJobActivityInput {
-  /** Stable per-scan Cloud Run Job id (`aegis-scan-<scanId>`). */
+  /** Stable per-scan Cloud Run Job id (`shor-scan-<scanId>`). */
   readonly jobId: string;
   /** Per-run secret mount + scoped identity binding for the Job resource. */
   readonly manifest: InjectionManifest;

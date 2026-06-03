@@ -1,5 +1,5 @@
 /**
- * Aegis cloud + data foundation — env-driven configuration.
+ * Shor cloud + data foundation — env-driven configuration.
  *
  * Every value is read from the environment with a safe default so `tsc` and
  * `pnpm build` succeed WITHOUT live GCP credentials. Nothing here touches the
@@ -150,7 +150,7 @@ export interface SecretsConfig {
 /**
  * GitHub App connection config (ADR-039/040/041).
  *
- * One Aegis App, per-tenant installation. The numeric `appId` is non-secret
+ * One Shor App, per-tenant installation. The numeric `appId` is non-secret
  * config; the App private key (PEM) is NEVER held here — it lives in Secret
  * Manager and is read on demand via `privateKeySecretRef`. Installation tokens
  * are short-lived and minted per scan.
@@ -196,7 +196,7 @@ export interface GithubOauthConfig {
  * env lands in one typed place.
  */
 export interface SinasConfig {
-  /** Bearer Sinas presents to the `/external/*` ingress (`AEGIS_ENGINE_TRIGGER_TOKEN`). */
+  /** Bearer Sinas presents to the `/external/*` ingress (`SHOR_ENGINE_TRIGGER_TOKEN`). */
   readonly engineTriggerToken: string;
   /** Base URL of the user's Sinas instance the engine mirrors to (`SINAS_URL`). */
   readonly sinasUrl: string;
@@ -206,7 +206,7 @@ export interface SinasConfig {
   readonly sinasNamespace: string;
 }
 
-export interface AegisConfig {
+export interface ShorConfig {
   readonly env: 'development' | 'production' | 'test';
   /**
    * Direct Cloud Run Job launch + findings-sink wiring (ADR-051).
@@ -219,12 +219,12 @@ export interface AegisConfig {
    */
   /** Pre-created Cloud Run Job that runs the worker image (`CLOUD_RUN_SCAN_JOB`). */
   readonly scanJobName: string;
-  /** Shared service token the worker presents to the findings sink (`AEGIS_SINK_TOKEN`). */
+  /** Shared service token the worker presents to the findings sink (`SHOR_SINK_TOKEN`). */
   readonly sinkToken: string;
-  /** The dashboard's own public base URL the worker POSTs findings to (`AEGIS_PUBLIC_URL`). */
+  /** The dashboard's own public base URL the worker POSTs findings to (`SHOR_PUBLIC_URL`). */
   readonly publicUrl: string;
   /**
-   * Env-gated dev login (`AEGIS_DEV_LOGIN`, default false).
+   * Env-gated dev login (`SHOR_DEV_LOGIN`, default false).
    *
    * When true, `GET /auth/me` with no valid session provisions a seeded dev
    * tenant/user, mints a session, and seeds one sample project — so the
@@ -233,7 +233,7 @@ export interface AegisConfig {
    */
   readonly devLogin: boolean;
   /**
-   * App-wide passcode gate (`AEGIS_APP_PASSCODE`, empty/unset ⇒ gate disabled).
+   * App-wide passcode gate (`SHOR_APP_PASSCODE`, empty/unset ⇒ gate disabled).
    *
    * A thin front lock ABOVE the session/dev-login auth: when set, every
    * browser-facing request must carry a valid gate cookie before the normal
@@ -255,54 +255,54 @@ export interface AegisConfig {
   readonly sinas: SinasConfig;
 }
 
-let cached: AegisConfig | undefined;
+let cached: ShorConfig | undefined;
 
 /**
  * Build (and memoize) the resolved config from the current environment.
  * Lazy + defaulted: importing this module performs no I/O and needs no live
  * GCP credentials.
  */
-export function getConfig(): AegisConfig {
+export function getConfig(): ShorConfig {
   if (cached) return cached;
 
-  const projectId = env('GCP_PROJECT_ID', 'aegis-local');
+  const projectId = env('GCP_PROJECT_ID', 'shor-local');
   const region = env('GCP_REGION', 'us-central1');
 
   const nodeEnv = env('NODE_ENV', 'development');
-  const resolvedEnv: AegisConfig['env'] = nodeEnv === 'production' || nodeEnv === 'test' ? nodeEnv : 'development';
+  const resolvedEnv: ShorConfig['env'] = nodeEnv === 'production' || nodeEnv === 'test' ? nodeEnv : 'development';
 
-  const publicUrl = env('AEGIS_PUBLIC_URL');
+  const publicUrl = env('SHOR_PUBLIC_URL');
   const githubOauthClientId = env('GITHUB_OAUTH_CLIENT_ID');
   const githubOauthClientSecret = env('GITHUB_OAUTH_CLIENT_SECRET');
 
   cached = {
     env: resolvedEnv,
     // Env-gated dev login (default OFF). Never enable in production.
-    devLogin: envBool('AEGIS_DEV_LOGIN', false),
+    devLogin: envBool('SHOR_DEV_LOGIN', false),
     // App-wide passcode gate; empty/unset disables the gate (local dev). Env only.
-    appPasscode: env('AEGIS_APP_PASSCODE'),
+    appPasscode: env('SHOR_APP_PASSCODE'),
     // Direct Cloud Run Job launch + findings sink (ADR-051).
-    scanJobName: env('CLOUD_RUN_SCAN_JOB', 'aegis-scan-worker'),
-    sinkToken: env('AEGIS_SINK_TOKEN'),
+    scanJobName: env('CLOUD_RUN_SCAN_JOB', 'shor-scan-worker'),
+    sinkToken: env('SHOR_SINK_TOKEN'),
     publicUrl,
     gcp: { projectId, region },
     sql: {
       host: env('CLOUD_SQL_HOST'),
       port: envInt('CLOUD_SQL_PORT', 5432),
-      database: env('CLOUD_SQL_DATABASE', 'aegis'),
-      user: env('CLOUD_SQL_USER', 'aegis'),
+      database: env('CLOUD_SQL_DATABASE', 'shor'),
+      user: env('CLOUD_SQL_USER', 'shor'),
       password: env('CLOUD_SQL_PASSWORD'),
       instanceConnectionName: env('CLOUD_SQL_INSTANCE_CONNECTION_NAME'),
       ssl: envBool('CLOUD_SQL_SSL', false),
       maxPoolSize: envInt('CLOUD_SQL_MAX_POOL', 10),
     },
     storage: {
-      bucket: env('GCS_BUCKET', 'aegis-artifacts'),
+      bucket: env('GCS_BUCKET', 'shor-artifacts'),
     },
     temporal: {
       address: env('TEMPORAL_ADDRESS', 'localhost:7233'),
       namespace: env('TEMPORAL_NAMESPACE', 'default'),
-      taskQueue: env('TEMPORAL_TASK_QUEUE', 'aegis-scans'),
+      taskQueue: env('TEMPORAL_TASK_QUEUE', 'shor-scans'),
       clientCertPath: env('TEMPORAL_CLIENT_CERT_PATH'),
       clientKeyPath: env('TEMPORAL_CLIENT_KEY_PATH'),
       apiKey: env('TEMPORAL_API_KEY'),
@@ -310,8 +310,8 @@ export function getConfig(): AegisConfig {
     cloudRun: {
       projectId: env('CLOUD_RUN_PROJECT_ID', projectId),
       region: env('CLOUD_RUN_REGION', region),
-      workerImage: env('CLOUD_RUN_WORKER_IMAGE', 'aegis-worker:latest'),
-      runServiceAccount: env('CLOUD_RUN_RUN_SERVICE_ACCOUNT', `aegis-scan-{tenantId}@${projectId}.iam.gserviceaccount.com`),
+      workerImage: env('CLOUD_RUN_WORKER_IMAGE', 'shor-worker:latest'),
+      runServiceAccount: env('CLOUD_RUN_RUN_SERVICE_ACCOUNT', `shor-scan-{tenantId}@${projectId}.iam.gserviceaccount.com`),
       vpcConnector: env('CLOUD_RUN_VPC_CONNECTOR'),
       vpcEgress: env('CLOUD_RUN_VPC_EGRESS', 'private-ranges-only'),
       jobCommand: splitCommand(env('CLOUD_RUN_JOB_COMMAND', 'node dist/job-entry.js')),
@@ -323,23 +323,23 @@ export function getConfig(): AegisConfig {
     identity: {
       projectId: env('IDENTITY_PLATFORM_PROJECT_ID', projectId),
       defaultTenantId: env('IDENTITY_PLATFORM_TENANT_ID'),
-      sessionCookieName: env('SESSION_COOKIE_NAME', 'aegis_session'),
+      sessionCookieName: env('SESSION_COOKIE_NAME', 'shor_session'),
       sessionTtlSeconds: envInt('SESSION_TTL_SECONDS', 3600),
     },
     session: {
-      cookieName: env('SESSION_COOKIE_NAME', 'aegis_session'),
+      cookieName: env('SESSION_COOKIE_NAME', 'shor_session'),
       ttlSeconds: envInt('SESSION_TTL_SECONDS', 3600),
       // Local default keeps `tsc`/dev working with no secret set; production
       // MUST override with a strong random value.
-      signingSecret: env('SESSION_SIGNING_SECRET', 'aegis-local-dev-session-secret'),
+      signingSecret: env('SESSION_SIGNING_SECRET', 'shor-local-dev-session-secret'),
     },
     secrets: {
       projectId: env('SECRET_MANAGER_PROJECT_ID', projectId),
-      prefix: env('SECRET_MANAGER_PREFIX', 'aegis'),
+      prefix: env('SECRET_MANAGER_PREFIX', 'shor'),
     },
     github: {
       appId: env('GITHUB_APP_ID'),
-      privateKeySecretRef: env('GITHUB_APP_PRIVATE_KEY_SECRET_REF', 'aegis/github-app/private-key'),
+      privateKeySecretRef: env('GITHUB_APP_PRIVATE_KEY_SECRET_REF', 'shor/github-app/private-key'),
       cloneDepth: envInt('GITHUB_CLONE_DEPTH', 1),
     },
     githubOauth: {
@@ -350,7 +350,7 @@ export function getConfig(): AegisConfig {
     },
     sinas: {
       // Bearer for the Sinas->engine ingress (empty = ingress disabled, all 401).
-      engineTriggerToken: env('AEGIS_ENGINE_TRIGGER_TOKEN'),
+      engineTriggerToken: env('SHOR_ENGINE_TRIGGER_TOKEN'),
       // Outbound mirror connection (consumed by the sibling mirror task).
       sinasUrl: env('SINAS_URL'),
       sinasApiKey: env('SINAS_API_KEY'),

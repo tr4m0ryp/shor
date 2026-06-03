@@ -1,7 +1,7 @@
 /**
  * GitHub App authentication (LAUNCH-SPEC §4.2, ADR-039).
  *
- * One Aegis App, per-tenant installation. We mint a SHORT-LIVED installation
+ * One Shor App, per-tenant installation. We mint a SHORT-LIVED installation
  * token per scan (never a PAT — ADR-039) so clone egress is scoped to exactly
  * the repositories the tenant installed the App on (ADR-041).
  *

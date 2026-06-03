@@ -3,7 +3,7 @@
  *
  * One secret resource per (tenant, user, provider). Only the key material lives
  * here — the provider/model choice is ordinary Postgres config. The reference
- * name is `aegis/<tenant>/<user>/<provider>` (slashes flattened to a valid
+ * name is `shor/<tenant>/<user>/<provider>` (slashes flattened to a valid
  * Secret Manager id since secret ids may not contain `/`).
  *
  * Lazy client: the SDK `SecretManagerServiceClient` is constructed on first use,
@@ -27,7 +27,7 @@ async function getClient(): Promise<SecretManagerServiceClient> {
 
 /**
  * Canonical secret reference for a (tenant, user, provider) triple:
- * `aegis/<tenant>/<user>/<provider>` (ADR-017). Stored in `provider_key.secret_ref`.
+ * `shor/<tenant>/<user>/<provider>` (ADR-017). Stored in `provider_key.secret_ref`.
  */
 export function secretRef(tenantId: string, userId: string, provider: string): string {
   const { prefix } = getConfig().secrets;
@@ -35,7 +35,7 @@ export function secretRef(tenantId: string, userId: string, provider: string): s
 }
 
 /**
- * Convert a logical secret ref (`aegis/<tenant>/<user>/<provider>`) into a valid
+ * Convert a logical secret ref (`shor/<tenant>/<user>/<provider>`) into a valid
  * Secret Manager secret id. Ids must match `[A-Za-z0-9_-]+`, so path separators
  * collapse to `__`.
  */
