@@ -30,6 +30,7 @@ export interface PipelineInput {
 	promptDir?: string; // Override prompt template directory
 	sastSarifPath?: string; // Path to SARIF file (gates SAST-enhanced mode)
 	checkpointsEnabled?: boolean; // Enable checkpoint activities (default: false)
+	reconFanout?: boolean; // OPTIONAL recon breadth (default: false). When true, recon fans out into one sub-run per recommended tool. Resolved OUTSIDE workflow scope (from AEGIS_RECON_FANOUT) and read here so the workflow stays deterministic.
 	skipGitCheck?: boolean; // Skip .git directory validation in preflight (e.g. when .git is removed after clone)
 	providerConfig?: ProviderConfig; // LLM provider configuration (Bedrock, Vertex, LiteLLM, etc.)
 }
