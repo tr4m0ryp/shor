@@ -115,7 +115,7 @@ async function runFinalizer(
 	const chatRes = await sinasFetch(
 		conn,
 		"POST",
-		`/agents/${conn.namespace}/finalizer/chats`,
+		`/agents/${conn.namespace}/${conn.finalizerAgent}/chats`,
 		{ title: `scan ${scanId}`, input: { scan_id: scanId, target } },
 	);
 	if (!chatRes.ok) throw new Error(`create chat failed: ${chatRes.status}`);
