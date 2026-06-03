@@ -6,6 +6,7 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+.turbo/
 
 # Env / secrets
 .env
@@ -24,6 +25,8 @@ credentials.*
 
 # Claude Code harness state (agent worktrees, acceptance artifacts)
 .claude/
+# Internal project notes for Claude — local-only, not pushed
+CLAUDE.md
 
 # Flow scaffolding (local-only build plumbing)
 tasks/
