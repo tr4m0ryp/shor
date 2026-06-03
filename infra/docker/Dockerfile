@@ -59,9 +59,11 @@ COPY --from=node-builder /app/package.json /app/pnpm-workspace.yaml /opt/aegis/a
 
 # 6) Per-tool skills the Claude Agent SDK loads on demand (progressive disclosure).
 #    HOME=/tmp + settingSources:["user"] → the SDK discovers ~/.claude/skills.
-#    The repo groups skills into category subdirs (recon/ exploit/ static-analysis/)
-#    for organisation; flatten them here so each skill sits directly under the
-#    discovery root (the SDK scans one level: skills/<name>/SKILL.md).
+#    The repo groups skills into nested category dirs (recon/{discovery,scanning,
+#    crawling}/, exploit/{injection,xss,auth,ssrf,authz,browser}/, static-analysis/
+#    {secrets,code,dependencies}/) for organisation; flatten them here (find at any
+#    depth) so each skill sits directly under the discovery root, which the SDK
+#    scans one level deep: skills/<name>/SKILL.md.
 COPY skills/ /tmp/aegis-skills-src/
 RUN mkdir -p /tmp/.claude/skills && \
     find /tmp/aegis-skills-src -name SKILL.md -type f -exec sh -c \

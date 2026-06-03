@@ -17,6 +17,29 @@ import { selectPreReconTemplate } from "./template-selection.js";
 import type { PromptVariables } from "./types.js";
 
 /**
+ * Resolve a prompt file by basename under `baseDir`. Prefers a direct hit at the
+ * root, then searches the category subdirs (prompts are organised into
+ * recon/ vulnerability/ exploitation/ reporting/ attack-surface/). Returns the
+ * absolute path, or undefined if not found anywhere.
+ */
+async function resolvePromptFile(baseDir: string, filename: string): Promise<string | undefined> {
+	const direct = path.join(baseDir, filename);
+	if (await fs.pathExists(direct)) return direct;
+	const stack: string[] = [baseDir];
+	while (stack.length > 0) {
+		const dir = stack.pop();
+		if (dir === undefined) break;
+		const entries = await fs.readdir(dir, { withFileTypes: true });
+		for (const entry of entries) {
+			const full = path.join(dir, entry.name);
+			if (entry.isDirectory()) stack.push(full);
+			else if (entry.name === filename) return full;
+		}
+	}
+	return undefined;
+}
+
+/**
  * Load a named prompt template, resolve `@include(...)` directives, and
  * interpolate variables. The pre-recon agent always resolves to its
  * clearnet template.
@@ -37,14 +60,15 @@ export async function loadPrompt(
 			promptName === "pre-recon-code"
 				? selectPreReconTemplate(variables.webUrl)
 				: `${promptName}.txt`;
-		const promptPath = path.join(basePromptsDir, promptFilename);
+		// Prompts live in category subdirs; resolve by basename (root or subdir).
+		const promptPath = await resolvePromptFile(basePromptsDir, promptFilename);
 
-		if (!(await fs.pathExists(promptPath))) {
+		if (promptPath === undefined) {
 			throw new PentestError(
-				`Prompt file not found: ${promptPath}`,
+				`Prompt file not found: ${promptFilename} under ${basePromptsDir}`,
 				"prompt",
 				false,
-				{ promptName, promptPath },
+				{ promptName, basePromptsDir },
 			);
 		}
 
