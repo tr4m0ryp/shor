@@ -33,6 +33,14 @@ interface SinasConnection {
 	url: string;
 	apiKey: string;
 	namespace: string;
+	/**
+	 * Name of the finalizer agent under `<namespace>`. Configurable because
+	 * via-12 has no agent PATCH/PUT: changing the finalizer's model means
+	 * delete+recreate, and a soft-deleted name cannot be reused — so a model
+	 * swap ships as a fresh agent name (e.g. `finalizer-opus`) selected here,
+	 * with no engine rebuild. Defaults to `finalizer`.
+	 */
+	finalizerAgent: string;
 }
 
 /** Structured report returned by the Sinas finalizer agent (its output_schema). */
