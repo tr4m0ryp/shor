@@ -18,7 +18,8 @@
     "build": "tsc",
     "check": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "job": "node dist/job-entry.js"
+    "job": "node dist/job-entry.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "catalog:",
