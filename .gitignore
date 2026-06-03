@@ -34,3 +34,4 @@ docs/
 
 # Local acceptance/test runs (repos, .env, evidence)
 .acceptance/
+research/
