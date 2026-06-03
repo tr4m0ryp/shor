@@ -929,7 +929,9 @@ var ghState = { connected: false, login: null, repos: [], oauthEnabled: false, p
 // full-name list of currently-visible (filtered) rows for Enter-to-select.
 var repoFilter = '', repoActiveIdx = 0, repoVisible = [];
 
-async function loadGithubSettings() {
+// Fetch the GitHub connection status (config + connected/login) into ghState.
+// Cheap (no repo list); used both to prefetch at boot and to refresh on open.
+async function fetchGithubStatus() {
   try {
     const cfg = await api('GET', '/settings/github/config');
     ghState.oauthEnabled = !!cfg.oauthEnabled;
@@ -939,8 +941,30 @@ async function loadGithubSettings() {
     ghState.connected = !!s.connected;
     ghState.login = s.login || null;
   } catch (_) { ghState.connected = false; }
-  if (ghState.connected) { try { await loadReposIntoPicker(); } catch (_) {} }
+}
+
+// Prefetch the status at boot so the first Settings visit paints instantly.
+// Fire-and-forget; failures are swallowed (the page refetches on open anyway).
+function prefetchGithubStatus() {
+  fetchGithubStatus().then(function () {
+    // If the user is already on Settings when the prefetch lands, reflect it.
+    if (document.getElementById('pageSettings').style.display !== 'none') renderGithubSettings();
+  }).catch(function () {});
+}
+
+async function loadGithubSettings() {
+  // 1. Paint immediately from cache (prefetch / a prior visit) so "Connected as
+  //    <name>" shows with no spinner on return visits.
   renderGithubSettings();
+  // 2. Refresh the connection status (fast) and repaint the connected line.
+  await fetchGithubStatus();
+  renderGithubSettings();
+  // 3. Refresh the repo list in the BACKGROUND — the ~hundreds-of-repos fetch is
+  //    the slow part and must not gate the "Connected as" render. Repaint the
+  //    repo count when it lands.
+  if (ghState.connected) {
+    loadReposIntoPicker().then(renderGithubSettings).catch(function () {});
+  }
 }
 
 function togglePat() {
@@ -1975,6 +1999,9 @@ function renderUserRow(u) {
     if (gh === 'connected') { showToast('GitHub connected', 'success'); showPage('settings'); return; }
     if (gh === 'error') showToast('GitHub connection failed', 'error');
   }
+  // Warm the GitHub connection status in the background so navigating to
+  // Settings shows "Connected as <name>" instantly (no on-open fetch wait).
+  prefetchGithubStatus();
   showPage('targets');
 })();
 </script>
