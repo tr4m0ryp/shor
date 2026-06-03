@@ -1,0 +1,75 @@
+# Copyright (C) 2025 Keygraph, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License version 3
+# as published by the Free Software Foundation.
+#
+# Sinas `engine` connector (pentest namespace) — REPOINTED + BEARER-AUTHED.
+#
+# Replaces the placeholder (base_url https://ENGINE-HOST.invalid, auth: none).
+# Sinas -> engine is the bearer channel (T7): every operation carries
+# Authorization: Bearer <AEGIS_ENGINE_TRIGGER_TOKEN>. The engine mints all ids
+# (T8); the trigger_scan / create_project functions invoke these operations
+# FIRST and record the returned id.
+#
+# Placeholders use Sinas install-time variable substitution `${{ vars.NAME }}`
+# (resolved before persistence — NOT Jinja2). The two variables below are
+# declared in sinas-package.yaml > spec.variables. The bearer secret is created
+# from the ENGINE_TRIGGER_TOKEN secret variable; nothing real is committed.
+#
+# This fragment is the connector's canonical source. It is also embedded under
+# spec.connectors in sinas-package.yaml; keep the two in sync (the README's
+# apply order installs from the package).
+
+namespace: pentest
+name: engine
+baseUrl: "${{ vars.ENGINE_BASE_URL }}"
+auth:
+  type: bearer
+  secret: "${{ vars.ENGINE_TRIGGER_TOKEN }}"
+timeoutSeconds: 60
+operations:
+  # Start a scan. Engine mints the scan id. -> { scanId, status }
+  - name: start_scan
+    method: POST
+    path: /external/scans
+    parameters:
+      - name: body
+        in: body
+        schema:
+          type: object
+          properties:
+            projectId: { type: string }
+            ref: { type: string }
+            provider: { type: string }
+          required: [projectId]
+  # Create a project (black-box or white-box). Engine mints the project id and,
+  # for white-box, ingests the referenced repo with its stored GitHub token.
+  # -> { projectId }
+  - name: create_project
+    method: POST
+    path: /external/projects
+    parameters:
+      - name: body
+        in: body
+        schema:
+          type: object
+          properties:
+            name: { type: string }
+            targetUrl: { type: string }
+            mode: { type: string, enum: [blackbox, whitebox] }
+            repoRef: { type: string }
+          required: [name, targetUrl, mode]
+  # Poll a scan's status. -> scan record
+  - name: get_scan
+    method: GET
+    path: /external/scans/{scanId}
+    parameters:
+      - name: scanId
+        in: path
+        schema: { type: string }
+  # List the tenant's connected GitHub repos (white-box repo picker). -> repos[]
+  - name: list_repos
+    method: GET
+    path: /external/github/repos
+    parameters: []
