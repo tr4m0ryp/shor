@@ -601,6 +601,51 @@ body.guest .sidebar nav { display: none; }
   .main { padding: 20px; }
   .new-run-grid { grid-template-columns: 1fr; }
 }
+
+/* === Phone layout (≤600px) — primarily the read-only share view === */
+@media (max-width: 600px) {
+  .main { padding: 16px; }
+
+  /* Scan-detail metadata: stack label over value so long workflow paths /
+     UUIDs wrap across the full width instead of laddering down a 200px column. */
+  .detail-grid { grid-template-columns: 1fr; gap: 0; }
+  .detail-grid dt { margin-top: 12px; }
+  .detail-grid dd { margin-top: 2px; }
+  .finding-field { grid-template-columns: 1fr; gap: 2px; }
+  .finding-field dt { margin-top: 8px; }
+
+  /* Tab bar: swipe horizontally instead of clipping Diff/Report off-screen
+     (they were unreachable on a phone before). */
+  .detail-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .detail-tabs::-webkit-scrollbar { display: none; }
+  .detail-tab { flex: 0 0 auto; padding: 8px 12px; white-space: nowrap; }
+
+  /* Finding + diff rows (share .finding-row): severity/id/badges on the top
+     line, the TITLE on its own full-width line below — otherwise the 1fr title
+     column is crushed to ~0px and the title disappears entirely. */
+  .finding-row {
+    grid-template-columns: auto auto 1fr auto;
+    grid-template-areas: "sev id badges chev" "title title title title";
+    column-gap: 8px; row-gap: 6px;
+  }
+  .finding-row > .finding-type-badge,
+  .finding-row > .diff-badge { grid-area: sev; }
+  .finding-row > .finding-id { grid-area: id; }
+  .finding-row > .finding-title { grid-area: title; white-space: normal; overflow: visible; }
+  .finding-row > .finding-badges { grid-area: badges; justify-self: end; }
+  .finding-row > :last-child { grid-area: chev; }
+
+  /* Scan list rows: stack the run number above its timestamp so the number
+     stops truncating to "Scan #...". */
+  .run-card .run-meta { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .run-card .run-target { max-width: none; }
+
+  /* Gantt: give the bars more room on a narrow screen. */
+  .gantt-row { grid-template-columns: 92px 1fr; gap: 8px; }
+
+  /* Attack-surface cards: trim padding for small screens. */
+  .attack-scenario { padding: 16px; }
+}
 </style>
 </head>
 <body>
