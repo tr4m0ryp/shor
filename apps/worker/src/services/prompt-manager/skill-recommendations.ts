@@ -41,20 +41,44 @@ export const RECOMMENDED: Readonly<Record<string, readonly string[]>> = {
 /**
  * The "recommended skills" markdown footer for an agent, or "" when the agent
  * (synthesis / unknown) has no recommendations. `loadPrompt` appends this.
+ *
+ * Rendered as an explicit TOOL CHECKLIST the agent seeds into its TodoWrite plan
+ * (one todo per applicable tool, each resolved `ran` or `skipped` with a
+ * one-line reason), plus breadth-before-depth and justify-every-skip rules. This
+ * is the cheap prevention layer that keeps the coverage gate from firing; it
+ * complements the gate, it does not replace it.
  */
 export function recommendedSkillsSection(promptName: string): string {
 	const skills = RECOMMENDED[promptName];
 	if (!skills || skills.length === 0) return "";
-	const list = skills.map((s) => `- \`${s}\``).join("\n");
+	const checklist = skills
+		.map((s) => `- [ ] \`${s}\` — ran | skipped: <one-line reason>`)
+		.join("\n");
 	return [
 		"",
-		"## Recommended skills for this agent",
+		"## Tool checklist for this agent (seed into TodoWrite)",
 		"",
-		"These skills fit this agent's attack surface — reach for them first. Read each",
-		"skill's `SKILL.md` for usage. All other skills remain available if a finding",
-		"genuinely calls for one.",
+		"These skills fit this agent's attack surface. Seed ONE TodoWrite item per",
+		"applicable tool below, then resolve each as either `ran` or",
+		"`skipped: <one-line reason>` before you finish the phase. Read a skill's",
+		"`SKILL.md` for usage. All other skills stay available if a finding genuinely",
+		"calls for one — this list is the floor, not the ceiling.",
 		"",
-		list,
+		checklist,
+		"",
+		"**Breadth before depth.** Complete the surface sweep across the applicable",
+		"tools above — at least attempt each, or justify the skip — BEFORE deep-diving",
+		"any single finding. A shallow pass over the whole surface beats an exhaustive",
+		"drill into the first hit while the rest goes untouched.",
+		"",
+		"**Justify every skip.** A tool left unrun needs a specific one-line reason",
+		"(out of scope, not applicable to this stack, superseded by another tool's",
+		"result). Running only one tool is a FAILED phase unless the rest are each",
+		"explicitly justified. \"Did not get to it\" is not a reason.",
+		"",
+		"This is NOT a mandate to spray: honor this agent's own scope, per-host",
+		"rate-limit, and minimum-impact rules above — pick the tool that fits each",
+		"target rather than firing all of them at every input.",
 		"",
 	].join("\n");
 }
