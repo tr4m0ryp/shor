@@ -15,12 +15,19 @@ export function buildPipelineInput(
 	workspace: WorkspaceResolution,
 	loaded: LoadedConfig,
 ): PipelineInput {
+	// OPTIONAL recon breadth: resolved HERE (worker/Node scope, outside the
+	// workflow sandbox) so the deterministic workflow only reads the boolean.
+	// Default off — the key is omitted entirely unless explicitly enabled, so a
+	// disabled run's input is byte-identical to today.
+	const reconFanout = process.env.AEGIS_RECON_FANOUT === "1";
+
 	return {
 		webUrl: args.webUrl,
 		repoPath: args.repoPath,
 		workflowId: workspace.workflowId,
 		sessionId: workspace.sessionId,
 		...(args.configPath && { configPath: args.configPath }),
+		...(reconFanout && { reconFanout: true }),
 
 		...(workspace.isResume &&
 			args.resumeFromWorkspace && {
