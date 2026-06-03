@@ -95,7 +95,7 @@ describe("coverage canary: continuation reaches the floor", () => {
 		// re-prompt adds tools until the 6th lands and the loop exits.
 		const policy = policyFor("recon");
 		if (!policy) throw new Error("recon must have a policy");
-		expect(policy.floor).toBeGreaterThanOrEqual(6);
+		expect(policy.minCount).toBeGreaterThanOrEqual(6);
 
 		// Six real recon candidates, fed in cumulatively across rounds.
 		const six = ["httpx", "katana", "naabu", "nmap", "subfinder", "dnsx"];
@@ -123,7 +123,7 @@ describe("coverage canary: continuation reaches the floor", () => {
 		expect(outcome.rounds).toBe(3);
 		expect(outcome.coverage.ok).toBe(true);
 		expect(outcome.coverage.ran).toEqual(six);
-		expect(outcome.coverage.ran.length).toBeGreaterThanOrEqual(policy.floor);
+		expect(outcome.coverage.ran.length).toBeGreaterThanOrEqual(policy.minCount);
 		// Round 0 saw the base prompt; the re-prompt named the missing tools.
 		expect(runner.prompts[0]).toBe("BASE");
 		expect(runner.prompts[1]).toContain("did NOT run");
