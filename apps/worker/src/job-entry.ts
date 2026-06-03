@@ -26,7 +26,7 @@ import { reportFindings } from "./job/findings/index.js";
 import { ConsoleActivityLogger } from "./job/logger.js";
 import { runScanPipeline } from "./job/pipeline.js";
 import { materializeRepo } from "./job/repo.js";
-import { finalizeViaSinas } from "./job/sinas-finalization.js";
+import { finalizeAttackSurfaceViaSinas, finalizeViaSinas } from "./job/sinas-finalization.js";
 import { deliverablesDir } from "./paths.js";
 
 export { readScanJobParams } from "./job/env.js";
@@ -66,8 +66,15 @@ export async function runJob(): Promise<void> {
 			agentCount: result.completedAgents.length,
 		});
 
-		// If the user has connected Sinas, offload report finalization to their
-		// instance (overwrites the local report; falls back to it on any failure).
+		// If the user has connected Sinas, offload attack-surface synthesis and
+		// report finalization to their instance (Opus). Both overwrite the local
+		// deliverables; each falls back to the engine output on any failure.
+		await finalizeAttackSurfaceViaSinas(
+			deliverablesPath,
+			params.scanId,
+			params.targetUrl,
+			logger,
+		);
 		await finalizeViaSinas(
 			deliverablesPath,
 			params.scanId,

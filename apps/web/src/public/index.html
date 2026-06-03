@@ -319,6 +319,8 @@ body {
 .needs-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .needs-tag { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(242,100,25,.10); border: 1px solid rgba(242,100,25,.35); border-radius: 4px; padding: 2px 7px; cursor: pointer; transition: background .15s; }
 .needs-tag:hover { background: rgba(242,100,25,.22); }
+.needs-tag--static { cursor: default; opacity: .8; }
+.needs-tag--static:hover { background: rgba(242,100,25,.10); }
 .finding-field dd code, .field-value code, .attack-chain code, .report-body code { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; background: #1B1E23; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
 .md-code { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; line-height: 1.5; background: #0F1115; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin: 6px 0; white-space: pre; overflow-x: auto; color: var(--text-secondary); }
 .finding-field dd strong, .field-value strong, .attack-chain strong, .report-body strong { color: var(--text); font-weight: 600; }
@@ -1946,6 +1948,29 @@ async function loadScanAttackSurface(scanId) {
   }
 }
 
+// Which findings a scenario needs. Prefer the agent's explicit required_findings
+// (mapped from the agent finding id, e.g. AUTH-VULN-04, to the UI number XSS-01 +
+// fingerprint for the click-through); fall back to the heuristic text match for
+// older scenarios that lack required_findings.
+function scenarioNeeds(scenario) {
+  const findings = state.findingsCache || [];
+  const req = Array.isArray(scenario.required_findings) ? scenario.required_findings : null;
+  if (req && req.length) {
+    const byId = {};
+    findings.forEach(function (f) { if (f && f.id) byId[String(f.id)] = f; });
+    const out = [], seen = {};
+    req.forEach(function (rid) {
+      const f = byId[String(rid)];
+      const label = f && f.displayId ? f.displayId : String(rid);
+      if (seen[label]) return;
+      seen[label] = true;
+      out.push({ id: label, fp: f ? f.fingerprint : null });
+    });
+    return out;
+  }
+  return relatedFindingIds(scenario);
+}
+
 function renderAttackScenario(scenario, index) {
   const id = String(scenario.id || scenario.ID || ('ATK-' + (index + 1)));
   const title = String(scenario.title || 'Untitled scenario');
@@ -1959,18 +1984,28 @@ function renderAttackScenario(scenario, index) {
     : '';
 
   const sections = [];
-  const needs = relatedFindingIds(scenario);
+  if (scenario.explanation) {
+    sections.push('<div class="attack-scenario-section"><div class="field-label">Explanation</div><div class="field-value">' + mdToHtml(String(scenario.explanation)) + '</div></div>');
+  }
+  const needs = scenarioNeeds(scenario);
   if (needs.length) {
     sections.push('<div class="attack-scenario-section"><div class="field-label">Requires vulnerabilities</div><div class="needs-tags">' +
       needs.map(function (n) {
-        return '<span class="needs-tag" title="Open ' + escapeHtml(n.id) + '" onclick="openFindingFromDiff(\'' + escapeHtml(n.fp) + '\')">' + escapeHtml(n.id) + '</span>';
+        return n.fp
+          ? '<span class="needs-tag" title="Open ' + escapeHtml(n.id) + '" onclick="openFindingFromDiff(\'' + escapeHtml(n.fp) + '\')">' + escapeHtml(n.id) + '</span>'
+          : '<span class="needs-tag needs-tag--static">' + escapeHtml(n.id) + '</span>';
       }).join('') + '</div></div>');
-  }
-  if (scenario.business_impact) {
-    sections.push('<div class="attack-scenario-section"><div class="field-label">Business impact</div><div class="field-value">' + mdToHtml(String(scenario.business_impact)) + '</div></div>');
   }
   if (chainHtml) {
     sections.push('<div class="attack-scenario-section"><div class="field-label">Kill chain</div>' + chainHtml + '</div>');
+  }
+  const repro = Array.isArray(scenario.how_to_reproduce) ? scenario.how_to_reproduce : [];
+  if (repro.length) {
+    sections.push('<div class="attack-scenario-section"><div class="field-label">How to reproduce</div><ol class="attack-chain">' +
+      repro.map(function (step) { return '<li>' + mdToHtml(String(step)) + '</li>'; }).join('') + '</ol></div>');
+  }
+  if (scenario.business_impact) {
+    sections.push('<div class="attack-scenario-section"><div class="field-label">Business impact</div><div class="field-value">' + mdToHtml(String(scenario.business_impact)) + '</div></div>');
   }
 
   // ADR-010: the attack-prompt button is flipped to a remediation "fix" prompt.

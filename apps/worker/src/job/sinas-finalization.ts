@@ -41,6 +41,8 @@ interface SinasConnection {
 	 * with no engine rebuild. Defaults to `finalizer`.
 	 */
 	finalizerAgent: string;
+	/** Attack-surface agent (same recreate-by-name constraint). Defaults to `attack-surface-opus`. */
+	attackSurfaceAgent: string;
 }
 
 /** Structured report returned by the Sinas finalizer agent (its output_schema). */
@@ -69,8 +71,9 @@ function resolveSinasConnection(): SinasConnection | null {
 	const apiKey = process.env.SINAS_API_KEY;
 	const namespace = process.env.SINAS_NAMESPACE ?? "pentest";
 	const finalizerAgent = process.env.SINAS_FINALIZER_AGENT ?? "finalizer";
+	const attackSurfaceAgent = process.env.SINAS_ATTACK_SURFACE_AGENT ?? "attack-surface-opus";
 	if (!enabled || !url || !apiKey) return null;
-	return { url: url.replace(/\/+$/, ""), apiKey, namespace, finalizerAgent };
+	return { url: url.replace(/\/+$/, ""), apiKey, namespace, finalizerAgent, attackSurfaceAgent };
 }
 
 async function sinasFetch(
@@ -276,6 +279,82 @@ export async function finalizeViaSinas(
 		logger.info("Sinas finalization complete; report overwritten", { scanId });
 	} catch (err) {
 		logger.warn("Sinas finalization failed; keeping local report", {
+			scanId,
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+}
+
+const ATTACK_SURFACE_FILE = "attack_surface_scenarios.json";
+
+/** Build the attack-surface message: findings inline, no tools, output bounded. */
+function buildAttackSurfaceMessage(scanId: string, target: string, findings: FindingRecord[]): string {
+	const compact = findings.map((f) => ({
+		id: f.id,
+		category: f.category,
+		severity: f.severity,
+		confidence: f.confidence,
+		cwe: f.cwe,
+		location: `${f.vulnerable_code_location?.file ?? ""}:${f.vulnerable_code_location?.line ?? ""}`,
+		evidence: String(f.evidence ?? "").slice(0, 320),
+	}));
+	return (
+		`Produce the chained attack-surface scenarios for scan ${scanId} (target ${target}).\n` +
+		`Do NOT call tools — use ONLY the ${findings.length} findings below. Reference real finding ids in required_findings.\n` +
+		`RESPONSE LIMIT IS TIGHT — you MUST fit: AT MOST 5 scenarios; explanation <= 2 sentences; kill_chain <= 4 steps; how_to_reproduce <= 3 steps; business_impact 1 sentence; remediation 1 sentence; claude_code_prompt <= 2 sentences. Prioritise the most severe chains.\n\n` +
+		`FINDINGS JSON:\n${JSON.stringify(compact)}`
+	);
+}
+
+/** Drive the attack-surface agent (Opus on Sinas) and return its `{ scenarios }` doc. */
+async function runAttackSurface(
+	conn: SinasConnection,
+	scanId: string,
+	target: string,
+	findings: FindingRecord[],
+): Promise<{ scenarios?: unknown[] }> {
+	const chatRes = await sinasFetch(
+		conn,
+		"POST",
+		`/agents/${conn.namespace}/${conn.attackSurfaceAgent}/chats`,
+		{ title: `attack-surface ${scanId}`, input: { scan_id: scanId, target } },
+	);
+	if (!chatRes.ok) throw new Error(`create chat failed: ${chatRes.status}`);
+	const chat = (await chatRes.json()) as { id?: string };
+	if (!chat.id) throw new Error("no chat id");
+	const msgRes = await sinasFetch(conn, "POST", `/chats/${chat.id}/messages/stream`, {
+		content: buildAttackSurfaceMessage(scanId, target, findings),
+	});
+	if (!msgRes.ok) throw new Error(`attack-surface message failed: ${msgRes.status}`);
+	// Reuse the finalizer SSE parser (concatenates deltas, parses assembled JSON).
+	return parseFinalizerStream(await msgRes.text()) as { scenarios?: unknown[] };
+}
+
+/**
+ * Offload attack-surface synthesis to the connected Sinas instance (Opus), writing
+ * the result over the engine's local `attack_surface_scenarios.json` so the sink
+ * posts the richer scenarios. Best-effort: any failure keeps the local file.
+ */
+export async function finalizeAttackSurfaceViaSinas(
+	deliverablesPath: string,
+	scanId: string,
+	targetUrl: string,
+	logger: ActivityLogger,
+): Promise<void> {
+	const conn = resolveSinasConnection();
+	if (!conn) return;
+	try {
+		const findings = collectFindings(deliverablesPath, logger);
+		if (findings.length === 0) return;
+		const doc = await runAttackSurface(conn, scanId, targetUrl, findings);
+		if (!doc || !Array.isArray(doc.scenarios)) throw new Error("no scenarios returned");
+		await fsp.writeFile(path.join(deliverablesPath, ATTACK_SURFACE_FILE), `${JSON.stringify(doc, null, 2)}\n`);
+		logger.info("Sinas attack-surface synthesis complete; scenarios overwritten", {
+			scanId,
+			scenarios: doc.scenarios.length,
+		});
+	} catch (err) {
+		logger.warn("Sinas attack-surface synthesis failed; keeping engine output", {
 			scanId,
 			error: err instanceof Error ? err.message : String(err),
 		});
