@@ -91,11 +91,20 @@ export function createDashboardServer(): ReturnType<typeof createServer> {
       // clients) and the disabled case fall straight through to normal serving.
       // The actual unlock page / 401 is produced by `apiRouter` below so all
       // gate logic stays in one place.
-      const pathname = new URL(url, 'http://localhost').pathname;
+      const parsedUrl = new URL(url, 'http://localhost');
+      const pathname = parsedUrl.pathname;
       const gateParts = pathname.split('/').filter(Boolean);
       // Mirror the router's `/api`-prefix strip so the exempt check matches.
       const gateSegments = gateParts[0] === 'api' ? gateParts.slice(1) : gateParts;
-      const gateLocked = !isGateExempt(gateSegments, req.headers.authorization) && !isUnlocked(req.headers.cookie);
+      // A read-only share link is `/?share=<slug>` — it must load for guests
+      // WITHOUT the app passcode. The SPA then enters guest mode and only ever
+      // calls the already-exempt `/share/<slug>/*` endpoints, so serving the
+      // shell here exposes nothing beyond the shared project.
+      const shareEntry = !!parsedUrl.searchParams.get('share');
+      const gateLocked =
+        !isGateExempt(gateSegments, req.headers.authorization) &&
+        !shareEntry &&
+        !isUnlocked(req.headers.cookie);
 
       // Static assets (the ported dashboard UI) for GET requests to `/` or an
       // asset path; extension-less GETs fall through to the API router. Skipped
