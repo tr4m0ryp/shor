@@ -323,9 +323,6 @@ body {
 .needs-tag--static:hover { background: rgba(242,100,25,.10); }
 .diff-trans { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-left: 6px; }
 .finding-title { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sinas-intro { font-size: 12.5px; color: var(--text-secondary); margin: 2px 0 16px; }
-.sinas-block { margin-bottom: 22px; }
-.sinas-block__title { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); font-weight: 600; margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 .finding-field dd code, .field-value code, .attack-chain code, .report-body code { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; background: #1B1E23; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
 .md-code { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; line-height: 1.5; background: #0F1115; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin: 6px 0; white-space: pre; overflow-x: auto; color: var(--text-secondary); }
 .finding-field dd strong, .field-value strong, .attack-chain strong, .report-body strong { color: var(--text); font-weight: 600; }
@@ -760,20 +757,15 @@ body.guest .sidebar nav { display: none; }
       <div class="detail-tabs" role="tablist">
         <button class="detail-tab active" data-tab="activity" onclick="showScanTab('activity')">Activity</button>
         <button class="detail-tab" data-tab="findings" onclick="showScanTab('findings')">Findings <span class="count" id="findingsCount">0</span></button>
+        <button class="detail-tab" data-tab="attackSurface" onclick="showScanTab('attackSurface')">Attack Surface <span class="count" id="attackSurfaceCount">0</span></button>
         <button class="detail-tab" data-tab="diff" onclick="showScanTab('diff')">Diff <span class="count" id="diffCount">0</span></button>
-        <button class="detail-tab" data-tab="sinas" onclick="showScanTab('sinas')">Sinas <span class="count" id="attackSurfaceCount">0</span></button>
+        <button class="detail-tab" data-tab="report" onclick="showScanTab('report')">Report</button>
       </div>
       <div class="detail-panel" id="panelActivity"></div>
       <div class="detail-panel" id="panelFindings" style="display:none"></div>
+      <div class="detail-panel" id="panelAttackSurface" style="display:none"></div>
       <div class="detail-panel" id="panelDiff" style="display:none"></div>
-      <!-- Sinas: the post-processing done on Sinas — finding refinement (Sonnet),
-           executive report (Opus), and attack surface (Opus) — in one grid. -->
-      <div class="detail-panel" id="panelSinas" style="display:none">
-        <p class="sinas-intro">Post-processing on <b>Sinas</b>: finding refinement &rarr; executive report &rarr; attack surface.</p>
-        <div class="sinas-block"><div class="sinas-block__title">Finding refinement</div><div id="sinasRefine"></div></div>
-        <div class="sinas-block"><div class="sinas-block__title">Executive report</div><div id="panelReport"></div></div>
-        <div class="sinas-block"><div class="sinas-block__title">Attack surface</div><div id="panelAttackSurface"></div></div>
-      </div>
+      <div class="detail-panel" id="panelReport" style="display:none"></div>
     </div>
 
     <!-- ===================== Settings page ===================== -->
@@ -1582,17 +1574,10 @@ function showScanTab(tab) {
   });
   document.getElementById('panelActivity').style.display = tab === 'activity' ? 'block' : 'none';
   document.getElementById('panelFindings').style.display = tab === 'findings' ? 'block' : 'none';
+  document.getElementById('panelAttackSurface').style.display = tab === 'attackSurface' ? 'block' : 'none';
   document.getElementById('panelDiff').style.display = tab === 'diff' ? 'block' : 'none';
-  // The Sinas tab is one grid holding the Opus report + attack surface.
-  document.getElementById('panelSinas').style.display = tab === 'sinas' ? 'block' : 'none';
-  if (tab === 'sinas' && state.currentScan) {
-    const n = (state.findingsCache || []).length;
-    document.getElementById('sinasRefine').innerHTML = '<div class="field-value">Sinas rewrote ' +
-      (n ? 'all ' + n + ' ' : 'the ') +
-      'findings for clarity and consistent formatting — structured evidence with proper fenced code blocks (Sonnet&nbsp;4.6). The refined findings are shown on the <b>Findings</b> tab.</div>';
-    loadScanReport(state.currentScan.id);
-    loadScanAttackSurface(state.currentScan.id);
-  }
+  document.getElementById('panelReport').style.display = tab === 'report' ? 'block' : 'none';
+  if (tab === 'report' && state.currentScan) loadScanReport(state.currentScan.id);
 }
 
 // ----- Activity (live run progress) -----
@@ -1663,7 +1648,25 @@ function renderProgress(view) {
   const banner = renderProgressBanner(view);
   const timeline = renderTimeline(view);
   const arsenal = renderArsenal(view);
-  const phases = (view.phases || []).map(renderProgressPhase).join('');
+  // Activity overview: merge the consecutive "Sinas" phases (report + attack
+  // surface) into one card, and prepend the Sonnet "Finding refinement" step —
+  // it runs on Sinas with the report/attack-surface but isn't an engine pipeline
+  // agent, so it has no live timing.
+  const merged = [];
+  (view.phases || []).forEach(function (p) {
+    const last = merged[merged.length - 1];
+    if (last && last.label === p.label) last.agents = last.agents.concat(p.agents);
+    else merged.push({ id: p.id, label: p.label, status: p.status, agents: (p.agents || []).slice() });
+  });
+  merged.forEach(function (p) {
+    if (p.label === 'Sinas') {
+      const refStatus = (p.agents[0] && p.agents[0].status) || 'completed';
+      p.agents = [{ name: 'finding-refinement', label: 'Finding refinement', status: refStatus, durationMs: null, skills: [], subtasks: [], startedAt: null, finishedAt: null }].concat(p.agents);
+    }
+    p.done = p.agents.filter(function (a) { return a.status === 'completed'; }).length;
+    p.total = p.agents.length;
+  });
+  const phases = merged.map(renderProgressPhase).join('');
   document.getElementById('panelActivity').innerHTML =
     banner + timeline + arsenal + '<div class="pending-grid">' + phases + '</div>';
 }

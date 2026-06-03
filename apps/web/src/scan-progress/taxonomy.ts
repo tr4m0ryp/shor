@@ -102,12 +102,12 @@ export const PIPELINE_PLAN: readonly PhaseSpec[] = [
   },
   {
     id: 'reporting',
-    label: 'Remediation Report',
+    label: 'Sinas',
     agents: [{ name: 'report', label: 'Report', subtasks: ['Assemble findings', 'Write executive report'] }],
   },
   {
     id: 'attack-surface',
-    label: 'Attack Surface & Fixes',
+    label: 'Sinas',
     agents: [
       {
         name: 'attack-surface',
