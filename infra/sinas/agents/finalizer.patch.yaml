@@ -4,22 +4,33 @@
 # it under the terms of the GNU Affero General Public License version 3
 # as published by the Free Software Foundation.
 #
-# Finalizer agent model swap (Decisions Made For You).
+# Finalizer agent model = anthropic/claude-opus-4.8.
 #
-# The pentest/finalizer agent already exists on via-12 with an enforced
-# output_schema and reads pentest/findings. This is a MINIMAL PATCH: change ONLY
-# the model from deepseek/deepseek-v4-pro to anthropic/claude-sonnet-4.6. Leave
-# output_schema, system_prompt, enabled_stores, and every other field UNCHANGED.
+# The Sinas finalize layer (only) runs on Opus 4.8 — it is covered by Sinas's
+# own OpenRouter account (funded; paid Anthropic slugs return real output), NOT
+# our API. The engine pipeline agents stay on DeepSeek flash.
 #
-# via-12's OpenRouter provider is funded and its default_model is
-# anthropic/claude-sonnet-4.6 (F6), so this slug returns real output at no extra
-# cost. The runbook applies this via PATCH on the Management API (agents do NOT
-# hit the component PUT/DELETE hang).
+# IMPORTANT — via-12 has NO agent PATCH/PUT (returns 405). Changing an agent's
+# model therefore means DELETE + recreate. And a deleted agent name is
+# soft-delete-locked: recreating under the SAME name 500s on the unique
+# (namespace, name) constraint (the row is invisible to GET/LIST/DELETE but the
+# INSERT still collides). So a model swap ships as a NEW agent name.
 #
-# Apply (see README): PATCH /api/v1/agents/pentest/finalizer  { "model": ... }
-# Do NOT recreate the agent — that would require re-supplying the output_schema.
+# Live state: the Opus finalizer exists as `pentest/finalizer-opus` (the old
+# `pentest/finalizer` name is burned). The engine selects it at runtime via the
+# worker env `SINAS_FINALIZER_AGENT` (apps/worker/src/job/sinas-finalization.ts;
+# default `finalizer`). To swap models again: create `finalizer-<model>` with
+# this model + the unchanged output_schema, then set SINAS_FINALIZER_AGENT to
+# it on the shor-scan-worker job (no engine rebuild).
+#
+# Recreate body (NOT a PATCH): POST /api/v1/agents with the full agent minus the
+# server-managed fields (id, user_id, created_at, updated_at, llm_provider_id,
+# is_default) — those cause a 500. Keep: namespace, name, model, system_prompt,
+# description, output_schema, input_schema, enabled_stores, system_tools
+# (["store_search"]), max_tokens, temperature.
 
 namespace: pentest
-name: finalizer
-patch:
-  model: anthropic/claude-sonnet-4.6
+name: finalizer-opus
+model: anthropic/claude-opus-4.8
+engineEnv:
+  SINAS_FINALIZER_AGENT: finalizer-opus
