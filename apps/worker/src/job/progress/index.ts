@@ -23,6 +23,7 @@ import { AGENT_PHASE_MAP } from "../../session-manager.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import type { AgentName } from "../../types/agents.js";
 import { readSinkConfig, type SinkConfig } from "../findings/sink.js";
+import { buildCoverageMap, type CoverageSummary } from "./coverage-map.js";
 import { skillTracker } from "./skill-tracker.js";
 
 interface AgentProgress {
@@ -46,6 +47,12 @@ interface ProgressSnapshot {
 	starts: Record<string, number>;
 	/** agent → skills it has used so far (live, from the skill tracker). */
 	skills: Record<string, string[]>;
+	/**
+	 * Per-agent coverage summary (ran / missing / floor), computed at emit time
+	 * from Task 001's evaluateCoverage. Optional for backward compatibility with
+	 * older dashboard versions that do not yet render coverage.
+	 */
+	coverage?: Record<string, CoverageSummary>;
 }
 
 async function post(config: SinkConfig, snapshot: ProgressSnapshot, logger: ActivityLogger): Promise<void> {
@@ -105,6 +112,7 @@ export class ProgressEmitter {
 	private async emit(): Promise<void> {
 		if (!this.config) return;
 		const rep = this.representative();
+		const skills = skillTracker.all();
 		await post(
 			this.config,
 			{
@@ -115,7 +123,8 @@ export class ProgressEmitter {
 				runningAgents: [...this.running],
 				completedAgents: this.completed,
 				starts: this.starts,
-				skills: skillTracker.all(),
+				skills,
+				coverage: buildCoverageMap(skills),
 			},
 			this.logger,
 		);
