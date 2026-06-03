@@ -12,6 +12,7 @@
 import { randomBytes } from 'node:crypto';
 import { projectRepo, scanRepo } from '../../db/repositories/index.js';
 import type { NewProject, ProjectId, ProjectMode } from '../../domain/types.js';
+import { mirrorProject } from '../../sinas/mirror.js';
 import type { ApiResponse } from '../router.js';
 import { badRequest, created, gate, notFound, ok, serverError } from './auth-util.js';
 
@@ -84,6 +85,8 @@ export async function createProject(
   };
   try {
     const project = await projectRepo.create(input);
+    // Best-effort hub->Sinas mirror; self-swallowing, never affects the response.
+    await mirrorProject(project);
     return created({ project });
   } catch (err) {
     return serverError(err);
@@ -148,6 +151,8 @@ export async function updateProject(
 
   try {
     const project = await projectRepo.update(g.tenantId, id, patch);
+    // Best-effort hub->Sinas mirror; self-swallowing, never affects the response.
+    if (project) await mirrorProject(project);
     return project ? ok({ project }) : notFound('project not found');
   } catch (err) {
     return serverError(err);
