@@ -14,6 +14,7 @@ import { handleIngestFindings, handleSarifExport } from '../findings/index.js';
 import { handleIngestProgress } from '../scan-progress/index.js';
 import { routeDashboard } from './dashboard/index.js';
 import { getGithubConfig, githubOauthCallback, startGithubOauth } from './dashboard/settings.js';
+import { routeExternal } from './external/index.js';
 import { routeShare } from './share.js';
 
 /** Standard response envelope: HTTP status, JSON body, optional `Set-Cookie`. */
@@ -94,6 +95,14 @@ export async function apiRouter(
       };
       return githubOauthCallback(query, cookieHeader);
     }
+  }
+
+  // External Sinas->engine ingress: /external/... — bearer-authed (NO session),
+  // guarded by AEGIS_ENGINE_TRIGGER_TOKEN. Lets Sinas start/create/read; the
+  // engine mints all ids. Returns null when the path is not an external route.
+  if (resource === 'external') {
+    const external = await routeExternal(method, segments, body, authHeader);
+    if (external) return external;
   }
 
   // Public read-only share plane: /share/:slug/... — NO auth, NO cookie. The
