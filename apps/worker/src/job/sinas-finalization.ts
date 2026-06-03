@@ -43,6 +43,8 @@ interface SinasConnection {
 	finalizerAgent: string;
 	/** Attack-surface agent (same recreate-by-name constraint). Defaults to `attack-surface-opus`. */
 	attackSurfaceAgent: string;
+	/** Findings-improver agent (Sonnet) that rewrites raw findings for readability. */
+	improverAgent: string;
 }
 
 /** Structured report returned by the Sinas finalizer agent (its output_schema). */
@@ -72,8 +74,9 @@ function resolveSinasConnection(): SinasConnection | null {
 	const namespace = process.env.SINAS_NAMESPACE ?? "pentest";
 	const finalizerAgent = process.env.SINAS_FINALIZER_AGENT ?? "finalizer-opus-v2";
 	const attackSurfaceAgent = process.env.SINAS_ATTACK_SURFACE_AGENT ?? "attack-surface-opus-v2";
+	const improverAgent = process.env.SINAS_IMPROVER_AGENT ?? "findings-improver";
 	if (!enabled || !url || !apiKey) return null;
-	return { url: url.replace(/\/+$/, ""), apiKey, namespace, finalizerAgent, attackSurfaceAgent };
+	return { url: url.replace(/\/+$/, ""), apiKey, namespace, finalizerAgent, attackSurfaceAgent, improverAgent };
 }
 
 async function sinasFetch(
@@ -357,6 +360,98 @@ export async function finalizeAttackSurfaceViaSinas(
 		});
 	} catch (err) {
 		logger.warn("Sinas attack-surface synthesis failed; keeping engine output", {
+			scanId,
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+}
+
+const IMPROVED_FINDINGS_FILE = "improved_findings.json";
+const IMPROVE_BATCH = 20;
+
+/** One improved finding (text fields only; identity stays on the original record). */
+interface ImprovedFinding {
+	id?: string;
+	title?: string;
+	evidence?: string;
+	missing_defense?: string;
+	remediation?: string;
+	safe_poc?: string;
+	repro_steps?: string[];
+}
+
+/** Build the improver message: a batch of raw findings inline, no tools. */
+function buildImproveMessage(findings: FindingRecord[]): string {
+	const compact = findings.map((f) => ({
+		id: f.id,
+		category: f.category,
+		severity: f.severity,
+		cwe: f.cwe,
+		location: `${f.vulnerable_code_location?.file ?? ""}:${f.vulnerable_code_location?.line ?? ""}`,
+		evidence: f.evidence,
+		missing_defense: f.missing_defense,
+		remediation: f.remediation,
+		safe_poc: f.safe_poc,
+		repro_steps: f.repro_steps,
+	}));
+	return (
+		`Rewrite these ${compact.length} findings for clarity and correct formatting. Use ONLY this data; do not call tools. ` +
+		`Return EVERY finding, keyed by its exact id, with cleaned title/evidence/missing_defense/remediation/safe_poc/repro_steps.\n\n` +
+		`FINDINGS JSON:\n${JSON.stringify(compact)}`
+	);
+}
+
+/** Drive the findings-improver agent over one batch; returns improved entries. */
+async function runImprover(
+	conn: SinasConnection,
+	scanId: string,
+	findings: FindingRecord[],
+): Promise<ImprovedFinding[]> {
+	const chatRes = await sinasFetch(conn, "POST", `/agents/${conn.namespace}/${conn.improverAgent}/chats`, {
+		title: `improve ${scanId}`,
+		input: { scan_id: scanId },
+	});
+	if (!chatRes.ok) throw new Error(`create chat failed: ${chatRes.status}`);
+	const chat = (await chatRes.json()) as { id?: string };
+	if (!chat.id) throw new Error("no chat id");
+	const msgRes = await sinasFetch(conn, "POST", `/chats/${chat.id}/messages/stream`, {
+		content: buildImproveMessage(findings),
+	});
+	if (!msgRes.ok) throw new Error(`improver message failed: ${msgRes.status}`);
+	const doc = parseFinalizerStream(await msgRes.text()) as { findings?: ImprovedFinding[] };
+	return Array.isArray(doc.findings) ? doc.findings : [];
+}
+
+/**
+ * "Improvement findings" pass (ADR): before the report, a Sonnet agent rewrites
+ * every finding's prose for readability + correct formatting (real fenced bash /
+ * http blocks instead of crammed inline markdown). The improved text is written
+ * to `improved_findings.json`; `collectFindings` overlays it, so the dashboard,
+ * the report, and the attack surface all use the cleaned findings. Best-effort:
+ * any failure leaves the raw findings in place. Batched to fit the token budget.
+ */
+export async function improveFindingsViaSinas(
+	deliverablesPath: string,
+	scanId: string,
+	logger: ActivityLogger,
+): Promise<void> {
+	const conn = resolveSinasConnection();
+	if (!conn) return;
+	try {
+		const findings = collectFindings(deliverablesPath, logger);
+		if (findings.length === 0) return;
+		const improved: ImprovedFinding[] = [];
+		for (let i = 0; i < findings.length; i += IMPROVE_BATCH) {
+			const batch = findings.slice(i, i + IMPROVE_BATCH);
+			improved.push(...(await runImprover(conn, scanId, batch)));
+		}
+		await fsp.writeFile(
+			path.join(deliverablesPath, IMPROVED_FINDINGS_FILE),
+			`${JSON.stringify({ findings: improved })}\n`,
+		);
+		logger.info("Findings improved via Sinas", { scanId, improved: improved.length });
+	} catch (err) {
+		logger.warn("Findings improvement failed; keeping raw findings", {
 			scanId,
 			error: err instanceof Error ? err.message : String(err),
 		});

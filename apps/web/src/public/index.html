@@ -321,6 +321,7 @@ body {
 .needs-tag:hover { background: rgba(242,100,25,.22); }
 .needs-tag--static { cursor: default; opacity: .8; }
 .needs-tag--static:hover { background: rgba(242,100,25,.10); }
+.diff-trans { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-left: 6px; }
 .finding-field dd code, .field-value code, .attack-chain code, .report-body code { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; background: #1B1E23; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
 .md-code { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; line-height: 1.5; background: #0F1115; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin: 6px 0; white-space: pre; overflow-x: auto; color: var(--text-secondary); }
 .finding-field dd strong, .field-value strong, .attack-chain strong, .report-body strong { color: var(--text); font-weight: 600; }
@@ -1882,7 +1883,7 @@ function renderFindings() {
 function renderFindingRow(f, i) {
   const sev = String(f.severity || 'info').toLowerCase();
   const conf = String(f.confidence || '');
-  const cat = String(f.category || 'finding');
+  const cat = String(f.title || f.category || 'finding');
   const cwe = String(f.cwe || '');
   const loc = f.vulnerable_code_location || {};
   const locStr = loc.file ? loc.file + ':' + (loc.line != null ? loc.line : '?') : '';
@@ -2049,6 +2050,11 @@ async function copyFixPrompt(scenarioId) {
 async function loadScanDiff(scanId) {
   const panel = document.getElementById('panelDiff');
   try {
+    // The diff rows are titled from the findings; make sure they're loaded first
+    // (openScan starts findings + diff in parallel and the diff often wins).
+    if (!state.findingsCache || !state.findingsCache.length) {
+      try { await loadScanFindings(scanId); } catch (_) {}
+    }
     const data = await gapi('GET', '/scans/' + scanId + '/diff');
     const diff = data.diff || { transitions: [], counts: {}, priorScanId: null };
     const counts = diff.counts || {};
@@ -2076,19 +2082,24 @@ async function loadScanDiff(scanId) {
     // live in the PRIOR scan, so they won't be in this scan's cache.
     const byFp = {};
     (state.findingsCache || []).forEach((f) => { if (f && f.fingerprint) byFp[String(f.fingerprint)] = f; });
+    // Strip markdown markers for a clean one-line preview.
+    const plain = (s) => String(s || '').replace(/[`*_#>]/g, '').replace(/\s+/g, ' ').trim();
     const rows = transitions.map((t) => {
       const to = String(t.to || 'open');
       const fp = String(t.fingerprint || '');
       const f = byFp[fp];
-      const title = f ? ((f.displayId ? f.displayId + ' · ' : '') + String(f.category || 'Finding')) : 'Resolved finding (prior scan)';
+      const title = f
+        ? (f.displayId ? f.displayId + ' · ' : '') + String(f.title || f.category || 'finding')
+        : (to === 'fixed' ? 'Fixed since last scan' : 'finding ' + fp.slice(0, 8));
+      const summary = f ? plain(f.evidence || f.missing_defense).slice(0, 100) : ('fingerprint ' + fp.slice(0, 12));
       const sev = f ? String(f.severity || 'info').toLowerCase() : '';
       const sevBadge = sev ? '<span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span>' : '';
-      const transition = (t.from ? escapeHtml(String(t.from)) + ' &rarr; ' : '') + escapeHtml(to) + ' &middot; ' + escapeHtml(fp.slice(0, 12));
+      const trans = t.from ? ' <span class="diff-trans">' + escapeHtml(String(t.from)) + ' &rarr; ' + escapeHtml(to) + '</span>' : '';
       return (
         '<div class="finding-row"' + (f ? ' onclick="openFindingFromDiff(\'' + escapeHtml(fp) + '\')"' : ' style="cursor:default"') + '>' +
           '<span class="diff-badge diff-' + escapeHtml(to) + '">' + escapeHtml(to) + '</span>' +
-          '<span class="finding-id">' + escapeHtml(title) + '</span>' +
-          '<span class="finding-summary">' + transition + '</span>' +
+          '<span class="finding-id">' + escapeHtml(title) + trans + '</span>' +
+          '<span class="finding-summary">' + escapeHtml(summary) + '</span>' +
           '<span class="finding-badges">' + sevBadge + '</span>' +
           (f ? '<span class="finding-chevron">&rsaquo;</span>' : '<span></span>') +
         '</div>'

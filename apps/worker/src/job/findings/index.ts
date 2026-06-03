@@ -47,6 +47,49 @@ function readAttackSurface(
 	}
 }
 
+const IMPROVED_FINDINGS_FILE = "improved_findings.json";
+
+/**
+ * Overlay the Sinas "improvement findings" pass (sinas-finalization.ts) onto the
+ * mapped records: if `improved_findings.json` exists, replace each record's prose
+ * fields (title/evidence/missing_defense/remediation/safe_poc/repro_steps) with
+ * the cleaned versions, matched by id. Identity (fingerprint, severity, cwe,
+ * location, category) is never changed. No-op when the file is absent.
+ */
+function applyImprovedText(
+	deliverablesPath: string,
+	records: FindingRecord[],
+	logger: ActivityLogger,
+): FindingRecord[] {
+	const file = path.join(deliverablesPath, IMPROVED_FINDINGS_FILE);
+	if (!fs.existsSync(file)) return records;
+	try {
+		const doc = JSON.parse(fs.readFileSync(file, "utf8")) as {
+			findings?: Array<Record<string, unknown>>;
+		};
+		const byId = new Map((doc.findings ?? []).map((f) => [String(f.id), f]));
+		return records.map((r) => {
+			const imp = byId.get(String(r.id));
+			if (!imp) return r;
+			const overlay: Partial<FindingRecord> & { title?: string } = {};
+			if (typeof imp.title === "string" && imp.title.trim()) overlay.title = imp.title;
+			if (typeof imp.evidence === "string" && imp.evidence.trim()) overlay.evidence = imp.evidence;
+			if (typeof imp.missing_defense === "string" && imp.missing_defense.trim())
+				overlay.missing_defense = imp.missing_defense;
+			if (typeof imp.remediation === "string" && imp.remediation.trim()) overlay.remediation = imp.remediation;
+			if (typeof imp.safe_poc === "string" && imp.safe_poc.trim()) overlay.safe_poc = imp.safe_poc;
+			if (Array.isArray(imp.repro_steps) && imp.repro_steps.length)
+				overlay.repro_steps = imp.repro_steps.map((s) => String(s));
+			return { ...r, ...overlay };
+		});
+	} catch (err) {
+		logger.warn("Failed to apply improved findings; using raw", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+		return records;
+	}
+}
+
 /**
  * Build the finding records from the deliverables: read each category's queue,
  * enrich with the exploitation-evidence disposition + prose, then map to §6.1.
@@ -72,7 +115,7 @@ export function collectFindings(
 		}
 	}
 
-	return toFindingRecords(vulns);
+	return applyImprovedText(deliverablesPath, toFindingRecords(vulns), logger);
 }
 
 /**
