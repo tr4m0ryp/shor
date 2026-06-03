@@ -26,6 +26,8 @@ import sys
 
 import yaml
 
+from component_build import COMPONENT, component_module
+
 HERE = pathlib.Path(__file__).resolve().parent
 PACKAGE = HERE / "sinas-package.yaml"
 
@@ -140,13 +142,36 @@ def build() -> dict:
             {"type": "function", "namespace": "pentest", "name": "trigger_scan"},
             {"type": "function", "namespace": "pentest", "name": "create_project"},
             {"type": "agent", "namespace": "pentest", "name": "finalizer"},
-            # TODO(sibling component task): append report-view here, e.g.
-            # {"type": "component", "namespace": "pentest", "name": "report-view"},
+            {"type": "component", "namespace": "pentest", "name": "report-view"},
         ],
         "requiredPermissions": [],
         "optionalPermissions": [],
         "exposedNamespaces": {},
         "storeDependencies": [],
+    }
+
+    # report-view: the no-login showcase component. Reads the four mirror stores
+    # and writes ONLY through the two functions. Keys use the package's camelCase
+    # convention (enabledStores/enabledFunctions, matching inputSchema/sharedPool/
+    # requiredResources); stores are bound read-only since this is a viewer.
+    # FLAG (apply-time): if the via-12 component schema expects snake_case
+    # (enabled_stores/enabled_functions) or bare store refs instead of the
+    # {store, access} object form, adjust ONLY these two keys here and re-run.
+    component = {
+        "namespace": "pentest",
+        "name": "report-view",
+        "description": (
+            "No-login showcase: projects + recent runs (live status) + a run's "
+            "findings and finalized report; Run/rerun + New-project actions."
+        ),
+        "enabledStores": [
+            {"store": "pentest/findings", "access": "readonly"},
+            {"store": "pentest/reports", "access": "readonly"},
+            {"store": "pentest/scans", "access": "readonly"},
+            {"store": "pentest/projects", "access": "readonly"},
+        ],
+        "enabledFunctions": ["pentest/trigger_scan", "pentest/create_project"],
+        "code": component_module(),
     }
 
     return {
@@ -188,9 +213,9 @@ def build() -> dict:
             "stores": [store],
             "connectors": [connector],
             "functions": functions,
-            # Sibling component task appends report-view here (recreate-by-POST
-            # on via-12). No other section changes.
-            "components": [],
+            # report-view component (recreate-by-POST on via-12 per the README
+            # gotcha — PUT/DELETE hang). Assembled from the two .jsx fragments.
+            "components": [component],
         },
     }
 
@@ -210,20 +235,25 @@ def main() -> int:
     args = ap.parse_args()
 
     rendered = render(build())
+    component = component_module()
+    root = HERE.parent.parent
+    targets = [(PACKAGE, rendered), (COMPONENT, component)]
 
     if args.check:
-        current = PACKAGE.read_text() if PACKAGE.exists() else ""
-        if current != rendered:
+        stale = [p for p, want in targets if (p.read_text() if p.exists() else "") != want]
+        if stale:
+            names = ", ".join(p.relative_to(root).as_posix() for p in stale)
             sys.stderr.write(
-                "sinas-package.yaml is STALE — run `python3 "
-                "infra/sinas/assemble.py` to regenerate.\n"
+                f"STALE: {names} — run `python3 infra/sinas/assemble.py` to "
+                "regenerate.\n"
             )
             return 1
-        print("sinas-package.yaml is up to date with the fragments.")
+        print("sinas-package.yaml + report-view.jsx are up to date with the fragments.")
         return 0
 
-    PACKAGE.write_text(rendered)
-    print(f"wrote {PACKAGE.relative_to(HERE.parent.parent)}")
+    for path, want in targets:
+        path.write_text(want)
+        print(f"wrote {path.relative_to(root).as_posix()}")
     return 0
 
 
