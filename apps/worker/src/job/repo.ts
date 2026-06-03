@@ -8,11 +8,11 @@
  * Repo materialization for the Cloud Run Job entrypoint (ADR-051, Phase 4).
  *
  * Two delivery modes:
- *  - Direct `docker run -v` — `AEGIS_REPO_PATH` already points at a populated,
+ *  - Direct `docker run -v` — `SHOR_REPO_PATH` already points at a populated,
  *    writable repo. Use it as-is.
  *  - Cloud Run Job — the codebase snapshot lives in a GCS bucket mounted
  *    read-only at `/gcs`. We copy `/gcs/<prefix>` (prefix parsed from
- *    `AEGIS_REPO_GCS_URI`) into the WRITABLE `AEGIS_REPO_PATH`, because the
+ *    `SHOR_REPO_GCS_URI`) into the WRITABLE `SHOR_REPO_PATH`, because the
  *    pipeline writes deliverables under the repo (`.storron/deliverables/`).
  *
  * The image ships no `gcloud`; we copy with Node `fs.cp` over the FUSE mount.
@@ -63,7 +63,7 @@ function gcsMountExists(): boolean {
 /**
  * Ensure `params.repoPath` holds a writable copy of the repo to scan.
  *
- * - If `AEGIS_REPO_PATH` is already populated (direct `-v` case), it is used
+ * - If `SHOR_REPO_PATH` is already populated (direct `-v` case), it is used
  *   as-is and returned unchanged.
  * - Otherwise, if a GCS mount exists at `/gcs`, the snapshot at
  *   `/gcs/<prefix>` is copied into `params.repoPath` (created, writable).

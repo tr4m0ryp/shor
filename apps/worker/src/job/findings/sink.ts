@@ -6,8 +6,8 @@
 
 /**
  * POST findings to the dashboard sink, per the shared contract:
- *   POST `${AEGIS_FINDINGS_SINK_URL}/scans/${AEGIS_SCAN_ID}/findings`
- *   Authorization: Bearer ${AEGIS_SINK_TOKEN}
+ *   POST `${SHOR_FINDINGS_SINK_URL}/scans/${SHOR_SCAN_ID}/findings`
+ *   Authorization: Bearer ${SHOR_SINK_TOKEN}
  *   body: { findings, attackSurface?, status }
  *
  * Best-effort: a missing sink config or a failed request is logged (never with
@@ -26,8 +26,8 @@ export interface SinkConfig {
 
 /** Read sink config from env; returns undefined if not fully configured. */
 export function readSinkConfig(scanId: string): SinkConfig | undefined {
-	const baseUrl = process.env.AEGIS_FINDINGS_SINK_URL?.trim();
-	const token = process.env.AEGIS_SINK_TOKEN?.trim();
+	const baseUrl = process.env.SHOR_FINDINGS_SINK_URL?.trim();
+	const token = process.env.SHOR_SINK_TOKEN?.trim();
 	if (!baseUrl || !token) return undefined;
 	return { baseUrl: baseUrl.replace(/\/+$/, ""), token, scanId };
 }

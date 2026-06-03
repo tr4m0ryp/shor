@@ -16,7 +16,7 @@
  * Temporal activity surfaces it to the scan workflow). The worker no longer
  * self-submits a Temporal workflow.
  *
- * The selected provider key is file-mounted (AEGIS_PROVIDER_KEY_FILE) and read
+ * The selected provider key is file-mounted (SHOR_PROVIDER_KEY_FILE) and read
  * at use time inside the engine (sdk-env.ts); it is never an env value here.
  */
 
@@ -39,7 +39,7 @@ export async function runJob(): Promise<void> {
 
 	// Guardrail (LAUNCH-SPEC §5.6): the scan target itself must clear the network
 	// guard (RoE scope + egress allowlist, metadata/internal ranges blocked)
-	// before the pipeline starts. The guard reads the run's RoE from AEGIS_ROE.
+	// before the pipeline starts. The guard reads the run's RoE from SHOR_ROE.
 	// Per-tool/per-action calls are wired at integration; this is the gate at the
 	// run boundary + the example call site for the engine.
 	assertNetworkAllowed(params.targetUrl);

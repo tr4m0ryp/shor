@@ -24,7 +24,7 @@ const logger = {
 
 const tmpDirs: string[] = [];
 async function mkTmp(prefix: string): Promise<string> {
-	const dir = await fs.mkdtemp(path.join(os.tmpdir(), `aegis-${prefix}-`));
+	const dir = await fs.mkdtemp(path.join(os.tmpdir(), `shor-${prefix}-`));
 	tmpDirs.push(dir);
 	return dir;
 }

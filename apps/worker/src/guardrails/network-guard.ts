@@ -15,8 +15,8 @@
  *      (RoE hosts + GitHub App hosts). Default-deny.
  *
  * Inputs are read from the Cloud Run Job environment (the dashboard sets them on
- * the per-scan Job): the validated RoE JSON in AEGIS_ROE, and an optional
- * whitespace/comma-separated host allowlist in AEGIS_EGRESS_ALLOWLIST (when
+ * the per-scan Job): the validated RoE JSON in SHOR_ROE, and an optional
+ * whitespace/comma-separated host allowlist in SHOR_EGRESS_ALLOWLIST (when
  * absent it is derived from the RoE plus the GitHub App hosts). Parsing is
  * memoized; this module performs no I/O.
  */
@@ -52,7 +52,7 @@ interface GuardContext {
 let cached: GuardContext | undefined;
 
 function parseRoe(): Roe | null {
-	const raw = process.env.AEGIS_ROE;
+	const raw = process.env.SHOR_ROE;
 	if (!raw || raw.trim() === "") return null;
 	try {
 		const parsed = JSON.parse(raw) as Roe;
@@ -68,7 +68,7 @@ function deriveAllowlist(roe: Roe | null): { hosts: Set<string>; suffixes: strin
 	const suffixes: string[] = [];
 
 	// Explicit env override wins; otherwise derive from the RoE.
-	const explicit = process.env.AEGIS_EGRESS_ALLOWLIST;
+	const explicit = process.env.SHOR_EGRESS_ALLOWLIST;
 	if (explicit && explicit.trim() !== "") {
 		for (const h of explicit.split(/[\s,]+/)) {
 			const v = h.trim().toLowerCase();
@@ -100,7 +100,7 @@ function context(): GuardContext {
 	return cached;
 }
 
-/** Test/runtime hook: re-read AEGIS_ROE / AEGIS_EGRESS_ALLOWLIST on next call. */
+/** Test/runtime hook: re-read SHOR_ROE / SHOR_EGRESS_ALLOWLIST on next call. */
 export function resetNetworkGuard(): void {
 	cached = undefined;
 }

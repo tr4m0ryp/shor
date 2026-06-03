@@ -83,14 +83,14 @@ function loadFixtureOrBlock(): {
 
 	if (!hasProviderKey()) blocked("no DEEPSEEK_API_KEY / ANTHROPIC_API_KEY");
 
-	const targetUrl = process.env.AEGIS_TARGET_URL?.trim();
-	if (!targetUrl) blocked("no AEGIS_TARGET_URL");
+	const targetUrl = process.env.SHOR_TARGET_URL?.trim();
+	if (!targetUrl) blocked("no SHOR_TARGET_URL");
 
-	const repoPath = process.env.AEGIS_REPO_PATH?.trim();
-	if (!repoPath) blocked("no AEGIS_REPO_PATH");
-	if (!existsSync(repoPath)) blocked(`AEGIS_REPO_PATH missing: ${repoPath}`);
+	const repoPath = process.env.SHOR_REPO_PATH?.trim();
+	if (!repoPath) blocked("no SHOR_REPO_PATH");
+	if (!existsSync(repoPath)) blocked(`SHOR_REPO_PATH missing: ${repoPath}`);
 
-	const scanId = process.env.AEGIS_SCAN_ID?.trim() || `canary-${Date.now()}`;
+	const scanId = process.env.SHOR_SCAN_ID?.trim() || `canary-${Date.now()}`;
 	return { scanId, targetUrl, repoPath };
 }
 
