@@ -74,7 +74,7 @@ function resolveSinasConnection(): SinasConnection | null {
 	const namespace = process.env.SINAS_NAMESPACE ?? "pentest";
 	const finalizerAgent = process.env.SINAS_FINALIZER_AGENT ?? "finalizer-opus-v2";
 	const attackSurfaceAgent = process.env.SINAS_ATTACK_SURFACE_AGENT ?? "attack-surface-opus-v2";
-	const improverAgent = process.env.SINAS_IMPROVER_AGENT ?? "findings-improver";
+	const improverAgent = process.env.SINAS_IMPROVER_AGENT ?? "findings-improver-v2";
 	if (!enabled || !url || !apiKey) return null;
 	return { url: url.replace(/\/+$/, ""), apiKey, namespace, finalizerAgent, attackSurfaceAgent, improverAgent };
 }
