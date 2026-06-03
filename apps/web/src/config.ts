@@ -184,6 +184,28 @@ export interface GithubOauthConfig {
   readonly oauthEnabled: boolean;
 }
 
+/**
+ * Two-way Sinas integration config.
+ *
+ * `engineTriggerToken` is the bearer the external Sinas->engine ingress
+ * (`/external/*`) validates, EXACTLY like `sinkToken` guards the findings/progress
+ * sink: a secret that MUST be set to a strong random value in any non-local
+ * deployment (empty disables the ingress — every request 401s). The `sinas*`
+ * trio describes the engine's outbound connection to the user's Sinas instance
+ * and is consumed by the sibling mirror task; declared here so all integration
+ * env lands in one typed place.
+ */
+export interface SinasConfig {
+  /** Bearer Sinas presents to the `/external/*` ingress (`AEGIS_ENGINE_TRIGGER_TOKEN`). */
+  readonly engineTriggerToken: string;
+  /** Base URL of the user's Sinas instance the engine mirrors to (`SINAS_URL`). */
+  readonly sinasUrl: string;
+  /** API key the engine presents to Sinas (`SINAS_API_KEY`). */
+  readonly sinasApiKey: string;
+  /** Sinas project/namespace the engine writes under (`SINAS_NAMESPACE`). */
+  readonly sinasNamespace: string;
+}
+
 export interface AegisConfig {
   readonly env: 'development' | 'production' | 'test';
   /**
@@ -220,6 +242,8 @@ export interface AegisConfig {
   readonly secrets: SecretsConfig;
   readonly github: GithubAppConfig;
   readonly githubOauth: GithubOauthConfig;
+  /** Two-way Sinas integration: external-ingress bearer + outbound mirror connection. */
+  readonly sinas: SinasConfig;
 }
 
 let cached: AegisConfig | undefined;
@@ -312,6 +336,14 @@ export function getConfig(): AegisConfig {
       clientSecret: githubOauthClientSecret,
       redirectUri: env('GITHUB_OAUTH_REDIRECT_URI', `${publicUrl}/settings/github/callback`),
       oauthEnabled: githubOauthClientId !== '' && githubOauthClientSecret !== '',
+    },
+    sinas: {
+      // Bearer for the Sinas->engine ingress (empty = ingress disabled, all 401).
+      engineTriggerToken: env('AEGIS_ENGINE_TRIGGER_TOKEN'),
+      // Outbound mirror connection (consumed by the sibling mirror task).
+      sinasUrl: env('SINAS_URL'),
+      sinasApiKey: env('SINAS_API_KEY'),
+      sinasNamespace: env('SINAS_NAMESPACE', 'pentest'),
     },
   };
 
