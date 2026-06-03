@@ -6,7 +6,7 @@ it under the terms of the GNU Affero General Public License version 3
 as published by the Free Software Foundation.
 -->
 
-# Aegis ↔ Sinas backend resources — apply runbook
+# Shor ↔ Sinas backend resources — apply runbook
 
 Provisions the net-new / updated **`pentest`** backend resources for the
 two-way integration on the group instance
@@ -63,8 +63,8 @@ The package declares two `spec.variables`; Sinas substitutes `${{ vars.NAME }}`
 
 | Variable | Type | Fill with |
 |---|---|---|
-| `ENGINE_BASE_URL` | `text` | public base URL of the hosted **aegis-web** control plane (e.g. `https://aegis-web-…run.app`) |
-| `ENGINE_TRIGGER_TOKEN` | `secret` | the shared **`AEGIS_ENGINE_TRIGGER_TOKEN`** (same value the engine validates) |
+| `ENGINE_BASE_URL` | `text` | public base URL of the hosted **shor-web** control plane (e.g. `https://shor-web-…run.app`) |
+| `ENGINE_TRIGGER_TOKEN` | `secret` | the shared **`SHOR_ENGINE_TRIGGER_TOKEN`** (same value the engine validates) |
 
 `ENGINE_TRIGGER_TOKEN` is type `secret`: installing creates a **write-only**
 Sinas secret. Sinas secrets are set once and never read back (T7) — supply it at
@@ -73,7 +73,7 @@ install time; re-installs do not need it again unless rotating.
 ## Apply order
 
 > Auth: engine→Sinas uses `X-API-Key`; **Sinas→engine uses bearer**
-> (`Authorization: Bearer <AEGIS_ENGINE_TRIGGER_TOKEN>`), carried by the
+> (`Authorization: Bearer <SHOR_ENGINE_TRIGGER_TOKEN>`), carried by the
 > `engine` connector — never put that token in the browser/component bundle.
 
 1. **Pre-flight (no writes).** From a checkout with `.sinas/config.json`:

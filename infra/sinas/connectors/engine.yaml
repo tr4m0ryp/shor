@@ -8,7 +8,7 @@
 #
 # Replaces the placeholder (base_url https://ENGINE-HOST.invalid, auth: none).
 # Sinas -> engine is the bearer channel (T7): every operation carries
-# Authorization: Bearer <AEGIS_ENGINE_TRIGGER_TOKEN>. The engine mints all ids
+# Authorization: Bearer <SHOR_ENGINE_TRIGGER_TOKEN>. The engine mints all ids
 # (T8); the trigger_scan / create_project functions invoke these operations
 # FIRST and record the returned id.
 #

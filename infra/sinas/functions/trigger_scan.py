@@ -6,7 +6,7 @@
 #
 # Sinas function: pentest/trigger_scan
 #
-# Deterministic, no LLM. Starts a scan on the aegis engine and mirrors the
+# Deterministic, no LLM. Starts a scan on the shor engine and mirrors the
 # engine-minted scan id into the pentest/scans store.
 #
 # Design T8 (engine mints all ids): call the `engine` connector FIRST, take the
@@ -16,7 +16,7 @@
 # writes the engine's id (T2/T3).
 #
 # Auth channels (T7): Sinas -> engine is bearer, carried by the `engine`
-# connector (AEGIS_ENGINE_TRIGGER_TOKEN); this function never sees that token.
+# connector (SHOR_ENGINE_TRIGGER_TOKEN); this function never sees that token.
 # The store write uses the per-execution Sinas access token in
 # context["access_token"].
 

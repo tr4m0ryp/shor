@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 #
-# Aegis worker APP image — the thin, fast-changing half.
+# Shor worker APP image — the thin, fast-changing half.
 #
-# `FROM` the prebuilt toolkit base (`aegis-worker-base`, built by
+# `FROM` the prebuilt toolkit base (`shor-worker-base`, built by
 # infra/docker/Dockerfile.base) and layer ONLY the compiled Node worker + skills
 # on top. The ~30 offensive tools, the Python venv, chromium and the Claude CLI
 # all live in the base, so this build skips all ~50 tool-install steps and
@@ -13,10 +13,10 @@
 
 # Global ARG (declared before the first FROM so it is usable in the runtime
 # stage's FROM). Cloud Build overrides it; the default keeps local builds working.
-ARG BASE_IMAGE=us-central1-docker.pkg.dev/aegis-avelero-test/aegis/aegis-worker-base:latest
+ARG BASE_IMAGE=us-central1-docker.pkg.dev/shor-avelero-test/shor/shor-worker-base:latest
 
 # ---------------------------------------------------------------------------
-# Stage A: node-builder — build the Aegis worker (Node) + prune to prod deps.
+# Stage A: node-builder — build the Shor worker (Node) + prune to prod deps.
 # ---------------------------------------------------------------------------
 # hadolint ignore=DL3018
 FROM cgr.dev/chainguard/wolfi-base:latest AS node-builder
@@ -34,7 +34,7 @@ RUN pnpm install --frozen-lockfile
 
 # Worker source + build.
 COPY apps/worker ./apps/worker
-RUN pnpm --filter @aegis/worker run build
+RUN pnpm --filter @shor/worker run build
 
 # Prune to production dependencies (drops devDeps; keeps the pnpm workspace layout).
 RUN rm -rf node_modules apps/worker/node_modules apps/web/node_modules && \
@@ -49,13 +49,13 @@ FROM ${BASE_IMAGE} AS runtime
 # back. ENV/PATH/ENTRYPOINT are inherited from the base.
 USER root
 
-# 5) Aegis worker app (Node): dist + prod node_modules + prompts, from node-builder.
-#    Kept in the pnpm workspace layout at /opt/aegis/app so the symlinked
+# 5) Shor worker app (Node): dist + prod node_modules + prompts, from node-builder.
+#    Kept in the pnpm workspace layout at /opt/shor/app so the symlinked
 #    node_modules resolve. WORKER_ROOT (paths.ts) → apps/worker; PROMPTS_DIR →
 #    apps/worker/prompts (both present here).
-COPY --from=node-builder /app/node_modules /opt/aegis/app/node_modules
-COPY --from=node-builder /app/apps/worker /opt/aegis/app/apps/worker
-COPY --from=node-builder /app/package.json /app/pnpm-workspace.yaml /opt/aegis/app/
+COPY --from=node-builder /app/node_modules /opt/shor/app/node_modules
+COPY --from=node-builder /app/apps/worker /opt/shor/app/apps/worker
+COPY --from=node-builder /app/package.json /app/pnpm-workspace.yaml /opt/shor/app/
 
 # 6) Per-tool skills the Claude Agent SDK loads on demand (progressive disclosure).
 #    HOME=/tmp + settingSources:["user"] → the SDK discovers ~/.claude/skills.
@@ -64,23 +64,23 @@ COPY --from=node-builder /app/package.json /app/pnpm-workspace.yaml /opt/aegis/a
 #    {secrets,code,dependencies}/) for organisation; flatten them here (find at any
 #    depth) so each skill sits directly under the discovery root, which the SDK
 #    scans one level deep: skills/<name>/SKILL.md.
-COPY skills/ /tmp/aegis-skills-src/
+COPY skills/ /tmp/shor-skills-src/
 RUN mkdir -p /tmp/.claude/skills && \
-    find /tmp/aegis-skills-src -name SKILL.md -type f -exec sh -c \
+    find /tmp/shor-skills-src -name SKILL.md -type f -exec sh -c \
       'cp -r "$(dirname "$1")" /tmp/.claude/skills/' _ {} \; && \
-    rm -rf /tmp/aegis-skills-src
+    rm -rf /tmp/shor-skills-src
 
 # 7) save-deliverable / generate-totp CLIs that the prompts invoke by name.
-RUN ln -sf /opt/aegis/app/apps/worker/dist/scripts/save-deliverable.js /usr/local/bin/save-deliverable && \
-    ln -sf /opt/aegis/app/apps/worker/dist/scripts/generate-totp.js /usr/local/bin/generate-totp && \
-    chmod +x /opt/aegis/app/apps/worker/dist/scripts/*.js 2>/dev/null || true
+RUN ln -sf /opt/shor/app/apps/worker/dist/scripts/save-deliverable.js /usr/local/bin/save-deliverable && \
+    ln -sf /opt/shor/app/apps/worker/dist/scripts/generate-totp.js /usr/local/bin/generate-totp && \
+    chmod +x /opt/shor/app/apps/worker/dist/scripts/*.js 2>/dev/null || true
 
 # Own the laid-down app + skills as the nonroot runtime user.
-RUN chown -R 65532:65532 /opt/aegis/app /tmp/.claude
+RUN chown -R 65532:65532 /opt/shor/app /tmp/.claude
 
 USER 65532
 WORKDIR /work
 
 # Default: run one scan (the per-scan Job command, ADR-051). job-entry.js reads
-# the scan params from the environment (AEGIS_*) and runs the pipeline, then exits.
-CMD ["node", "/opt/aegis/app/apps/worker/dist/job-entry.js"]
+# the scan params from the environment (SHOR_*) and runs the pipeline, then exits.
+CMD ["node", "/opt/shor/app/apps/worker/dist/job-entry.js"]

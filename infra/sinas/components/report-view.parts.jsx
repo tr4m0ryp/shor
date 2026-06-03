@@ -198,7 +198,7 @@ export function NewProjectForm({ repos, reposConnected, onCreate, busy }) {
       : React.createElement(
           "p",
           { style: { color: "#777", fontSize: 12 } },
-          "No GitHub repos connected — black-box only. Connect GitHub in the aegis app to enable white-box.",
+          "No GitHub repos connected — black-box only. Connect GitHub in the shor app to enable white-box.",
         ),
     React.createElement("button", { type: "submit", disabled: busy }, busy ? "Creating…" : "Create project"),
   );

@@ -1,9 +1,9 @@
-# Aegis offensive-toolkit image
+# Shor offensive-toolkit image
 
 Multi-stage Wolfi/glibc Docker image that preinstalls the ~30 offensive CLI
-tools the Aegis agent pipeline drives via shell (LAUNCH-SPEC §5.2/§5.3,
+tools the Shor agent pipeline drives via shell (LAUNCH-SPEC §5.2/§5.3,
 ADR-023→027). Ported from storron's `infra/docker/Dockerfile` **minus all
-Tor/onion machinery** — Aegis runs direct clearnet egress only.
+Tor/onion machinery** — Shor runs direct clearnet egress only.
 
 ## Files
 
@@ -23,7 +23,7 @@ Tor/onion machinery** — Aegis runs direct clearnet egress only.
   `ld-musl` vs `libc.so.6`). The runtime OS closure (libs, `nmap`, `chromium`,
   `python-3.13`) is apk-installed in `runtime-staging` against the *same* Wolfi
   glibc, then copied forward — so every shared object is glibc-ABI.
-- One **shared Python venv** at `/opt/aegis/venv`, on PATH, no
+- One **shared Python venv** at `/opt/shor/venv`, on PATH, no
   `--break-system-packages` (ADR-026).
 - **katana** is built `CGO_ENABLED=1` with gcc + Go 1.25 (`go-1.25` apk
   package) for the headless path; **naabu** needs `libpcap-dev` (build) /
@@ -46,7 +46,7 @@ docker build \
   --build-arg JWT_TOOL_SHA=3bc7407cf2222d6a821dcc19c776e5a1b1cb9a9b \
   --build-arg NOSQLI_SHA=6fce3ebc8c8127940221d9287b00493be43d7564 \
   --build-arg PARAMSPIDER_SHA=c44bdaae54789b237028e309b603d1aa5ad52e5e \
-  -t aegis-toolkit:latest \
+  -t shor-toolkit:latest \
   infra/docker
 ```
 
@@ -63,8 +63,8 @@ docker build --target py-builder --build-arg SQLMAP_SHA=... ... infra/docker
 | Path | Contents |
 |---|---|
 | `/usr/local/bin/` | Go tool binaries + thin wrappers for the in-place Python tools (`sqlmap`, `commix`, `sstimap`, `xsstrike`, `ssrfmap`, `jwt_tool`). |
-| `/opt/aegis/venv/` | Shared Python venv (semgrep, arjun, paramspider, wafw00f, playwright + git-clone tools' requirements). First on PATH. |
-| `/opt/aegis/tools/` | Pinned git-clone tool checkouts (run in place). |
+| `/opt/shor/venv/` | Shared Python venv (semgrep, arjun, paramspider, wafw00f, playwright + git-clone tools' requirements). First on PATH. |
+| `/opt/shor/tools/` | Pinned git-clone tool checkouts (run in place). |
 | `/usr/bin/` | apk-provided `nmap`, `chromium`, `python3.13`, `git`, `bash`, `curl`. |
 | `/work` | Default ephemeral per-run working dir; runs as nonroot uid 65532. |
 
@@ -82,7 +82,7 @@ ADR-051; the image runs unprivileged as uid 65532). `grep -ri 'tor\|onion' .`
 in this directory returns only the word "history"/"tools" — no Tor machinery.
 
 The storron Node-app build layers (pnpm install/build of `@storron/worker`) are
-**not** ported here: the Aegis worker source does not yet exist in this repo, and
+**not** ported here: the Shor worker source does not yet exist in this repo, and
 the engine port is a later phase (LAUNCH-SPEC §7 Phase 1). This image is the
 toolkit substrate; the worker layers get appended when the engine lands.
 

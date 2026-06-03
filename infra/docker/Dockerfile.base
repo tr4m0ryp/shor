@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 #
-# Aegis offensive-toolkit BASE image (multi-stage, Wolfi/glibc).
+# Shor offensive-toolkit BASE image (multi-stage, Wolfi/glibc).
 #
 # This is the SLOW, RARELY-CHANGING half of the worker image: the ~30 offensive
 # tools (Go binaries, the shared Python venv, the git-clone tools), the runtime
 # OS closure (nmap, chromium + its glibc libs, node), and the Claude/Playwright
-# CLIs. It does NOT contain the Aegis Node app — that lives in the thin app image
+# CLIs. It does NOT contain the Shor Node app — that lives in the thin app image
 # (`infra/docker/Dockerfile`) which does `FROM` this base and only COPYs the
 # compiled worker on top.
 #
@@ -14,7 +14,7 @@
 # (~14 min) even when only a few lines of Node changed. Building this base once
 # (when tools.lock / system deps change) lets app builds be ~1-2 min.
 #
-# Build: .acceptance/cloudbuild.base.yaml → aegis-worker-base:latest.
+# Build: .acceptance/cloudbuild.base.yaml → shor-worker-base:latest.
 #
 # Strategy mirrors the original combined Dockerfile (ADR-023/024/026/027):
 #   - Builder  : cgr.dev/chainguard/wolfi-base  (apk + shell; build everything)
@@ -88,11 +88,11 @@ RUN apk update && apk add --no-cache \
     libffi-dev \
     openssl-dev
 
-ENV VENV=/opt/aegis/venv
+ENV VENV=/opt/shor/venv
 RUN python3 -m venv "$VENV"
 ENV PATH=$VENV/bin:$PATH
 
-ENV TOOLS_DIR=/opt/aegis/tools
+ENV TOOLS_DIR=/opt/shor/tools
 RUN mkdir -p "$TOOLS_DIR"
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
@@ -182,20 +182,20 @@ RUN apk update && apk add --no-cache \
 # it travels with `COPY --from=runtime-staging /usr/`.
 RUN npm install -g @anthropic-ai/claude-code@2.1.84 @playwright/cli@0.1.1 && \
     CLI="$(npm root -g)/@anthropic-ai/claude-code/cli.js" && \
-    test -f "$CLI" && ln -sf "$CLI" /usr/lib/aegis-claude-cli.js
+    test -f "$CLI" && ln -sf "$CLI" /usr/lib/shor-claude-cli.js
 
 # ---------------------------------------------------------------------------
 # Stage 4: base runtime — minimal glibc-dynamic with the toolkit baked in but
-#          NO Aegis app. The app image does `FROM` this and adds the Node layer.
+#          NO Shor app. The app image does `FROM` this and adds the Node layer.
 # ---------------------------------------------------------------------------
 FROM cgr.dev/chainguard/glibc-dynamic:latest AS base
 
 USER root
 
-ENV AEGIS_HOME=/opt/aegis
-ENV TOOLS_DIR=/opt/aegis/tools
-ENV VENV=/opt/aegis/venv
-ENV AEGIS_CLAUDE_CLI=/usr/lib/aegis-claude-cli.js
+ENV SHOR_HOME=/opt/shor
+ENV TOOLS_DIR=/opt/shor/tools
+ENV VENV=/opt/shor/venv
+ENV SHOR_CLAUDE_CLI=/usr/lib/shor-claude-cli.js
 
 # 1) Runtime OS closure (libs, nmap, chromium, python3.13, bash/git/curl, …).
 COPY --from=runtime-staging /usr/ /usr/
@@ -206,8 +206,8 @@ COPY --from=runtime-staging /etc/fonts/ /etc/fonts/
 COPY --from=go-builder /go/bin/ /usr/local/bin/
 
 # 3) Shared Python venv + the in-place git-clone tools.
-COPY --from=py-builder /opt/aegis/venv/ /opt/aegis/venv/
-COPY --from=py-builder /opt/aegis/tools/ /opt/aegis/tools/
+COPY --from=py-builder /opt/shor/venv/ /opt/shor/venv/
+COPY --from=py-builder /opt/shor/tools/ /opt/shor/tools/
 
 # 4) Convenience wrappers so skills can invoke the in-place Python tools by name.
 RUN set -eux; \
@@ -229,21 +229,21 @@ RUN set -eux; \
 
 # System-level git config (clones/checkouts run as nonroot at runtime).
 RUN git config --system user.email "agent@localhost" && \
-    git config --system user.name "Aegis Agent" && \
+    git config --system user.name "Shor Agent" && \
     git config --system --add safe.directory '*'
 
 # Ephemeral working dirs (per-run workdirs are mounted/created at runtime).
 # /tmp/.claude is pre-created so the app image's `COPY skills/` lands cleanly.
 RUN mkdir -p /work /tmp/.cache /tmp/.config /tmp/.claude && \
     chmod 1777 /tmp/.cache /tmp/.config && \
-    chown -R 65532:65532 /work /opt/aegis /tmp/.claude
+    chown -R 65532:65532 /work /opt/shor /tmp/.claude
 
 # Entrypoint is tool-level (env/path setup), so it ships in the base.
 COPY infra/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # PATH: venv first (shared Python tools), then /usr/local/bin (Go + wrappers).
-ENV PATH=/opt/aegis/venv/bin:/usr/local/bin:/usr/bin:/bin
+ENV PATH=/opt/shor/venv/bin:/usr/local/bin:/usr/bin:/bin
 ENV HOME=/tmp
 ENV XDG_CACHE_HOME=/tmp/.cache
 ENV XDG_CONFIG_HOME=/tmp/.config

@@ -1,4 +1,4 @@
-# Aegis toolkit lockfile (ADR-027, LAUNCH-SPEC §5.2/§5.3).
+# Shor toolkit lockfile (ADR-027, LAUNCH-SPEC §5.2/§5.3).
 #
 # Source of truth for the pinned git-clone tools. Every git-clone tool is
 # pinned to a real commit SHA resolved with `git ls-remote <url> HEAD` on
@@ -193,7 +193,7 @@ module = github.com/trufflesecurity/trufflehog/v3
 ref = @latest
 
 # ---------------------------------------------------------------------------
-# pip tools into the shared venv /opt/aegis/venv (ADR-026). Versions float to
+# pip tools into the shared venv /opt/shor/venv (ADR-026). Versions float to
 # the latest glibc wheel at build time (semgrep/playwright pin transitively).
 # ---------------------------------------------------------------------------
 

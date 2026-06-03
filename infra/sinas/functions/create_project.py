@@ -6,7 +6,7 @@
 #
 # Sinas function: pentest/create_project
 #
-# Deterministic, no LLM. Creates a project on the aegis engine and mirrors the
+# Deterministic, no LLM. Creates a project on the shor engine and mirrors the
 # engine-minted project id into the pentest/projects store.
 #
 # Design T8/T9 (engine mints all ids; white-box ingest is engine-side): call the
@@ -16,7 +16,7 @@
 # GitHub token; Sinas never handles the repo or the token.
 #
 # Auth channels (T7): Sinas -> engine is bearer, carried by the `engine`
-# connector (AEGIS_ENGINE_TRIGGER_TOKEN); this function never sees that token.
+# connector (SHOR_ENGINE_TRIGGER_TOKEN); this function never sees that token.
 # The store write uses the per-execution Sinas access token in
 # context["access_token"].
 

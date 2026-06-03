@@ -1,4 +1,4 @@
-# Aegis dashboard (apps/web) — Cloud Run service image.
+# Shor dashboard (apps/web) — Cloud Run service image.
 # Small Node image (no offensive toolkit); builds the web app and serves it.
 FROM node:22-slim AS build
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
@@ -9,7 +9,7 @@ COPY apps/web/package.json ./apps/web/package.json
 COPY apps/worker/package.json ./apps/worker/package.json
 RUN pnpm install --frozen-lockfile
 COPY apps/web ./apps/web
-RUN pnpm --filter @aegis/web build
+RUN pnpm --filter @shor/web build
 
 FROM node:22-slim AS runtime
 WORKDIR /app

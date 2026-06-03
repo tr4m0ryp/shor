@@ -18,5 +18,5 @@
 namespace: pentest
 name: projects
 description: >-
-  Mirror of aegis projects, keyed by engine-minted projectId. One state per
+  Mirror of shor projects, keyed by engine-minted projectId. One state per
   project; value carries updatedAt for last-writer-wins idempotency.
