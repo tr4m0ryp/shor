@@ -74,6 +74,39 @@ attackers and real auditors work.
 Same agents, same pipeline either way — white-box just unlocks the source-reading tools and
 sharper proof. Black-box is the realistic outsider's view; white-box is the deep audit.
 
+## What it looks like
+
+The screenshots below are from a demo scan of **"Northwind"**, a fictional online store, so
+nothing here is a real target. The dashboard is deliberately plain: connect a target, watch
+the agents work, read what they proved.
+
+**Your targets.** Each card is a connected app — white-box (with its repo) or black-box
+(URL only).
+
+![Targets dashboard](assets/ui-dashboards.png)
+
+**A live run.** The activity view shows the whole pipeline as it happens: a progress bar, a
+timeline where you can see agents running **two-at-a-time**, every offensive tool that fired,
+and each phase with its agents, durations, and the skills they used.
+
+![Scan activity timeline](assets/ui-scan-activity.png)
+
+**Proven findings.** Every finding expands to the full proof — severity and confidence, the
+exact vulnerable `file:line`, the evidence, a **safe proof-of-concept**, repro steps, and a
+concrete remediation.
+
+![Findings with proof](assets/ui-finding-detail.png)
+
+**Attack surface.** The most dangerous findings are chained into realistic "kill-chain"
+scenarios with their business impact and a one-click **fix prompt** for each.
+
+![Attack-surface kill chains](assets/ui-attack-surface.png)
+
+**What changed since last time.** Re-run the scan and Shor diffs it against the previous run —
+what's **new, still open, fixed, or regressed** — so you track progress, not just a snapshot.
+
+![Scan-to-scan diff](assets/ui-diff.png)
+
 ## How it works — the agent architecture
 
 The heart of Shor is a **pipeline of specialist agents**. Instead of one giant agent trying
