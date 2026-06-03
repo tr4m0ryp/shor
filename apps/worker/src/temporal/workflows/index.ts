@@ -41,6 +41,7 @@ import {
 import { toWorkflowSummary } from "../summary-mapper.js";
 import { classifyErrorCode, formatWorkflowError } from "../workflow-errors.js";
 import { runPreflightPhase } from "./phases/preflight.js";
+import { runReconPhase } from "./phases/recon.js";
 import { runReportingPhase } from "./phases/reporting.js";
 import { runSequentialPhase } from "./phases/sequential.js";
 import { runVulnExploitPhase } from "./phases/vuln-exploit.js";
@@ -151,7 +152,9 @@ export async function pentestPipeline(
 		);
 
 		// === Phase 2: Reconnaissance ===
-		await runSequentialPhase(ctx, "recon", "recon", ctx.a.runReconAgent);
+		// Default (reconFanout off): identical to the single recon agent.
+		// Opt-in fan-out lives behind the flag inside runReconPhase.
+		await runReconPhase(ctx);
 
 		// === Phases 3-4: Vulnerability Analysis + Exploitation (Pipelined) ===
 		await runVulnExploitPhase(ctx);

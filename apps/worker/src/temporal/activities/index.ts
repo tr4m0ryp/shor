@@ -34,6 +34,10 @@ export {
 	runXssVulnAgent,
 } from "./agents/dispatchers.js";
 export {
+	resolveReconCandidates,
+	runReconToolSubrun,
+} from "./agents/recon-fanout.js";
+export {
 	logPhaseTransition,
 	logWorkflowComplete,
 	saveCheckpoint,
