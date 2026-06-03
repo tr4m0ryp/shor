@@ -70,8 +70,8 @@ function resolveSinasConnection(): SinasConnection | null {
 	const url = process.env.SINAS_URL;
 	const apiKey = process.env.SINAS_API_KEY;
 	const namespace = process.env.SINAS_NAMESPACE ?? "pentest";
-	const finalizerAgent = process.env.SINAS_FINALIZER_AGENT ?? "finalizer";
-	const attackSurfaceAgent = process.env.SINAS_ATTACK_SURFACE_AGENT ?? "attack-surface-opus";
+	const finalizerAgent = process.env.SINAS_FINALIZER_AGENT ?? "finalizer-opus-v2";
+	const attackSurfaceAgent = process.env.SINAS_ATTACK_SURFACE_AGENT ?? "attack-surface-opus-v2";
 	if (!enabled || !url || !apiKey) return null;
 	return { url: url.replace(/\/+$/, ""), apiKey, namespace, finalizerAgent, attackSurfaceAgent };
 }
@@ -134,14 +134,15 @@ function buildFinalizerMessage(scanId: string, target: string, findings: Finding
 			remediation: String(f.remediation ?? "").slice(0, 200),
 		}))
 		.sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9));
-	const top = compact.slice(0, 10);
+	// No numeric cap: a fixed top-N silently dropped real critical/high issues.
+	// Send all findings and require every critical/high to be reported individually;
+	// the v2 agent's larger token budget makes this fit.
 	return (
-		`Produce the finalized executive security report for scan ${scanId} (target ${target}).\n` +
+		`Produce the finalized executive report for scan ${scanId} (target ${target}).\n` +
 		`Do NOT call any tools and do NOT read from the store — use ONLY the data in this message.\n` +
-		`There are ${findings.length} findings total. Use EXACTLY these severity_counts: ${JSON.stringify(counts)}.\n` +
-		`The report's "findings" array must contain ONLY the ${top.length} highest-severity findings listed below (the dashboard shows the full list). ` +
-		`Keep each finding's evidence/remediation/fix_prompt to one short sentence and executive_summary under 130 words; set overall_risk.\n\n` +
-		`TOP FINDINGS JSON:\n${JSON.stringify(top)}`
+		`Use EXACTLY these severity_counts: ${JSON.stringify(counts)}.\n` +
+		`Include EVERY critical and high finding INDIVIDUALLY in the "findings" array — do not cap or summarise them away. You may group medium/low/info (the counts already capture them). Set overall_risk from the worst confirmed issues.\n\n` +
+		`FINDINGS JSON:\n${JSON.stringify(compact)}`
 	);
 }
 
@@ -287,7 +288,7 @@ export async function finalizeViaSinas(
 
 const ATTACK_SURFACE_FILE = "attack_surface_scenarios.json";
 
-/** Build the attack-surface message: findings inline, no tools, output bounded. */
+/** Build the attack-surface message: findings inline, no tools, severity-complete. */
 function buildAttackSurfaceMessage(scanId: string, target: string, findings: FindingRecord[]): string {
 	const compact = findings.map((f) => ({
 		id: f.id,
@@ -298,10 +299,11 @@ function buildAttackSurfaceMessage(scanId: string, target: string, findings: Fin
 		location: `${f.vulnerable_code_location?.file ?? ""}:${f.vulnerable_code_location?.line ?? ""}`,
 		evidence: String(f.evidence ?? "").slice(0, 320),
 	}));
+	// No numeric cap on scenarios — a fixed cap dropped real high-impact chains.
+	// Require full critical/high coverage; the v2 agent's token budget makes it fit.
 	return (
 		`Produce the chained attack-surface scenarios for scan ${scanId} (target ${target}).\n` +
-		`Do NOT call tools — use ONLY the ${findings.length} findings below. Reference real finding ids in required_findings.\n` +
-		`RESPONSE LIMIT IS TIGHT — you MUST fit: AT MOST 5 scenarios; explanation <= 2 sentences; kill_chain <= 4 steps; how_to_reproduce <= 3 steps; business_impact 1 sentence; remediation 1 sentence; claude_code_prompt <= 2 sentences. Prioritise the most severe chains.\n\n` +
+		`Do NOT call tools — use ONLY the ${findings.length} findings below. Cover EVERY critical and high finding — each MUST appear in required_findings of at least one scenario; do not omit any. Chain related findings into the most dangerous end-to-end paths, ordered most-severe-first. Produce as many scenarios as the findings genuinely warrant (merge duplicates, do not pad).\n\n` +
 		`FINDINGS JSON:\n${JSON.stringify(compact)}`
 	);
 }
