@@ -13,6 +13,7 @@ import type { AgentProgress, ScanId, ScanProgress, ScanStatus } from '../domain/
 import { resolveSinkTenant } from '../findings/index.js';
 import type { ApiResponse } from '../server/router.js';
 import { gate, notFound, ok, serverError } from '../server/dashboard/auth-util.js';
+import { mirrorScan } from '../sinas/mirror.js';
 import { deriveProgressView } from './derive.js';
 
 const STATUSES: ReadonlySet<string> = new Set(['pending', 'running', 'completed', 'failed', 'cancelled']);
@@ -102,6 +103,9 @@ export async function handleIngestProgress(
   try {
     const updated = await scanRepo.setProgress(resolved.tenantId, scanId, snapshot);
     if (!updated) return notFound('scan not found');
+    // Best-effort hub->Sinas mirror of the live progress snapshot (~3s cadence
+    // during a run -> near-real-time in Sinas); self-swallowing, never blocks.
+    await mirrorScan(updated);
     return ok({ ok: true });
   } catch (err) {
     return serverError(err);
