@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shor</title>
-<meta name="description" content="Shor -- AI web-pentest platform. Dashboards, scans, findings, attack surface, and scan-to-scan diffs.">
+<meta name="description" content="Shor -- AI web-pentest platform. Projects, scans, findings, attack surface, and scan-to-scan diffs.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F26419' stroke-width='1.5'%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4'/%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4' transform='rotate(60 12 12)'/%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4' transform='rotate(120 12 12)'/%3E%3Ccircle cx='12' cy='12' r='2.1' fill='%23F26419' stroke='none'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -314,6 +314,7 @@ body {
 .stat-card.sev-high .stat-val { color: #E8590C; }
 .stat-card.sev-medium .stat-val { color: var(--yellow); }
 .stat-card.sev-low .stat-val { color: var(--text-secondary); }
+.stat-card.stat-date .stat-val { font-size: 15px; white-space: nowrap; }
 .detail-grid { display: grid; grid-template-columns: 200px 1fr; gap: 8px 16px; font-size: 13px; }
 .detail-grid dt { color: var(--text-muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; align-self: center; }
 .detail-grid dd { color: var(--text); word-break: break-all; }
@@ -544,6 +545,27 @@ body.guest .sidebar nav { display: none; }
 .toast.success { background: #4ADE80; color: #fff; }
 .toast.error { background: #F87171; color: #fff; }
 
+/* === Modal === */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.62); backdrop-filter: blur(2px); padding: 20px;
+}
+.modal {
+  width: min(520px, 100%); background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 22px 18px;
+}
+.modal-head { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 600; color: var(--text); }
+.modal-head svg { width: 16px; height: 16px; color: var(--accent); }
+.modal-sub { font-size: 12.5px; color: var(--text-muted); margin: 9px 0 15px; line-height: 1.5; }
+.share-row { display: flex; gap: 8px; }
+.share-row input {
+  flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); background: #1B1E23; color: var(--text);
+  font-size: 13px; font-family: var(--font); outline: none;
+}
+.share-row input:focus { border-color: var(--accent); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
 /* === Spinner === */
 .spinner {
   display: inline-block; width: 20px; height: 20px;
@@ -587,7 +609,7 @@ body.guest .sidebar nav { display: none; }
   <main class="main">
     <div id="guestBanner" class="guest-banner" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-      <span>You're viewing a <b>shared, read-only</b> dashboard. Sign-in is not required; you can browse results but can't edit or run scans.</span>
+      <span>You're viewing a <b>shared, read-only</b> project. Sign-in is not required; you can browse results but can't edit or run scans.</span>
     </div>
     <!-- ===================== Targets page ===================== -->
     <div id="pageTargets" class="page">
@@ -597,11 +619,11 @@ body.guest .sidebar nav { display: none; }
       </div>
 
       <div class="new-run-card owner-only">
-        <h2>New Dashboard</h2>
+        <h2>New Project</h2>
         <div class="new-run-grid">
           <div>
             <label for="projName">Name</label>
-            <input type="text" id="projName" placeholder="My production app">
+            <input type="text" id="projName" placeholder="Project name">
           </div>
           <div>
             <label for="projUrl">Target URL</label>
@@ -641,20 +663,20 @@ body.guest .sidebar nav { display: none; }
           <div class="start-row">
             <button class="btn btn-primary" id="createProjBtn" onclick="createProject()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Create Dashboard
+              Create Project
             </button>
           </div>
         </div>
       </div>
 
       <div class="section-header">
-        <h2>Dashboards</h2>
+        <h2>Projects</h2>
         <span class="count" id="projCount">0</span>
       </div>
       <div class="runs-grid" id="projectsContainer">
         <div class="empty-state" id="projectsEmpty">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/></svg>
-          <p>No dashboards yet. Create one above.</p>
+          <p>No projects yet. Create one above.</p>
         </div>
       </div>
     </div>
@@ -664,10 +686,10 @@ body.guest .sidebar nav { display: none; }
       <div class="page-header detail-header">
         <button class="btn btn-ghost btn-sm owner-only" onclick="showPage('targets')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="15 18 9 12 15 6"/></svg>
-          Dashboards
+          Projects
         </button>
         <div>
-          <h1 id="projDetailTitle">Dashboard</h1>
+          <h1 id="projDetailTitle">Project</h1>
           <p id="projDetailSubtitle" class="run-id"></p>
         </div>
         <div class="detail-actions">
@@ -774,6 +796,24 @@ body.guest .sidebar nav { display: none; }
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Read-only share link modal (themed, replaces the native prompt fallback) -->
+<div id="shareModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeShareModal()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="shareModalHead">
+    <div class="modal-head" id="shareModalHead">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      Read-only share link
+    </div>
+    <p class="modal-sub">Anyone with this link can view this project's scans, findings, and diffs — read-only, no sign-in required.</p>
+    <div class="share-row">
+      <input type="text" id="shareLinkInput" readonly onclick="this.select()">
+      <button class="btn btn-primary btn-sm" onclick="copyShareLink()">Copy</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeShareModal()">Done</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ===================== Shor dashboard client =====================
@@ -1176,7 +1216,7 @@ async function loadProjects() {
     const projects = data.projects || [];
     document.getElementById('projCount').textContent = String(projects.length);
     if (projects.length === 0) {
-      container.innerHTML = '<div class="empty-state"><p>No dashboards yet. Create one above.</p></div>';
+      container.innerHTML = '<div class="empty-state"><p>No projects yet. Create one above.</p></div>';
       return;
     }
     container.innerHTML = projects.map(renderProjectCard).join('');
@@ -1201,7 +1241,7 @@ function renderProjectCard(p) {
       '</div>' +
       '<div class="run-status">' + modeLabel(p) + '</div>' +
       '<div class="run-details">' + repoLine + '</div>' +
-      '<button class="btn btn-ghost btn-sm proj-delete" title="Delete dashboard" ' +
+      '<button class="btn btn-ghost btn-sm proj-delete" title="Delete project" ' +
         'onclick="event.stopPropagation(); deleteProject(\'' + escapeHtml(p.id) + '\', \'' + escapeHtml(p.name) + '\')">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
       '</button>' +
@@ -1210,10 +1250,10 @@ function renderProjectCard(p) {
 }
 
 async function deleteProject(id, name) {
-  if (!confirm('Delete dashboard "' + name + '" and all its scans? This cannot be undone.')) return;
+  if (!confirm('Delete project "' + name + '" and all its scans? This cannot be undone.')) return;
   try {
     await api('DELETE', '/projects/' + id);
-    showToast('Dashboard deleted', 'success');
+    showToast('Project deleted', 'success');
     loadProjects();
   } catch (err) {
     showToast(err.message, 'error');
@@ -1234,7 +1274,7 @@ async function createProject() {
     const payload = { name, targetUrl, mode };
     if (mode === 'whitebox' && repoFullName) payload.repoFullName = repoFullName;
     await api('POST', '/projects', payload);
-    showToast('Dashboard created', 'success');
+    showToast('Project created', 'success');
     document.getElementById('projName').value = '';
     document.getElementById('projUrl').value = '';
     selectRepo('', '— select a repo —');
@@ -1337,7 +1377,7 @@ async function renderProjectStats(scans) {
     card(sev.medium, 'Medium', 'sev-medium') +
     card(sev.low, 'Low', 'sev-low') +
     card(total, 'Total scans') +
-    card(escapeHtml(lastRun), 'Last run');
+    card(escapeHtml(lastRun), 'Last run', 'stat-date');
 }
 
 async function triggerScan() {
@@ -1366,13 +1406,30 @@ async function shareProject() {
   try {
     const r = await api('POST', '/projects/' + state.currentProject.id + '/share', {});
     const url = location.origin + '/?share=' + r.shareSlug;
-    try {
-      await navigator.clipboard.writeText(url);
-      showToast('Read-only share link copied', 'success');
-    } catch (_) {
-      window.prompt('Read-only share link:', url);
-    }
+    const input = document.getElementById('shareLinkInput');
+    input.value = url;
+    document.getElementById('shareModal').style.display = 'flex';
+    // Pre-select so a manual Cmd/Ctrl+C works even if the Copy button can't.
+    input.focus();
+    input.select();
   } catch (err) { showToast(err.message, 'error'); }
+}
+
+function closeShareModal() {
+  document.getElementById('shareModal').style.display = 'none';
+}
+
+async function copyShareLink() {
+  const input = document.getElementById('shareLinkInput');
+  input.select();
+  try {
+    await navigator.clipboard.writeText(input.value);
+    showToast('Share link copied', 'success');
+  } catch (_) {
+    // Clipboard API unavailable (e.g. non-secure context) — fall back to execCommand.
+    try { document.execCommand('copy'); showToast('Share link copied', 'success'); }
+    catch (_e) { showToast('Press ' + (navigator.platform.indexOf('Mac') > -1 ? '⌘C' : 'Ctrl+C') + ' to copy', 'success'); }
+  }
 }
 
 // Guest: enter read-only mode for a shared slug and open its dashboard.
