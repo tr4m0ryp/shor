@@ -80,7 +80,7 @@ export const PIPELINE_PLAN: readonly PhaseSpec[] = [
   },
   {
     id: 'vulnerability-analysis',
-    label: 'Explore',
+    label: 'Vulnerability Analysis',
     agents: [
       { name: 'injection-vuln', label: 'Injection', subtasks: VULN_SUBTASKS },
       { name: 'xss-vuln', label: 'XSS', subtasks: VULN_SUBTASKS },
@@ -102,12 +102,12 @@ export const PIPELINE_PLAN: readonly PhaseSpec[] = [
   },
   {
     id: 'reporting',
-    label: 'Sinas',
+    label: 'Remediation Report',
     agents: [{ name: 'report', label: 'Report', subtasks: ['Assemble findings', 'Write executive report'] }],
   },
   {
     id: 'attack-surface',
-    label: 'Sinas',
+    label: 'Attack Surface & Fixes',
     agents: [
       {
         name: 'attack-surface',

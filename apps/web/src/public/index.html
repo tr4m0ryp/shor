@@ -323,6 +323,7 @@ body {
 .needs-tag--static:hover { background: rgba(242,100,25,.10); }
 .diff-trans { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-left: 6px; }
 .finding-title { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sinas-intro { font-size: 12.5px; color: var(--text-secondary); margin: 2px 0 16px; }
 .sinas-block { margin-bottom: 22px; }
 .sinas-block__title { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); font-weight: 600; margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 .finding-field dd code, .field-value code, .attack-chain code, .report-body code { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; background: #1B1E23; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
@@ -448,8 +449,6 @@ body {
 .gantt { display: flex; flex-direction: column; gap: 5px; }
 .gantt-row { display: grid; grid-template-columns: 132px 1fr; align-items: center; gap: 10px; }
 .gantt-row__label { font-size: 12px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gantt-phase { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); font-weight: 600; margin: 12px 0 5px; }
-.gantt-phase:first-child { margin-top: 0; }
 .gantt-row__track { position: relative; height: 18px; background: var(--card-hover); border-radius: 4px; }
 .gantt-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; min-width: 4px; transition: width .4s ease, left .4s ease; }
 .gantt-bar.completed { background: var(--green); }
@@ -767,9 +766,11 @@ body.guest .sidebar nav { display: none; }
       <div class="detail-panel" id="panelActivity"></div>
       <div class="detail-panel" id="panelFindings" style="display:none"></div>
       <div class="detail-panel" id="panelDiff" style="display:none"></div>
-      <!-- Sinas grid: the Opus-generated report + attack surface (findings are also
-           Sonnet-improved before this step). -->
+      <!-- Sinas: the post-processing done on Sinas — finding refinement (Sonnet),
+           executive report (Opus), and attack surface (Opus) — in one grid. -->
       <div class="detail-panel" id="panelSinas" style="display:none">
+        <p class="sinas-intro">Post-processing on <b>Sinas</b>: finding refinement &rarr; executive report &rarr; attack surface.</p>
+        <div class="sinas-block"><div class="sinas-block__title">Finding refinement</div><div id="sinasRefine"></div></div>
         <div class="sinas-block"><div class="sinas-block__title">Executive report</div><div id="panelReport"></div></div>
         <div class="sinas-block"><div class="sinas-block__title">Attack surface</div><div id="panelAttackSurface"></div></div>
       </div>
@@ -1585,6 +1586,10 @@ function showScanTab(tab) {
   // The Sinas tab is one grid holding the Opus report + attack surface.
   document.getElementById('panelSinas').style.display = tab === 'sinas' ? 'block' : 'none';
   if (tab === 'sinas' && state.currentScan) {
+    const n = (state.findingsCache || []).length;
+    document.getElementById('sinasRefine').innerHTML = '<div class="field-value">Sinas rewrote ' +
+      (n ? 'all ' + n + ' ' : 'the ') +
+      'findings for clarity and consistent formatting — structured evidence with proper fenced code blocks (Sonnet&nbsp;4.6). The refined findings are shown on the <b>Findings</b> tab.</div>';
     loadScanReport(state.currentScan.id);
     loadScanAttackSurface(state.currentScan.id);
   }
@@ -1658,19 +1663,7 @@ function renderProgress(view) {
   const banner = renderProgressBanner(view);
   const timeline = renderTimeline(view);
   const arsenal = renderArsenal(view);
-  // Merge consecutive phases that share a label (e.g. the two "Sinas" phases —
-  // report + attack surface) into one card so the grid reads as one section.
-  const merged = [];
-  (view.phases || []).forEach(function (p) {
-    const last = merged[merged.length - 1];
-    if (last && last.label === p.label) {
-      last.agents = last.agents.concat(p.agents);
-      last.done += p.done; last.total += p.total;
-    } else {
-      merged.push({ id: p.id, label: p.label, status: p.status, done: p.done, total: p.total, agents: (p.agents || []).slice() });
-    }
-  });
-  const phases = merged.map(renderProgressPhase).join('');
+  const phases = (view.phases || []).map(renderProgressPhase).join('');
   document.getElementById('panelActivity').innerHTML =
     banner + timeline + arsenal + '<div class="pending-grid">' + phases + '</div>';
 }
@@ -1680,27 +1673,20 @@ function renderProgress(view) {
 function renderTimeline(view) {
   if (!view.runStart || !view.runEnd || view.runEnd <= view.runStart) return '';
   const span = view.runEnd - view.runStart;
-  // Group bars under their phase so the vuln-analysis and exploitation groups —
-  // which share the same per-class labels (Injection/XSS/…) — read as two
-  // distinct phases (Explore vs Validation) instead of looking duplicated.
-  let rows = '', lastPhase = '';
-  (view.phases || []).forEach(function (p) {
-    const ags = (p.agents || []).filter(function (a) { return a.startedAt != null; });
-    if (!ags.length) return;
-    if (p.label !== lastPhase) { rows += '<div class="gantt-phase">' + escapeHtml(p.label) + '</div>'; lastPhase = p.label; }
-    ags.forEach(function (a) {
-      const start = a.startedAt;
-      const end = a.finishedAt != null ? a.finishedAt : view.runEnd;
-      const left = Math.max(0, (start - view.runStart) / span * 100);
-      const width = Math.min(100 - left, Math.max(1.2, (end - start) / span * 100));
-      const dur = fmtDur(a.durationMs != null ? a.durationMs : end - start);
-      rows += '<div class="gantt-row"><div class="gantt-row__label">' + escapeHtml(a.label) + '</div>' +
-        '<div class="gantt-row__track"><div class="gantt-bar ' + a.status + '" style="left:' + left.toFixed(1) + '%;width:' + width.toFixed(1) + '%">' +
-          (width > 9 && dur ? '<span class="gantt-bar__dur">' + dur + '</span>' : '') +
-        '</div></div></div>';
-    });
-  });
-  if (!rows) return '';
+  const agents = (view.phases || []).reduce(function (acc, p) { return acc.concat(p.agents); }, [])
+    .filter(function (a) { return a.startedAt != null; });
+  if (agents.length === 0) return '';
+  const rows = agents.map(function (a) {
+    const start = a.startedAt;
+    const end = a.finishedAt != null ? a.finishedAt : view.runEnd;
+    const left = Math.max(0, (start - view.runStart) / span * 100);
+    const width = Math.min(100 - left, Math.max(1.2, (end - start) / span * 100));
+    const dur = fmtDur(a.durationMs != null ? a.durationMs : end - start);
+    return '<div class="gantt-row"><div class="gantt-row__label">' + escapeHtml(a.label) + '</div>' +
+      '<div class="gantt-row__track"><div class="gantt-bar ' + a.status + '" style="left:' + left.toFixed(1) + '%;width:' + width.toFixed(1) + '%">' +
+        (width > 9 && dur ? '<span class="gantt-bar__dur">' + dur + '</span>' : '') +
+      '</div></div></div>';
+  }).join('');
   return '<div class="run-section"><div class="run-section__title">Run timeline · ' + fmtDur(span) + ' total</div><div class="gantt">' + rows + '</div></div>';
 }
 
