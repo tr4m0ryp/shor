@@ -1,402 +1,477 @@
-# Shor: An Autonomous Multi-Tenant AI Pentester for Web Apps and APIs
+# Shor — an AI agent that pentests web apps, on top of Sinas
 
-**Shor** is a hosted platform that turns a large-language-model
-agent into a working web-application penetration tester. A customer connects a target —
-a **live URL** plus the **source repository** behind it — and Shor runs a staged agent
-pipeline that finds, *proves*, and explains vulnerabilities, then hands back a one-click
-prompt to fix each one in the connected repo.
+![WeAreBrain × Via hackathon](assets/hackathon-banner.png)
 
-> **Defensive and authorized-testing use only.** See [Disclaimer](#disclaimer--responsible-use).
+**Shor** is an autonomous penetration tester built as an AI agent. You point it at a
+live web application — a **URL** plus, optionally, the **source code** behind it — and
+it goes off and behaves like a human security tester would: it pokes at the app, finds
+weaknesses, *proves* each one with a small harmless attack, and writes up a report that
+tells your engineers exactly what to fix and how.
 
-## Project Overview
+It was built for the **WeAreBrain hackathon**, where the brief was simple to state and
+hard to do: *build AI agents that solve a real-world problem, running on top of Sinas*
+(WeAreBrain's agent platform). This README is the story of what we built, the decisions
+that made it work, and — the part we're most proud of — how we used Sinas for the things
+it's genuinely great at while running the heavy lifting elsewhere and still keeping it all
+reachable *through* Sinas.
 
-Manual web pentests are slow, expensive, and stale the moment the code changes. Automated
-DAST scanners are fast but noisy — they flag *possible* issues without proving them, drown
-teams in false positives, and have no memory of what was already triaged. The gap is a tool
-that reasons like a tester (chains recon into exploitation, reads the source to confirm a
-finding, writes a working proof-of-concept) **and** behaves like a product (multi-tenant,
-re-runnable on every push, diff-aware across scans, safe by construction).
+> **For authorized, defensive testing only.** Point it at systems you own or are contracted
+> to test. See [Responsible use](#responsible-use).
 
-Shor is that tool. It drives roughly **30 preinstalled offensive CLI tools** (sqlmap,
-dalfox, nuclei, ffuf, semgrep, and more) through a **rich system prompt plus one loadable
-skill per tool**, executed via shell inside an isolated, per-scan sandbox. Each agent works
-a single OWASP category; every finding is **validated by running a harmless, reproducible
-proof-of-concept** (the *minimum-impact* "XBOW" pattern — stop at the smallest convincing
-proof, no data exfiltration, no persistence). Confirmed findings are stored as **structured,
-diffable records** keyed on a stable fingerprint, so the dashboard can show what is **new,
-still open, fixed, or regressed** between any two scans — and offer a **"Copy fix prompt"**
-that turns each attack into a remediation task for the repo.
+---
 
-The engine is a hardened, multi-tenant rebuild of a proven single-user pentest agent, ported
-onto **Google Cloud** (Identity Platform, Temporal Cloud, Cloud Run, Cloud SQL, Secret
-Manager, GCS) and wrapped in a **code-enforced safety layer** — rules-of-engagement scope
-checks, per-host rate limits, a default-deny egress allowlist, secret redaction, and a kill
-switch. All Tor/onion machinery from the original engine has been removed; Shor runs **direct
-clearnet egress only**.
+## Why we built this
 
-## Core Architecture / How It Works
+Web apps get hacked through boring, well-understood mistakes — a login that can be
+bypassed, a search box that leaks the database, a link that quietly fetches internal
+URLs. Finding these is real work, and today you have two bad options:
 
-Shor splits into two deployable units plus managed cloud services. The **control plane** (a
-long-running web service) owns identity, data, secrets, and orchestration; the **data plane**
-(one ephemeral job per scan) runs the actual agent pipeline in isolation.
+- **Hire a human pentester.** Thorough, but slow and expensive, and the report is stale
+  the moment a developer ships the next change.
+- **Run an automated scanner.** Fast and cheap, but it shouts about *possible* problems
+  without proving any of them. Teams drown in false alarms and learn to ignore the tool.
+
+The gap is a tool that **reasons like a tester** — chains clues together, reads the code to
+confirm a hunch, writes a working proof — **but behaves like a product**: re-runnable on
+every code push, able to tell you what's *new* since last time, and safe by construction so
+it can't accidentally do damage.
+
+That's a perfect job for an AI agent, and exactly the kind of "real-world problem on Sinas"
+the hackathon was asking for. So we built one.
+
+## What it does, in one walkthrough
+
+1. **You connect a target.** Give it a live URL, and optionally connect a GitHub repo. With
+   the code, Shor does *white-box* testing (it can read the source to confirm findings);
+   without it, *black-box* (URL only, like an outside attacker).
+2. **You hit scan.** Shor spins up an isolated, throwaway sandbox just for this run.
+3. **The agents go to work.** A pipeline of specialist agents maps the app, hunts for each
+   class of bug, and then tries to actually exploit the ones it suspects — using real
+   offensive tools, the same ones professionals use.
+4. **Every finding is proven.** Shor doesn't report a guess. It runs the **smallest harmless
+   attack that demonstrates the bug is real** — enough to prove it, never enough to cause
+   harm — and saves that proof as evidence.
+5. **You get a report you can act on.** Each finding comes with a severity, the evidence,
+   the exact line of vulnerable code, and a one-click **"copy fix prompt"** you can hand
+   straight to a developer (or to another AI) to fix it. Re-scan later and Shor tells you
+   what's **new, still open, fixed, or came back**.
+
+### Two ways to test: black-box and white-box
+
+The difference is simply **how much Shor gets to see** — and it mirrors the two ways real
+attackers and real auditors work.
+
+- **Black-box** — *URL only.* Shor sees exactly what an outside attacker sees: the live site,
+  nothing else. It has to discover everything from the outside — pages, parameters, behavior —
+  and prove bugs purely by interacting with the running app. This is the honest "could a
+  stranger on the internet break in?" test.
+- **White-box** — *URL + the source code.* You also connect the GitHub repo, so Shor can
+  **read the code** behind the app. Now it can do everything black-box does *and* confirm a
+  finding by pointing at the exact vulnerable line, scan the source for risky patterns and
+  leaked secrets, and check your dependencies for known holes. Far more thorough, and the
+  findings come with precise `file:line` evidence.
+
+Same agents, same pipeline either way — white-box just unlocks the source-reading tools and
+sharper proof. Black-box is the realistic outsider's view; white-box is the deep audit.
+
+## How it works — the agent architecture
+
+The heart of Shor is a **pipeline of specialist agents**. Instead of one giant agent trying
+to do everything (which gets confused and misses things), we use a relay team where each
+agent has one job and hands its results to the next.
 
 ```
-   Operator browser
-         |  HTTPS (session cookie)
-         v
-  +-----------------------------------------------+
-  |  Cloud Run SERVICE  -  shor-web              |
-  |  dashboard UI + control-plane API             |
-  |  (serves the static UI; auth, data, secrets,  |
-  |   ingest, findings, guardrails, orchestration)|
-  +--+----------------+----------------+----------+
-     | verify token   | mint scan      | read/write
-     v                v                v
- Identity         Temporal Cloud    Cloud SQL (Postgres)
- Platform         1 workflow/scan    JSONB findings +
- 1 tenant / org   cancel = kill      pgMemento delta log
-                      |               (scan-to-scan diffs)
-                      | start job
-                      v
-  +-----------------------------------------------+
-  |  Cloud Run JOB per scan  -  shor-scan-worker |
-  |  gVisor sandbox, per-run service identity      |
-  |                                               |
-  |  Claude Agent SDK pipeline (via shell):        |
-  |  pre-recon -> recon -> vuln -> exploit -> report|
-  |  ~30 offensive CLI tools + per-tool skills     |
-  +--+---------------+----------------+------------+
-     | findings      | artifacts      | egress (firewalled)
-     v               v                v
-  shor-web       GCS bucket       Target ROE hosts
-  HTTP sink       per-tenant       + GitHub hosts only
-                  prefix           (169.254.169.254 blocked)
-
-  Secret Manager - one secret per (tenant, user, provider),
-  file-mounted into the job, scoped to that tenant only.
+ pre-recon ──▶ recon ──▶ vulnerability analysis ──▶ exploitation ──▶ reporting
+ (warm up)   (map the   (5 agents, one per bug    (5 agents prove   (write the
+             target)     class, read-only)          the bugs live)    report)
 ```
 
-**1. Connect and scan.** A tenant creates a **Project** — a named target = live URL +
-connected repo (via the GitHub App or "Connect with GitHub" OAuth) + optional cron schedule
-+ target auth/rules-of-engagement config. White-box projects clone the repo; black-box
-projects run URL-only.
+| Stage | What happens | The agents |
+|---|---|---|
+| **Recon** | Discover the app's pages, parameters, technologies, and — with source — its attack surface. Runs first, and the rest depends on it. | `pre-recon`, `recon` |
+| **Vulnerability analysis** | Five agents, each owning one bug family, study the app and the code *without attacking* — pure reading and static analysis. | `injection`, `xss`, `auth`, `ssrf`, `authz` |
+| **Exploitation** | The same five families, but now each agent *tries to actually break in* against the live app and captures a safe proof. | `injection`, `xss`, `auth`, `ssrf`, `authz` |
+| **Reporting** | Two agents turn raw findings into an executive report, attack scenarios ("kill chains"), and per-finding fix prompts. | `report`, `attack-surface` |
 
-**2. Mint a run.** Triggering a scan pins an immutable **CodebaseVersion** (a git SHA pulled
-to a per-tenant GCS prefix), records a **Scan** row, and starts a **Temporal Cloud workflow** —
-one workflow per scan, crash-resumable, where cancellation *is* the kill switch.
+That's **14 agents** in total per scan. Splitting analysis (reading) from exploitation
+(attacking) is a firm rule: the quiet study happens first across the board, and only then
+does any live traffic go out — so a finding is understood before it's poked.
 
-**3. Execute in isolation.** The workflow launches a **Cloud Run Job** for that scan only:
-gVisor-sandboxed, with a per-run service identity whose secret access is scoped to that one
-tenant, the selected provider key **mounted as a file** (never an env var), and a per-tenant
-VPC egress firewall that allows only the target's in-scope hosts and GitHub. The job
-materializes the repo snapshot and runs the pipeline **in-process**.
+### What each agent actually does
 
-**4. The agent <-> tool model.** Each pipeline stage is a Claude Agent SDK session with full
-shell access. The category prompt carries the methodology (persona, OWASP workflow, scope,
-evidence rules); the deep how-to for each tool lives in a **skill** — a folder whose
-frontmatter (name + one-line "when to use") is always in context, but whose body loads **only
-when the agent escalates to that tool** (*progressive disclosure*). This keeps the base prompt
-lean while bringing tool depth just-in-time.
+**Recon — figure out what we're even looking at.**
 
-**5. Findings and diffs.** Agents emit **structured findings** (JSON schema) — category, CWE,
-OWASP class, severity, confidence, evidence, a **safe PoC**, repro steps, the vulnerable
-`file:line`, the missing defense, and a remediation. The worker streams them back to the
-dashboard's sink after every agent (so a timeout never loses results). Each finding's **stable
-fingerprint** drives the diff engine: `new`, `open`, `fixed`, or `regressed` across scans,
-computed from Postgres' JSONB write-delta log.
+- **`pre-recon`** — the warm-up. Confirms the target is reachable and in scope, and sets up
+  the ground rules for the run.
+- **`recon`** — the mapper. Finds the app's pages, forms, parameters, and technologies, and
+  (in white-box) reads the source to chart the attack surface. Everything downstream builds
+  on what it discovers.
 
-### Pipeline stages
+**The five bug families.** Each family is studied by one analysis agent, then attacked by one
+exploit agent. Same specialty, two phases — read first, attack second:
 
-`pre-recon -> recon -> vulnerability-analysis -> exploitation -> reporting`
+- **`injection`** — *can user input sneak in as code or commands?* Hunts SQL injection (trick
+  the database), OS-command injection, and template injection — the classic "the app ran my
+  input instead of just storing it" bugs.
+- **`xss`** (cross-site scripting) — *can an attacker get their script to run in someone
+  else's browser?* The bug behind hijacked sessions and defaced pages; the exploit agent uses
+  a real browser to prove the script actually executes.
+- **`auth`** (authentication) — *can you get in without valid credentials?* Tests login
+  weaknesses, broken session tokens, and two-factor bypasses — proving you can become a user
+  you shouldn't be.
+- **`ssrf`** (server-side request forgery) — *can you make the server fetch URLs it shouldn't?*
+  The bug that lets an attacker reach a company's internal systems through its own server; the
+  proof is an out-of-band callback showing the server "phoned home."
+- **`authz`** (authorization) — *can you reach data or actions that aren't yours?* Tests
+  whether one user can read or change another's records, or a normal user can do admin things
+  (broken access control / IDOR).
 
-| Stage | Agents | Execution | Nature |
-|---|---|---|---|
-| **Prerequisites** | `pre-recon`, `recon` | Sequential, **fail-fast** | Discovery + whitebox surface mapping |
-| **Vulnerability analysis** | `injection`, `xss`, `auth`, `ssrf`, `authz` | 5 agents, **2-wide concurrent** | Read-only / static (SAST, SCA, secrets) |
-| **Exploitation** | `injection`, `xss`, `auth`, `ssrf`, `authz` | 5 agents, **2-wide concurrent** | Live DAST + harmless PoC |
-| **Synthesis** | `report`, `attack-surface` | Best-effort | Executive report + kill-chain + fix prompts |
+**Reporting — turn raw findings into something a human can use.**
 
-Within a parallel group a single agent failure is **isolated** — it is logged and the rest of
-the group continues. Prerequisites are fail-fast because the vuln agents read their
-deliverables. The split rule is firm: **static analyzers run in analysis (no live traffic);
-DAST runs in exploitation.**
+- **`report`** — the writer. Produces the executive summary and the per-finding write-ups,
+  each with evidence, severity, and a copy-paste fix prompt.
+- **`attack-surface`** — the storyteller. Chains individual findings into realistic
+  "kill-chain" scenarios — *how* an attacker would actually string these bugs together — so
+  teams fix the dangerous combinations first.
 
-## Toolkit and Scope
+**Each agent is a Claude session with a shell.** It can run commands, read files, and decide
+its own next move — exactly like a tester at a terminal. What makes one agent an "XSS
+specialist" and another an "auth specialist" is its **prompt** (its methodology and rules)
+plus the **tools** it knows how to reach.
 
-The worker image preinstalls the offensive toolkit; **31 skills** document them (30 tools + one
-`authz-recipe` procedure for the category with no headless CLI). Skills are tagged by pipeline
-layer and grouped by attack category.
+### The clever bit: tools as "skills" that load on demand
 
-### Recon and discovery
+Shor drives **~30 real offensive security tools** (the same ones professionals use — see
+[the toolkit](#the-toolkit)). The naive way to teach an agent 30 tools is to cram all 30
+manuals into its prompt — but that buries the agent in instructions it mostly doesn't need
+on any given step, and it costs a fortune in tokens.
 
-| Tool | Role |
+Instead we give each tool a **skill**: a little folder with a one-line "what this is and when
+to use it" summary that's *always* visible, and a detailed manual that **loads only when the
+agent actually decides to reach for that tool**. This is called **progressive disclosure** —
+the agent sees the whole toolbox at a glance but only pulls out the full instructions for the
+wrench when it's holding a bolt. The base prompt stays lean; the depth arrives just in time.
+
+## The decisions we're proud of
+
+The interesting part of a hackathon isn't the feature list — it's the calls that made a
+hard thing actually work. These are ours.
+
+**We didn't build the agent loop — we stood on the Claude Agent SDK.** The hardest part of
+an AI agent is the plumbing: the back-and-forth conversation, calling tools and feeding
+results back, running sub-agents, loading skills. Anthropic's **Claude Agent SDK** (the same
+"harness" that powers Claude Code) gives all of that for free, battle-tested. We treated it
+as our runtime and spent our time on the *security* logic — the methodology, the tools, the
+safety rails — instead of reinventing an agent framework in a weekend. This single decision
+is why a small team got a 14-agent pipeline working at all.
+
+**Every finding must be proven, minimally.** We adopted the *minimum-impact* discipline:
+an agent stops at the smallest convincing proof — no stealing data, no leaving anything
+behind. This is what separates Shor from a noisy scanner: if it says a bug is real, it's
+because it demonstrated the bug is real, and the proof is in the report.
+
+**We ran the whole thing on a budget model — and made it reliable anyway.** To keep costs
+sane we routed every agent to a fast, cheap model. That model couldn't reliably produce the
+strict machine-readable output the pipeline needed between stages, so instead of fighting it
+we had each agent **write its hand-off file directly**, and made the next stage tolerant: if
+the file is malformed, the run degrades to "found nothing here" rather than crashing. Cheap
+*and* robust.
+
+**We run agents two-at-a-time.** The five analysis agents don't depend on each other, and
+neither do the five exploit agents — so we run them in pairs to roughly halve the wall-clock
+time. We deliberately cap it at **two**, not all five, to stay under the model's rate limits
+and fit the handful of real browsers in memory. A scan still takes a while (it's genuinely
+deep work — tens of minutes), but parallelism keeps it tolerable.
+
+**Safety is enforced in code, not just asked for in the prompt.** Telling an AI "please stay
+in scope" is not a security control. So the rules live in the runtime: every network action
+is re-checked against the agreed scope, outbound traffic is **default-deny** (only the target
+and GitHub are allowed — cloud metadata and internal addresses are hard-blocked), there are
+per-host rate limits so it can never hammer a site, secrets are scrubbed from logs, and a
+**kill switch** can tear a run down instantly. The agent operates *inside* a cage it can't
+reason its way out of.
+
+**Each scan runs in its own disposable sandbox.** The long-lived service that holds your data
+and the short-lived job that actually attacks things are **separate**. Every scan gets a fresh,
+locked-down container with its own identity and only the one secret it needs, which is thrown
+away when the scan ends. A bug in one tenant's scan can't reach another's.
+
+## Where Sinas fits — and where it deliberately doesn't
+
+This is the heart of the hackathon brief, so it deserves a plain explanation.
+
+**Sinas** is WeAreBrain's platform for building AI agents. It's excellent at what an agent
+platform should do: it can host an agent that **thinks** (reasons with an LLM), store data in
+key-value stores, render a dashboard from a component, and call out to other systems through
+connectors. What it is *not* built to do is run a 70-minute pipeline of ~30 native hacking
+binaries — sqlmap, a headless Chrome browser, port scanners — inside firewalled sandboxes
+with per-customer secret isolation. Sinas functions are intentionally lightweight; that kind
+of heavy, long-running, tool-driven execution lives outside it.
+
+So we made a deliberate split: **Sinas is the brain and the front door; the heavy execution
+engine lives on Google Cloud — but you never have to leave Sinas to use it.** The bridge runs
+both directions.
+
+**Sinas → engine (the front door).** From inside Sinas, a connector and a function can kick
+off the engine: start a scan, create a project, check a scan's status, list connected repos.
+The engine exposes a small, locked-down, token-protected API just for this. To a Sinas user
+it feels native — you trigger a real pentest from the platform — but the actual work is
+dispatched out to the cloud.
+
+**Engine → Sinas (live state + the write-up).** While a scan runs, the engine continuously
+**mirrors** its state back into Sinas stores — the project, the scan's live progress, and
+each finding — so the run is visible *inside Sinas in near real time*, not just at the end.
+And for the final report, we hand the job back to **a Sinas agent**: the engine pushes its
+raw findings into Sinas and asks the Sinas "finalizer" agent to write the polished,
+structured report (this is the *thinking* Sinas is great at), which a Sinas dashboard
+component then displays.
+
+The result is the best of both worlds. The thing Sinas is great at — **reasoning, storing,
+displaying, orchestrating** — happens *in* Sinas. The thing it can't do — **running an arsenal
+of real attack tools for an hour in a sandbox** — happens on infrastructure built for it. And
+because the bridge is two-way and the engine is platform-agnostic, the whole pentest is
+**started from, visible in, and reported through Sinas** regardless of where the muscle lives.
+
+```
+   Sinas instance                          Google Cloud engine
+ ┌────────────────────┐   start scan    ┌──────────────────────────┐
+ │ connector +        │ ───────────────▶│ control plane (web)      │
+ │ trigger function   │                 │  auth, data, orchestration│
+ │                    │                 └────────────┬─────────────┘
+ │ finalizer agent    │ ◀── findings ───            │ one sandbox job per scan
+ │  (writes report)   │                 ┌────────────▼─────────────┐
+ │                    │ ◀── live state ─│ 14-agent pipeline        │
+ │ dashboard component│     mirror      │  ~30 offensive tools     │
+ └────────────────────┘                 └──────────────────────────┘
+```
+
+## The toolkit
+
+The agents drive a real offensive arsenal — preinstalled in the sandbox, documented by the
+on-demand skills described above. A sample of what's in the box:
+
+| Job | Tools |
 |---|---|
-| subfinder, dnsx, naabu, nmap | Subdomain enum, DNS, port discovery, deep service scan |
-| httpx, katana | Live HTTP probe/fingerprint, web crawl |
-| gau, waybackurls, paramspider | Historical URL + archived-parameter mining |
-| arjun | Active hidden-parameter discovery |
-| wafw00f | WAF/CDN fingerprinting |
-| ffuf | HTTP fuzzer (content / param / value; also auth + IDOR) |
-| nuclei | Templated vuln/misconfig scan |
+| **Map the target** | subfinder, dnsx, naabu, nmap, httpx, katana, gau, waybackurls, arjun, wafw00f |
+| **Read the code** (static analysis) | semgrep (find bugs by pattern), gitleaks & trufflehog (leaked secrets), osv-scanner (vulnerable dependencies) |
+| **Prove injection bugs** | sqlmap (databases), commix (commands), sstimap (templates), nosqli |
+| **Prove cross-site scripting** | dalfox, xsstrike, kxss |
+| **Prove auth weaknesses** | jwt_tool (token attacks), hydra (login brute-force), TOTP helper |
+| **Prove access-control / SSRF** | role-matrix recipe for broken access control, ssrfmap + interactsh for server-side request forgery |
+| **Drive a real browser** | Playwright headless Chrome (login flows + proving XSS actually executes) |
 
-### Static analysis (whitebox, read-only)
+Every skill carries the same non-negotiable rules: act only inside the agreed scope, respect
+rate limits, stop at the minimum proof, and redact secrets from evidence.
 
-| Tool | Role |
-|---|---|
-| semgrep | SAST — taint/pattern rules over the repo |
-| gitleaks, trufflehog | Secrets in repo + git history (trufflehog verifies live) |
-| osv-scanner | Dependency CVEs via OSV (software composition analysis) |
+## Under the hood
 
-### Exploitation (live proof-of-concept)
+The deeper reference for engineers. Skip this if you just wanted the story above.
 
-| Category | Tools |
-|---|---|
-| **Injection** | sqlmap (SQL), commix (OS command), sstimap (SSTI), nosqli (NoSQL) |
-| **XSS** | dalfox (primary), xsstrike (context-aware), kxss (reflected triage) |
-| **Auth** | jwt_tool (alg:none / key confusion / crack), hydra (login brute), generate-totp (2FA) |
-| **Authz / IDOR / BOLA** | authz-recipe (role x endpoint matrix + A/B session replay + ffuf ID enum) |
-| **SSRF** | ssrfmap (exploitation modules), interactsh-client (out-of-band callback proof) |
-| **Browser / DOM** | playwright (headless browser — auth flows + XSS execution proof) |
-
-**Cross-cutting rules baked into every skill:** act only on hosts inside the validated Rules
-of Engagement (re-checked before each network action); per-host rate limits (no-DoS); stop at
-the **minimum-impact PoC**; redact secrets/PII in evidence; git-clone tools are pinned to a
-`tools.lock` SHA for reproducibility.
-
-## Repository Layout
-
-```
-apps/web/      Cloud Run SERVICE (shor-web): auth, data repositories, secrets,
-               orchestration, ingest, findings/diff/SARIF, guardrails, share plane,
-               and the static dashboard (apps/web/src/public/)
-apps/worker/   Cloud Run JOB (shor-scan-worker): the Claude Agent SDK pipeline,
-               session/agent definitions, audit + metrics, guardrails
-skills/        31 per-tool skills loaded by the worker at runtime (progressive disclosure)
-infra/docker/  Wolfi/glibc multi-stage toolkit image (~30 tools) + tools.lock;
-               Dockerfile.web for the dashboard image
-infra/config/  Shared TypeScript + Biome config
-```
-
-The monorepo uses **pnpm workspaces + Turborepo**; lint/format is **Biome**. Internal design,
-research, and planning docs live under `docs/` and are intentionally **local-only (gitignored)**.
-
-## Quick Start
-
-Prerequisites: **Node 22+**, **pnpm 10.33+**, and (for the toolkit image) **Docker** on a
-native `linux/amd64` builder.
-
-```bash
-pnpm install
-pnpm build          # turbo: builds @shor/web and @shor/worker
-pnpm check          # type-check both packages (tsc --noEmit)
-```
-
-<details>
-<summary><b>Run the dashboard locally (no GCP needed)</b></summary>
-
-Every config value has a safe default, so the web app type-checks and boots **without live
-GCP credentials** — cloud SDK clients are constructed lazily on first use. For a local login
-shortcut, enable the env-gated dev login (provisions a seeded dev tenant + user; **must stay
-off in production**):
-
-```bash
-export SHOR_DEV_LOGIN=true
-pnpm dashboard:dev          # tsx apps/web/src/index.ts  (hot path)
-# or, after pnpm build:
-pnpm dashboard              # node apps/web/dist/index.js
-```
-
-The server listens on `WEB_PORT` (default `8080`) and serves the UI from
-`apps/web/src/public/`.
-</details>
-
-<details>
-<summary><b>Apply database migrations</b></summary>
-
-Migrations are idempotent SQL applied by a small runner; in production they run as the
-`shor-migrate` Cloud Run Job. Locally, point `CLOUD_SQL_*` at a Postgres instance and:
-
-```bash
-pnpm --filter @shor/web build
-node apps/web/dist/db/migrate.js
-```
-
-The schema models `tenant -> project -> codebase_ver -> scan -> { finding, attack_surface }`,
-stores findings as JSONB, and (in production) enables a **pgMemento** delta log on `finding`
-and `attack_surface` for scan-to-scan diffs. The migration degrades gracefully when pgMemento
-is absent (local dev).
-</details>
-
-<details>
-<summary><b>Build the dashboard image (shor-web)</b></summary>
-
-Small Node image, no offensive toolkit. **Build context is the repo root** (it copies the
-workspace manifests):
-
-```bash
-docker build -f infra/docker/Dockerfile.web -t shor-web:latest .
-```
-</details>
-
-<details>
-<summary><b>Build the offensive-toolkit image (shor-scan-worker)</b></summary>
-
-A 4-stage Wolfi/**glibc** build (`go-builder -> py-builder -> runtime-staging -> runtime`)
-producing a minimal, shell-less runtime with ~30 tools and a shared Python venv. **Build
-context is `infra/docker/`.** Pass the pinned git-clone SHAs from `tools.lock` as build args
-(a CI target should generate these from the lockfile):
-
-```bash
-docker build \
-  --build-arg SQLMAP_SHA=...   --build-arg COMMIX_SHA=... \
-  --build-arg SSTIMAP_SHA=...  --build-arg XSSTRIKE_SHA=... \
-  --build-arg SSRFMAP_SHA=...  --build-arg JWT_TOOL_SHA=... \
-  --build-arg NOSQLI_SHA=...   --build-arg PARAMSPIDER_SHA=... \
-  -t shor-toolkit:latest \
-  infra/docker
-
-docker build --check infra/docker        # lint all stages, no build
-```
-
-Wolfi is **glibc** (not Alpine/musl), so PyPI wheels and CGO binaries install natively;
-Playwright reuses the apk-provided Chromium (no second browser download). See
-`infra/docker/README.md` for the full tool inventory and build-verification status.
-</details>
-
-## Usage
-
-The happy path, control plane to fix:
-
-1. **Sign in.** In production via Google Cloud **Identity Platform** (one IdP tenant per org);
-   locally via the dev-login flag.
-2. **Connect a repo and create a Project.** Connect GitHub (OAuth or PAT), pick a repo, set
-   the **target URL**, choose **white-box** (clone repo) or **black-box** (URL-only), and
-   optionally a cron schedule and target auth/ROE config.
-3. **Trigger a scan.** The dashboard pins a CodebaseVersion, starts the Temporal workflow, and
-   launches the per-scan Cloud Run Job.
-4. **Watch live progress.** The run view shows the phase/agent timeline (which agents are
-   running concurrently, which skills each has invoked) as the worker pushes updates.
-5. **Review and remediate.** Each finding shows severity, confidence, evidence, the **safe
-   PoC**, repro steps, the vulnerable `file:line`, and a remediation. Open the **attack-surface**
-   scenarios (kill chains), compare against a prior scan in the **diff** view
-   (new/open/fixed/regressed), **Copy fix prompt** for the repo, or **export SARIF**
-   (`GET /export/sarif?scan=<id>`).
-
-Owners can mint a **read-only share link** for a single project — an opaque slug that exposes
-just that project's scans, findings, and diffs at `/share/:slug/...` with no login.
-
-## Technical Details
-
-### Data model
+### The shape of the data
 
 ```
 Tenant ─< Project ─< CodebaseVersion ─< Scan ─< { Finding, AttackSurface }
-       └─< User        (4-role RBAC)
-       └─< ProviderKey (key material in Secret Manager only)
+       └─< User        (4-role access control)
+       └─< ProviderKey (the actual key lives only in Secret Manager)
 ```
 
-| Entity | Notes |
+A **finding** is the contract the dashboard depends on: category, CWE, OWASP class, severity,
+confidence, evidence, the safe proof-of-concept, repro steps, the vulnerable `file:line`, the
+missing defense, a remediation — and a **stable fingerprint** (`sha256` of category + CWE +
+normalized location + normalized evidence). That fingerprint is what lets two scans be
+diffed into `new` / `open` / `fixed` / `regressed`.
+
+### Guardrails (enforced in code)
+
+| Rail | How it's enforced |
 |---|---|
-| **Tenant** | One Identity Platform tenant per org; row-level tenant scoping on every query |
-| **User** | Four-role RBAC: `owner` / `admin` / `member` / `viewer`; one tenant per user |
-| **ProviderKey** | Per (tenant, user, provider) — `anthropic`/`openai`/`deepseek`/`openrouter`/`vertex`; the DB stores only a Secret Manager **reference**, never key material |
-| **Project** | Target URL + connected repo + mode (`whitebox`/`blackbox`) + schedule + ROE; optional `shareSlug` |
-| **CodebaseVersion** | Immutable snapshot per ingest (git SHA + GCS prefix) |
-| **Scan** | One run; `pending`/`running`/`completed`/`failed`/`cancelled`; live progress snapshot (JSONB) |
-| **Finding** | JSONB record + stable `fingerprint`; diff status `new`/`open`/`fixed`/`regressed` |
-| **AttackSurface** | Kill-chain scenarios with a per-scenario remediation ("fix") prompt |
+| **Scope** | Allowlist checked before each run *and* before each network action |
+| **Rate limit** | Per-host token bucket — structurally can't cause a denial of service |
+| **Egress** | Default-deny outbound; only in-scope hosts + GitHub; cloud-metadata and internal IPs hard-blocked |
+| **Redaction** | Secrets / tokens / PII scrubbed from logs and evidence |
+| **Kill switch** | Cancel the workflow → the run is torn down |
+| **Audit** | Tamper-evident log of everything, redacted |
 
-The **Finding** record (the contract the dashboard depends on) carries: `category`, `cwe`,
-`owasp_category`, `severity` (`critical`..`info`), `confidence` (`confirmed`/`firm`/`tentative`),
-`evidence`, `safe_poc`, `repro_steps[]`, `vulnerable_code_location {file,line}`,
-`missing_defense`, `remediation`, and the load-bearing `fingerprint`
-= `sha256(category + cwe + normalized_location + normalized_evidence)`.
+### Isolation (one layer per axis)
 
-### Guardrails (code-enforced, not prompt-only)
-
-| Rail | Enforcement |
-|---|---|
-| **Rules of Engagement** | Per-target scope allowlist; checked before each run **and** before each network action |
-| **Rate limit** | Per-host token bucket — no denial-of-service |
-| **Egress** | Default-deny outbound allowlist (ROE hosts + GitHub); cloud metadata IP and internal ranges hard-blocked |
-| **Redaction** | Secret / token / PII redactor over logs and evidence |
-| **Kill switch** | Temporal cancellation + per-run teardown with blast-radius caps |
-| **Audit** | Tamper-evident tee to Cloud Audit Logs + the delta log (redacted) |
-
-### Isolation (defense-in-depth, one layer per axis)
-
-**Compute** — one gVisor-sandboxed Cloud Run Job per scan. **Identity** — dedicated per-run
-service account, secret access scoped to that tenant only. **Secrets** — mounted as volume
-files (not env vars, to avoid `/proc/environ` leakage); only the one provider key for that run
-is injected. **Filesystem** — ephemeral per-run workdir + per-tenant GCS prefix. **Network** —
-per-tenant VPC egress firewall. **Temporal** — per-scan workflow IDs (`shor-<random>`) so
-concurrent tenants never collide.
+One sandboxed job per scan, a dedicated identity per run, secrets mounted as files (not
+environment variables, to avoid leaks), an ephemeral workspace, and a per-tenant network
+firewall — so concurrent customers are walled off from each other on every axis.
 
 ### Stack
 
 | Area | Technology |
 |---|---|
 | Language / build | TypeScript (ESM), pnpm workspaces, Turborepo, Biome |
-| Control plane (`apps/web`) | `@google-cloud/{run,secret-manager,storage}`, `@octokit/*`, `@temporalio/client`, `pg`, `google-auth-library` |
-| Data plane (`apps/worker`) | `@anthropic-ai/claude-agent-sdk`, `@temporalio/*`, `ajv` + `zod` (schema validation), `zx`, `js-yaml` |
-| Toolkit image | Wolfi `wolfi-base` builders -> `glibc-dynamic` runtime; shared Python venv; apk Chromium for Playwright |
-| Cloud | Identity Platform, Temporal Cloud, Cloud Run (service + jobs), Cloud SQL (Postgres + pgMemento), Secret Manager, GCS |
+| Control plane (`apps/web`) | Cloud Run service, GitHub via Octokit, Temporal client, Postgres |
+| Data plane (`apps/worker`) | **Claude Agent SDK**, Temporal, ajv + zod validation, zx shell |
+| Toolkit image | Wolfi (glibc) multi-stage build, shared Python venv, apk Chromium for Playwright |
+| Cloud | Identity Platform, Temporal Cloud, Cloud Run (service + jobs), Cloud SQL, Secret Manager, GCS |
+| Bridge | Sinas KV stores, agent, component, connector + function (two-way) |
 
-### Key configuration
+### Repository layout
 
-Resolved from the environment with safe defaults (importing config performs no I/O). The
-operationally important variables:
+```
+apps/web/      Control-plane service: auth, data, secrets, orchestration, findings,
+               the Sinas bridge (apps/web/src/sinas/, apps/web/src/server/external/),
+               and the static dashboard (apps/web/src/public/)
+apps/worker/   The per-scan job: the Claude Agent SDK pipeline + Sinas finalization
+skills/        Per-tool skills loaded on demand (progressive disclosure)
+infra/docker/  The Wolfi/glibc toolkit image (~30 tools) + the dashboard image
+```
 
-| Variable | Purpose |
-|---|---|
-| `GCP_PROJECT_ID`, `GCP_REGION` | Core project + region |
-| `CLOUD_SQL_*` | Postgres connection (Auth Proxy socket in Cloud Run, TCP locally) |
-| `GCS_BUCKET` | Single artifact bucket (per-tenant prefixes) |
-| `TEMPORAL_ADDRESS` / `_NAMESPACE` / `_TASK_QUEUE` / mTLS or `_API_KEY` | Temporal Cloud client |
-| `CLOUD_RUN_SCAN_JOB`, `CLOUD_RUN_WORKER_IMAGE`, `CLOUD_RUN_*` | Per-scan job launch (identity template, CPU/memory, timeout, VPC egress) |
-| `IDENTITY_PLATFORM_*`, `SESSION_SIGNING_SECRET` | Auth + the HMAC-signed session cookie (**set a strong secret in prod**) |
-| `SHOR_PUBLIC_URL`, `SHOR_SINK_TOKEN` | Dashboard base URL + shared token the worker uses to post findings (**secret in prod**) |
-| `GITHUB_APP_ID`, `GITHUB_OAUTH_CLIENT_ID` / `_SECRET` | GitHub App ingest + "Connect with GitHub" OAuth |
-| `SHOR_DEV_LOGIN` | Local login shortcut — **must be `false` in production** |
+## Where we ran it
 
-The per-scan job additionally reads `SHOR_SCAN_ID`, `SHOR_TARGET_URL`, `SHOR_REPO_GCS_URI`
-(absent for black-box), and `SHOR_PROVIDER_KEY_FILE` (the file path of the mounted key).
+For the hackathon we ran Shor as a live two-part deployment:
 
-## Status and Roadmap
+- **The Sinas side** ran on our group's instance, **`via-12.sinas.wearebrain.com`** (the
+  WeAreBrain group-12 box). That's where the `pentest` stores, the finalizer agent, the
+  dashboard component, and the trigger connector/function live — the front door and the
+  reporting brain. Reasoning models are reached through the instance's OpenRouter provider
+  (e.g. `anthropic/claude-sonnet-4.6`).
+- **The engine side** ran on **Google Cloud** in `us-central1`: a Cloud Run *service* for the
+  dashboard/control plane and a Cloud Run *job* per scan for the agent pipeline, backed by
+  Cloud SQL and Secret Manager. A full all-models scan has run end-to-end against this
+  deployment, with findings mirrored back into the via-12 Sinas instance live.
 
-All build phases — the engine plus the cloud/multi-tenant shell — **compile end-to-end on
-`main`** (`pnpm install` + `tsc` green). Live deployment needs a provisioned GCP project, an
-authorized target, and an Anthropic API key.
+## Run it yourself
 
-Planned / not yet complete:
+### Locally (no cloud needed)
 
-- **Real authentication.** The hosted dashboard currently runs behind the **dev-login
-  prototype** (`SHOR_DEV_LOGIN`), a flag-gated placeholder that auto-provisions a fixed dev
-  tenant. The deliberate **Identity Platform** flow is partially wired and is finished in its
-  own work; dev-login is to be removed, never extended.
-- **Guest share-access credential.** The read-only per-project share plane exists; the team's
-  hardcoded guest-access credential is wired in server config at the end, not committed here.
-- **Native toolkit-image CI.** The 4-stage build passes `docker build --check` and the Python
-  builder is verified end-to-end; the large Go tools compile too slowly under local QEMU
-  emulation to finish in-sandbox, so a **native `linux/amd64` CI build + per-tool smoke test**
-  is the remaining acceptance gate.
-- **Deferred tools.** masscan, rustscan, amass, feroxbuster, gobuster, dirsearch, medusa, and
-  patator are non-blocking, post-launch image additions; the primary `*` tools already cover
-  every pipeline layer.
+Prerequisites: **Node 22+**, **pnpm 10.33+**, and (for the toolkit image) **Docker** on a
+native `linux/amd64` builder.
 
-## Disclaimer / Responsible Use
+```bash
+pnpm install
+pnpm build          # builds @shor/web and @shor/worker
+pnpm check          # type-checks both
+```
 
-Shor is built for **defensive security and authorized testing only**. It must be pointed
-exclusively at systems you own or are explicitly contracted to test, within a defined scope.
-The platform enforces this in code — rules-of-engagement scope checks before every network
-action, per-host rate limits, a default-deny egress allowlist, minimum-impact proofs-of-concept,
-secret redaction, and a kill switch — but **those rails do not absolve the operator of
-responsibility**. Running it against systems without authorization is illegal and unethical.
+Every setting has a safe default and cloud clients are built lazily, so the web app boots
+without any cloud credentials. A flag-gated dev login provisions a seeded local tenant + user
+(keep it off in production):
 
-Active findings reflect a point-in-time scan and may include false positives or miss issues;
-treat the output as input to human review, not a certificate of security.
+```bash
+export SHOR_DEV_LOGIN=true
+pnpm dashboard:dev          # hot path
+```
+
+It listens on `WEB_PORT` (default `8080`) and serves the UI from `apps/web/src/public/`.
+
+### Deploy the engine to GCP (from scratch)
+
+Standing up the engine on a fresh Google Cloud project is **a real provision — budget roughly
+45–90 minutes**, mostly waiting on two long poles: **Cloud SQL** takes ~10–15 minutes to come
+up, and the **offensive-toolkit image** (~30 native tools) takes ~14 minutes to build the
+first time. The rest is fast. You'll need the `gcloud` CLI, an open billing account, and
+Docker for local image work.
+
+**1. Foundation — project, billing, APIs.**
+
+```bash
+export PROJECT_ID=your-shor-project
+export REGION=us-central1
+gcloud projects create "$PROJECT_ID"
+gcloud billing projects link "$PROJECT_ID" --billing-account=YOUR_BILLING_ID
+gcloud config set project "$PROJECT_ID"
+gcloud services enable \
+  run.googleapis.com cloudbuild.googleapis.com sqladmin.googleapis.com \
+  secretmanager.googleapis.com artifactregistry.googleapis.com \
+  storage.googleapis.com
+gcloud artifacts repositories create shor --repository-format=docker --location="$REGION"
+```
+
+**2. Build the images** (the build configs live under `.acceptance/`). The worker image is
+deliberately **split in two** so day-to-day changes are quick: a heavy *base* image carrying
+all ~30 tools that you rebuild only when the toolset changes, and a thin *app* image on top of
+it. Build the base once (~14 min), then the app and the web images (~2–3 min each):
+
+```bash
+REPO=$REGION-docker.pkg.dev/$PROJECT_ID/shor
+# base toolkit image — the long pole, rebuild only when tools change
+gcloud builds submit --config .acceptance/cloudbuild.base.yaml \
+  --substitutions _IMAGE=$REPO/shor-worker-base:latest
+# thin per-scan worker app image (FROM the base)
+gcloud builds submit --config .acceptance/cloudbuild.yaml \
+  --substitutions _IMAGE=$REPO/shor-scan-worker:latest,_BASE_IMAGE=$REPO/shor-worker-base:latest
+# dashboard / control-plane image
+gcloud builds submit --config .acceptance/cloudbuild.web.yaml \
+  --substitutions _IMAGE=$REPO/shor-web:latest
+```
+
+**3. Database + storage.** Create the Postgres instance and the per-tenant artifact bucket:
+
+```bash
+gcloud sql instances create shor-db --database-version=POSTGRES_16 \
+  --tier=db-custom-1-3840 --region="$REGION"      # ~10–15 min
+gcloud storage buckets create gs://$PROJECT_ID-shor --location="$REGION"
+```
+
+**4. Deploy the control plane + run migrations.** Deploy the web service, then apply the
+idempotent SQL migrations as a one-shot job (`node apps/web/dist/db/migrate.js`, which tracks
+applied files so re-running is safe):
+
+```bash
+gcloud run deploy shor-web --image $REPO/shor-web:latest --region "$REGION" \
+  --set-env-vars GCP_PROJECT_ID=$PROJECT_ID,GCS_BUCKET=$PROJECT_ID-shor,SHOR_DEV_LOGIN=true
+gcloud run jobs create shor-migrate --image $REPO/shor-web:latest --region "$REGION" \
+  --command node --args apps/web/dist/db/migrate.js  &&  gcloud run jobs execute shor-migrate
+```
+
+**5. Register the per-scan worker job.** One job definition; the orchestrator launches one
+execution per scan, and the job **auto-pulls `:latest`** on each run — so future worker
+rebuilds need no redeploy, just a new image push.
+
+```bash
+gcloud run jobs create shor-scan-worker --image $REPO/shor-scan-worker:latest \
+  --region "$REGION" --task-timeout 7200s
+```
+
+That's the engine live. The control plane URL that `gcloud run deploy` prints is your
+`SHOR_PUBLIC_URL`.
+
+### Connect it to Sinas
+
+Set these on the web service and the bridge lights up — the engine mirrors state into your
+Sinas stores and offloads the report to your Sinas finalizer agent:
+
+```bash
+SINAS_ENABLED=1
+SINAS_URL=https://<your-instance>.sinas.wearebrain.com
+SINAS_API_KEY=<scoped engine-writer key>
+SINAS_NAMESPACE=pentest
+```
+
+To let Sinas drive the engine the *other* way (start scans from the platform), set
+`SHOR_ENGINE_TRIGGER_TOKEN` on the web service and install the Sinas-side resources — the
+`pentest` stores, finalizer agent, dashboard component, and the trigger connector/function —
+from the packaged manifest in **`infra/sinas/`** (regenerate it with
+`python3 infra/sinas/assemble.py`; the connector's `ENGINE_BASE_URL` points back at your
+`SHOR_PUBLIC_URL` and `ENGINE_TRIGGER_TOKEN` matches the token above).
+
+## Status & honest limitations
+
+The whole thing — engine plus cloud shell — **compiles end-to-end** and a full all-budget-model
+scan has run through to completion against a live Sinas-connected target. What's still rough,
+stated plainly:
+
+- **Auth is a prototype.** The hosted demo runs behind a flag-gated dev login that
+  auto-provisions a fixed tenant. The real Identity Platform flow is partially wired and
+  finished in its own work; the dev shortcut is to be removed, not extended.
+- **A full scan is slow** — tens of minutes to over an hour — because it's genuinely deep,
+  multi-tool work on a budget model. Parallelism helps; it's not instant.
+- **The toolkit image needs a native CI build.** It passes a structural lint, but the large
+  Go tools compile too slowly under local emulation to fully verify in-sandbox.
+
+## Responsible use
+
+Shor is for **defensive security and authorized testing only**. Point it exclusively at
+systems you own or are explicitly contracted to test, within a defined scope. The platform
+enforces this in code — scope checks before every network action, rate limits, a default-deny
+egress allowlist, minimum-impact proofs, secret redaction, and a kill switch — but **those
+rails don't absolve the operator**. Running it against systems without authorization is illegal
+and unethical. Treat its output as input to human review, not a certificate of security.
 
 ## License
 
-Source headers declare **GNU Affero General Public License v3.0** (AGPL-3.0-only), Copyright
-(C) 2025 Keygraph, Inc.
+GNU Affero General Public License v3.0 (AGPL-3.0-only). Copyright (C) 2025 Keygraph, Inc.
