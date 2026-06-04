@@ -2152,10 +2152,11 @@ async function loadScanDiff(scanId) {
       const fp = String(t.fingerprint || '');
       const f = byFp[fp];
       const idTag = f && f.displayId ? '<span class="vuln-num">' + escapeHtml(f.displayId) + '</span>' : '';
-      const titleText = f
-        ? String(f.title || f.category || 'finding')
-        : (to === 'fixed' ? 'Fixed since last scan' : 'finding ' + fp.slice(0, 8));
-      const sev = f ? String(f.severity || 'info').toLowerCase() : '';
+      const titleText = (t.title ? String(t.title) : '')
+        || (f ? String(f.title || f.category || '') : '')
+        || (t.category ? String(t.category) : '')
+        || (to === 'fixed' ? 'Fixed since last scan' : 'finding ' + fp.slice(0, 8));
+      const sev = String(t.severity || (f && f.severity) || 'info').toLowerCase();
       const sevBadge = sev ? '<span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span>' : '';
       const trans = t.from ? ' <span class="diff-trans">' + escapeHtml(String(t.from)) + ' &rarr; ' + escapeHtml(to) + '</span>' : '';
       return (

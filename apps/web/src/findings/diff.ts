@@ -28,6 +28,29 @@ export interface StatusTransition {
   readonly findingId: string | null;
   readonly from: FindingStatus | null;
   readonly to: FindingStatus;
+  /**
+   * Display fields carried inline so the diff view renders a real title without
+   * depending on the findings tab's client cache (which left every row reading
+   * "finding <hash>"). Sourced from the relevant scan's finding row — the current
+   * row for new/open/regressed, the prior row for fixed.
+   */
+  readonly title?: string;
+  readonly severity?: string;
+  readonly category?: string;
+}
+
+/** Pull the display fields off a finding row's `data` JSONB (defensive coercion). */
+function displayFields(finding: Finding): Pick<StatusTransition, 'title' | 'severity' | 'category'> {
+  const d = (finding.data ?? {}) as Record<string, unknown>;
+  const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v : undefined);
+  const out: { title?: string; severity?: string; category?: string } = {};
+  const title = str(d.title);
+  if (title) out.title = title;
+  const severity = str(d.severity);
+  if (severity) out.severity = severity;
+  const category = str(d.category);
+  if (category) out.category = category;
+  return out;
 }
 
 /** Aggregate result: transitions plus convenience counts per status. */
@@ -84,6 +107,7 @@ export async function computeStatusTransitions(
       findingId: finding.id,
       from: priorRow ? priorRow.status : null,
       to,
+      ...displayFields(finding),
     });
     counts[to] += 1;
     if (finding.status !== to) {
@@ -99,6 +123,7 @@ export async function computeStatusTransitions(
       findingId: priorRow.id,
       from: priorRow.status,
       to: 'fixed',
+      ...displayFields(priorRow),
     });
     counts.fixed += 1;
     if (priorRow.status !== 'fixed') {
