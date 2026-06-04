@@ -26,6 +26,13 @@ export interface VulnerableCodeLocation {
 /** Structured finding record — mirrors LAUNCH-SPEC §6.1. */
 export interface FindingRecord {
 	id: string;
+	/**
+	 * Human-readable finding title (e.g. "Stored XSS", "Token Management Issue").
+	 * Always synthesized at mapping time from the weakness type so the dashboard
+	 * never falls back to the bare category ("xss"/"auth"); the Sinas improver may
+	 * later overwrite it with a sharper, location-specific title.
+	 */
+	title: string;
 	category: string;
 	cwe: string;
 	owasp_category: string;
