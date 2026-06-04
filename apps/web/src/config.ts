@@ -219,6 +219,20 @@ export interface ShorConfig {
    */
   /** Pre-created Cloud Run Job that runs the worker image (`CLOUD_RUN_SCAN_JOB`). */
   readonly scanJobName: string;
+  /**
+   * High-memory worker Job (`CLOUD_RUN_SCAN_JOB_HIGHMEM`, default
+   * `shor-scan-worker-8gi`) used only for targets in `highMemTargets`. Most scans
+   * fit in the default 4Gi job; a few heavy live targets (e.g. datanose) OOM
+   * during recon and need 8Gi. Per-execution overrides can't change memory, so we
+   * route to a separate pre-created 8Gi Job instead.
+   */
+  readonly scanJobNameHighMem: string;
+  /**
+   * Host substrings whose scans run on `scanJobNameHighMem`
+   * (`CLOUD_RUN_HIGHMEM_TARGETS`, comma-separated, default `datanose`). Matched
+   * case-insensitively against the target URL's hostname.
+   */
+  readonly highMemTargets: readonly string[];
   /** Shared service token the worker presents to the findings sink (`SHOR_SINK_TOKEN`). */
   readonly sinkToken: string;
   /** The dashboard's own public base URL the worker POSTs findings to (`SHOR_PUBLIC_URL`). */
@@ -283,6 +297,11 @@ export function getConfig(): ShorConfig {
     appPasscode: env('SHOR_APP_PASSCODE'),
     // Direct Cloud Run Job launch + findings sink (ADR-051).
     scanJobName: env('CLOUD_RUN_SCAN_JOB', 'shor-scan-worker'),
+    scanJobNameHighMem: env('CLOUD_RUN_SCAN_JOB_HIGHMEM', 'shor-scan-worker-8gi'),
+    highMemTargets: env('CLOUD_RUN_HIGHMEM_TARGETS', 'datanose')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
     sinkToken: env('SHOR_SINK_TOKEN'),
     publicUrl,
     gcp: { projectId, region },

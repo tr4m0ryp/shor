@@ -44,6 +44,22 @@ function buildRoe(targetUrl: string): Roe {
 }
 
 /**
+ * Pick the worker Job for a target. Hosts matching a `highMemTargets` substring
+ * (e.g. datanose) run on the 8Gi Job; everything else on the default 4Gi Job.
+ * Memory can't be overridden per execution, so the lever is which Job we launch.
+ */
+function selectScanJob(cfg: ReturnType<typeof getConfig>, targetUrl: string): string {
+  let host: string;
+  try {
+    host = new URL(targetUrl).hostname.toLowerCase();
+  } catch {
+    host = targetUrl.toLowerCase();
+  }
+  const heavy = cfg.highMemTargets.some((p) => host.includes(p));
+  return heavy ? cfg.scanJobNameHighMem : cfg.scanJobName;
+}
+
+/**
  * Start a scan: build the per-run env, launch one execution of the pre-created
  * Cloud Run Job, mark the scan `running`, and persist the execution name (stored
  * via `setWorkflowId`). Returns the running scan with its execution recorded (or
@@ -86,7 +102,11 @@ export async function startScan(
     );
   }
 
-  const launch = await launchScanExecution(cfg.scanJobName, runEnv);
+  // Route heavy targets (e.g. datanose) to the pre-created 8Gi worker Job; most
+  // scans fit the default 4Gi job. Per-execution overrides can't change memory,
+  // so the choice is which Job to launch, matched on the target hostname.
+  const jobName = selectScanJob(cfg, project.targetUrl);
+  const launch = await launchScanExecution(jobName, runEnv);
 
   await scanRepo.setStatus(manifest.tenantId, scan.id, 'running');
   const executionName = launch.executionName ?? '';
