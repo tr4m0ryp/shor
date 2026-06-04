@@ -1729,7 +1729,10 @@ function renderTimeline(view) {
     const end = a.finishedAt != null ? a.finishedAt : view.runEnd;
     const left = Math.max(0, (start - view.runStart) / span * 100);
     const width = Math.min(100 - left, Math.max(1.2, (end - start) / span * 100));
-    const dur = fmtDur(a.durationMs != null ? a.durationMs : end - start);
+    // Label the bar with its WALL-CLOCK span (matches the bar width and the run
+    // total). durationMs counts only the agent's active model time, so a step that
+    // sat in a long tool run (sqlmap/playwright) showed a tiny label on a wide bar.
+    const dur = fmtDur(end - start);
     return '<div class="gantt-row"><div class="gantt-row__label">' + escapeHtml(a.label) + '</div>' +
       '<div class="gantt-row__track"><div class="gantt-bar ' + a.status + '" style="left:' + left.toFixed(1) + '%;width:' + width.toFixed(1) + '%">' +
         (width > 9 && dur ? '<span class="gantt-bar__dur">' + dur + '</span>' : '') +
@@ -1952,7 +1955,12 @@ function renderFindingRow(f, i) {
   const loc = f.vulnerable_code_location || {};
   const locStr = loc.file ? loc.file + ':' + (loc.line != null ? loc.line : '?') : '';
   const summary = String(f.evidence || f.missing_defense || '');
-  const confBadge = conf ? '<span class="confidence-badge">' + escapeHtml(conf) + '</span>' : '';
+  const confTip = {
+    confirmed: 'Confirmed — proven by live exploitation during the scan',
+    firm: 'Firm — strong code/behaviour evidence, but not live-exploited',
+    tentative: 'Tentative — plausible, needs manual verification'
+  }[conf.toLowerCase()] || 'Analyzer confidence in this finding';
+  const confBadge = conf ? '<span class="confidence-badge" title="' + escapeHtml(confTip) + '">' + escapeHtml(conf) + '</span>' : '';
 
   const detailRows = [];
   const push = (label, value, highlight) => {
