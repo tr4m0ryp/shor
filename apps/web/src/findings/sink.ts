@@ -89,10 +89,12 @@ export async function ingestFindings(
   }
 
   if (attackSurface !== undefined) {
-    const existing = await attackSurfaceRepo.findByScan(tenantId, scanId);
-    if (!existing) {
-      await attackSurfaceRepo.create({ scanId, data: attackSurface });
-    }
+    // Upsert (not create-if-absent): the worker posts the attack surface on every
+    // emission — the engine's local synthesis during the run, then the richer
+    // Sinas/Opus rewrite on the final `completed` post. Create-if-absent pinned
+    // the engine doc (whose schema the dashboard does not render) and dropped the
+    // Opus one; last-write-wins lets the final post replace it.
+    await attackSurfaceRepo.upsert({ scanId, data: attackSurface });
   }
 
   // Best-effort hub->Sinas mirror of the fingerprinted findings (keyed by the
