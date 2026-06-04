@@ -1805,7 +1805,12 @@ function renderProgressPhase(phase) {
 }
 
 function renderProgressAgent(agent) {
-  const dur = fmtDur(agent.durationMs);
+  // Wall-clock span (includes tool runs), not durationMs (active model time only),
+  // so a step that spent most of its time in a tool shows its full elapsed time.
+  const wall = (agent.startedAt != null && agent.finishedAt != null)
+    ? agent.finishedAt - agent.startedAt
+    : agent.durationMs;
+  const dur = fmtDur(wall);
   const skills = agent.skills || [];
   const open = expandedAgents.has(agent.name);
   const meta = [dur, skills.length ? skills.length + ' skill' + (skills.length > 1 ? 's' : '') : '']
