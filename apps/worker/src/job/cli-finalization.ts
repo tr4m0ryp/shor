@@ -78,6 +78,34 @@ interface CliEnvelope {
 	session_id?: string;
 }
 
+function spawnCli(
+	cmd: string,
+	args: string[],
+	prompt: string,
+	env: Record<string, string>,
+	cwd: string,
+): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const proc = spawn(cmd, args, { env, cwd, stdio: ["pipe", "pipe", "pipe"] });
+		let stdout = "";
+		let stderr = "";
+		proc.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+		proc.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+		proc.on("error", reject);
+		const timer = setTimeout(() => {
+			proc.kill("SIGTERM");
+			reject(new Error("CLI stage timed out"));
+		}, STAGE_TIMEOUT_MS);
+		proc.on("close", (code) => {
+			clearTimeout(timer);
+			if (code !== 0) reject(new Error(`CLI exited ${code}: ${stderr.slice(0, 300)}`));
+			else resolve(stdout);
+		});
+		proc.stdin.write(prompt);
+		proc.stdin.end();
+	});
+}
+
 async function runCli<T>(
 	config: CliConfig,
 	prompt: string,
@@ -93,14 +121,7 @@ async function runCli<T>(
 
 	logger.info("CLI finalization stage", { continue: continueSession, model: config.model });
 
-	const { stdout } = await run(cmd, args, {
-		env: buildCliEnv(),
-		input: prompt,
-		maxBuffer: 50 * 1024 * 1024,
-		timeout: STAGE_TIMEOUT_MS,
-		cwd: config.cwd,
-	});
-
+	const stdout = await spawnCli(cmd, args, prompt, buildCliEnv(), config.cwd);
 	const envelope: CliEnvelope = JSON.parse(stdout);
 	if (envelope.is_error || !envelope.result) {
 		throw new Error(`CLI stage failed: ${envelope.result?.slice(0, 200) ?? "empty"}`);
