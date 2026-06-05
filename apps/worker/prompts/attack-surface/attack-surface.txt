@@ -201,7 +201,8 @@ required:
   "real_world_context": "<typical attacker profile or environment in which this chain is realistic>",
   "claude_code_prompt": "<self-contained Markdown REMEDIATION prompt that fixes the involved findings in the connected repo — see <claude_code_prompt_template>>",
   "estimated_effort_minutes": <integer, 1-1440>,
-  "exploit_unverified": <true if no proven exploit backs this scenario, else false>
+  "exploit_unverified": <true if no proven exploit backs this scenario, else false>,
+  "confidence_tier": "confirmed | firm | tentative"
 }
 ```
 
