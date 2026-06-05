@@ -266,6 +266,7 @@ top-level sections, in this order:
 ## Scenarios
 ### <ATK-ID>: <title>
 - Severity: <severity>
+- Confidence tier: <confirmed | firm | tentative>
 - Involved findings: <comma-separated VULN-IDs>
 - Preconditions: <text>
 - Success criteria: <text>
