@@ -29,5 +29,27 @@ export function buildAuthContext(config: DistributedConfig | null): string {
 		lines.push("- MFA: TOTP enabled");
 	}
 
+	// The credential + login mechanism above are the PENTEST HARNESS'S OWN
+	// authorized access path — scaffolding we configured so the scanner can reach
+	// authenticated functionality. It is NOT part of the application's threat model
+	// and MUST NOT be reported as a vulnerability. Without this rail, agents flag
+	// the access path they were handed (e.g. "the test API key is enumerable", "no
+	// rate limit on the login we use", "hard-coded pentest credential") — noise
+	// about our own tooling, not the target.
+	lines.push(
+		"",
+		"IMPORTANT — this access path is HARNESS SCAFFOLDING, not a finding:",
+		"- The credential and login mechanism described above were provisioned by the",
+		"  pentest harness solely to grant the scanner authenticated access. Treat them",
+		"  as a trusted given.",
+		"- NEVER report a vulnerability whose subject is this injected test credential or",
+		"  the login mechanism used to obtain scanner access — not its strength,",
+		"  guessability, enumeration/timing behaviour, rate-limiting, storage, or the fact",
+		"  that it exists. These are out of scope.",
+		"- Instead, test the APPLICATION'S REAL end-user authentication and authorization",
+		"  (the flows genuine users go through). Use the harness credential only as a means",
+		"  to reach and exercise those real flows.",
+	);
+
 	return lines.join("\n");
 }
