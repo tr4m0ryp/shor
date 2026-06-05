@@ -26,6 +26,8 @@ export interface ScanJobParams {
 	repoPath: string;
 	/** Optional pipeline config file path. */
 	configPath?: string;
+	/** Optional pipeline config as raw YAML/JSON string (overrides configPath). */
+	configYaml?: string;
 	/** Optional provider label (anthropic|openai|…) for logging/routing. */
 	provider?: string;
 }
