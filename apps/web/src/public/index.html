@@ -2054,8 +2054,10 @@ function renderFindingRow(f, i) {
   const validatedBadge = disp === 'exploited'
     ? '<span class="validated-badge" title="Validated — proven by live exploitation during the scan">Validated</span>'
     : '';
-  const reviewBadge = disp === 'unverified_out_of_scope'
-    ? '<span class="review-badge" title="Manual review — the enforcing tier was not in the analyzed source (or its validation lane failed) and it was not live-confirmed. Verify manually.">Manual review</span>'
+  const reviewBadge = (disp === 'unverified_out_of_scope' || disp === 'unverified_screen_rejected')
+    ? '<span class="review-badge" title="' + (disp === 'unverified_screen_rejected'
+        ? 'Manual review — the adversarial screen refuted this hypothesis before exploitation. Verify manually.'
+        : 'Manual review — the enforcing tier was not in the analyzed source (or its validation lane failed) and it was not live-confirmed. Verify manually.') + '">Manual review</span>'
     : '';
 
   const detailRows = [];
