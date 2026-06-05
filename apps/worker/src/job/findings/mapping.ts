@@ -140,6 +140,12 @@ function synthesizeValidationNote(
 	if (disposition === "unverified_out_of_scope") {
 		return "Excluded — enforcing tier not in analyzed source; could not be verified from this scan";
 	}
+	if (disposition === "unverified_screen_rejected") {
+		const reason = evidenceText.trim();
+		return reason
+			? `Refuted by adversarial screen — ${reason}`
+			: "Refuted — the adversarial screen rejected this hypothesis before exploitation; not a confirmed finding";
+	}
 	if (disposition === "blocked") {
 		const e = evidenceText.toLowerCase();
 		if (/waf|cloudflare|akamai|imperva|block(ed)?\s+by\s+(waf|security|firewall)/.test(e)) {
