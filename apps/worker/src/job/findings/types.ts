@@ -26,6 +26,30 @@ export type FindingConfidence =
 	| "firm"
 	| "tentative"
 	| "unverified";
+
+/**
+ * Human-readable explanation of WHY a finding is not `confirmed`. Always
+ * empty for `exploited` dispositions; populated for every other outcome so the
+ * dashboard and attack surface can surface a specific failure reason rather than
+ * a bare "firm" label.
+ *
+ * Categories (maps to `VulnDisposition`):
+ *   - `blocked_waf`       – live probe intercepted by WAF / security control
+ *   - `blocked_auth`      – endpoint requires authentication we did not hold
+ *   - `blocked_ratelimit` – rate-limited during exploitation attempt
+ *   - `blocked_internal`  – endpoint not externally reachable (internal/VPN only)
+ *   - `blocked`           – blocked, specific reason not identifiable from evidence
+ *   - `unproven`          – queued hypothesis; no live validation evidence produced
+ *   - `excluded`          – enforcing tier not in analyzed source (unverified_out_of_scope)
+ */
+export type ValidationFailureReason =
+	| "blocked_waf"
+	| "blocked_auth"
+	| "blocked_ratelimit"
+	| "blocked_internal"
+	| "blocked"
+	| "unproven"
+	| "excluded";
 export type FindingStatus = "new" | "open" | "fixed" | "regressed";
 
 /**
