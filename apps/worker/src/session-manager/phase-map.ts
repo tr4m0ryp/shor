@@ -11,6 +11,7 @@ export type PhaseName =
 	| "pre-recon"
 	| "recon"
 	| "vulnerability-analysis"
+	| "adversarial-screen"
 	| "exploitation"
 	| "reporting"
 	| "attack-surface";
@@ -25,6 +26,11 @@ export const AGENT_PHASE_MAP: Readonly<Record<AgentName, PhaseName>> =
 		"auth-vuln": "vulnerability-analysis",
 		"authz-vuln": "vulnerability-analysis",
 		"ssrf-vuln": "vulnerability-analysis",
+		"injection-screen": "adversarial-screen",
+		"xss-screen": "adversarial-screen",
+		"auth-screen": "adversarial-screen",
+		"authz-screen": "adversarial-screen",
+		"ssrf-screen": "adversarial-screen",
 		"injection-exploit": "exploitation",
 		"xss-exploit": "exploitation",
 		"auth-exploit": "exploitation",
