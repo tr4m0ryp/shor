@@ -276,6 +276,7 @@ export function toFindingRecord(vuln: NormalizedVuln): FindingRecord {
 		partialFingerprints: {
 			"locationCwe/v1": computeFingerprint(vuln.category, cwe, location, ""),
 		},
+		validation_note,
 		// Forward-compatible: keep raw queue fields + disposition for the sink.
 		disposition: vuln.disposition,
 		vulnerability_type: vulnerabilityType,
