@@ -30,6 +30,11 @@ export const AGENT_PHASE_MAP: Readonly<Record<AgentName, PhaseName>> =
 		"auth-exploit": "exploitation",
 		"authz-exploit": "exploitation",
 		"ssrf-exploit": "exploitation",
+		"injection-exploit-retry": "exploitation",
+		"xss-exploit-retry": "exploitation",
+		"auth-exploit-retry": "exploitation",
+		"authz-exploit-retry": "exploitation",
+		"ssrf-exploit-retry": "exploitation",
 		report: "reporting",
 		"attack-surface": "attack-surface",
 	});
