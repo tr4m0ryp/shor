@@ -25,6 +25,10 @@ credentials.*
 
 # Claude Code harness state (agent worktrees, acceptance artifacts)
 .claude/
+.agents/
+
+# GitHub Actions / CI config (local-only)
+.github/
 # Internal project notes for Claude — local-only, not pushed
 CLAUDE.md
 
