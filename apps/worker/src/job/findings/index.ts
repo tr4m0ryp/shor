@@ -111,7 +111,9 @@ export function collectFindings(
 ): FindingRecord[] {
 	const vulns = readQueues(deliverablesPath, logger);
 
-	// Enrich each vuln with its evidence disposition + prose (per category).
+	// Enrich each vuln with its evidence disposition + prose (per category). The
+	// lookup is drift-tolerant (canonical ID + trailing-number fallback) — a strict
+	// match silently dropped every live-confirmed finding to `queued` → `firm`.
 	const evidenceByCategory = new Map(
 		FINDING_CATEGORIES.map((c) => [
 			c,
@@ -119,10 +121,42 @@ export function collectFindings(
 		]),
 	);
 	for (const vuln of vulns) {
-		const entry = evidenceByCategory.get(vuln.category)?.get(vuln.id);
+		const map = evidenceByCategory.get(vuln.category);
+		const entry = map ? lookupEvidence(map, vuln.id) : undefined;
 		if (entry) {
 			vuln.disposition = entry.disposition;
 			vuln.evidenceText = entry.text;
+		}
+	}
+
+	// Observability: a category whose evidence file HAS entries but matched NONE of
+	// its queue IDs is the exact silent-failure signature behind the "nothing ever
+	// confirmed" regression. Warn loudly per category and once in aggregate so the
+	// drift is visible in the run logs instead of disappearing into `firm`.
+	for (const category of FINDING_CATEGORIES) {
+		const map = evidenceByCategory.get(category);
+		if (!map || map.size === 0) continue;
+		const catVulns = vulns.filter((v) => v.category === category);
+		const matched = catVulns.filter((v) => v.disposition === "exploited" || v.disposition === "blocked").length;
+		const exploited = catVulns.filter((v) => v.disposition === "exploited").length;
+		if (catVulns.length > 0 && matched === 0) {
+			logger.warn(
+				"Evidence present but matched ZERO queue findings — disposition drift; all stay queued/firm",
+				{
+					category,
+					evidenceEntries: map.size,
+					evidenceIds: [...map.keys()],
+					queueIds: catVulns.map((v) => v.id),
+				},
+			);
+		} else {
+			logger.info("Evidence matched", {
+				category,
+				evidenceEntries: map.size,
+				queueFindings: catVulns.length,
+				matched,
+				exploited,
+			});
 		}
 	}
 
