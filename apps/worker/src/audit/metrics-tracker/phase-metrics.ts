@@ -23,6 +23,7 @@ export function calculatePhaseMetrics(
 		"pre-recon": [],
 		recon: [],
 		"vulnerability-analysis": [],
+		"adversarial-screen": [],
 		exploitation: [],
 		reporting: [],
 		"attack-surface": [],

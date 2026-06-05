@@ -61,12 +61,18 @@ export type FindingStatus = "new" | "open" | "fixed" | "regressed";
  *     finding's control was NOT in the analyzed source AND it was not
  *     live-confirmed. Terminal: excluded from the emitted findings and routed
  *     to the manual-review appendix. Distinct from `tentative` (weak-but-seen).
+ *   - `unverified_screen_rejected` — the adversarial screen agent refuted this
+ *     hypothesis before exploitation (recorded in `{category}_screen_rejected.json`).
+ *     Treated identically to `unverified_out_of_scope` for emission: excluded from
+ *     the emitted set and the attack surface, routed to the manual-review appendix
+ *     for audit. Distinct so the appendix can label WHY it was set aside.
  */
 export type VulnDisposition =
 	| "exploited"
 	| "blocked"
 	| "queued"
-	| "unverified_out_of_scope";
+	| "unverified_out_of_scope"
+	| "unverified_screen_rejected";
 
 /** file:line location for code findings (§6.1). */
 export interface VulnerableCodeLocation {

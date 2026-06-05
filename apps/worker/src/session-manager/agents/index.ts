@@ -22,6 +22,7 @@ import {
 import { preReconAgent, preReconValidator } from "./pre-recon.js";
 import { reconAgent, reconValidator } from "./recon.js";
 import { reportAgent, reportValidator } from "./reporting.js";
+import { screenAgents, screenValidators } from "./screen.js";
 import {
 	vulnerabilityAgents,
 	vulnerabilityValidators,
@@ -33,6 +34,7 @@ export const AGENTS: Readonly<Record<AgentName, AgentDefinition>> =
 		"pre-recon": preReconAgent,
 		recon: reconAgent,
 		...vulnerabilityAgents,
+		...screenAgents,
 		...exploitationAgents,
 		...exploitationRetryAgents,
 		report: reportAgent,
@@ -45,6 +47,7 @@ export const AGENT_VALIDATORS: Record<AgentName, AgentValidator> =
 		"pre-recon": preReconValidator,
 		recon: reconValidator,
 		...vulnerabilityValidators,
+		...screenValidators,
 		...exploitationValidators,
 		...exploitationRetryValidators,
 		report: reportValidator,
