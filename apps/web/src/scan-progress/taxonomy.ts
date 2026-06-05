@@ -80,6 +80,17 @@ export const PIPELINE_PLAN: readonly PhaseSpec[] = [
     ],
   },
   {
+    id: 'threat-model',
+    label: 'Threat Model',
+    agents: [
+      {
+        name: 'threat-model',
+        label: 'Threat Model',
+        subtasks: ['Map trust boundaries', 'Enumerate assets and actors', 'Rank abuse cases'],
+      },
+    ],
+  },
+  {
     id: 'vulnerability-analysis',
     label: 'Vulnerability Analysis',
     agents: [
@@ -88,6 +99,8 @@ export const PIPELINE_PLAN: readonly PhaseSpec[] = [
       { name: 'auth-vuln', label: 'Auth', subtasks: VULN_SUBTASKS },
       { name: 'ssrf-vuln', label: 'SSRF', subtasks: VULN_SUBTASKS },
       { name: 'authz-vuln', label: 'Authz', subtasks: VULN_SUBTASKS },
+      { name: 'logic-vuln', label: 'Logic', subtasks: VULN_SUBTASKS },
+      { name: 'misconfig-web-vuln', label: 'Web Misconfig', subtasks: VULN_SUBTASKS },
     ],
   },
   {
@@ -99,6 +112,8 @@ export const PIPELINE_PLAN: readonly PhaseSpec[] = [
       { name: 'auth-screen', label: 'Auth', subtasks: SCREEN_SUBTASKS },
       { name: 'ssrf-screen', label: 'SSRF', subtasks: SCREEN_SUBTASKS },
       { name: 'authz-screen', label: 'Authz', subtasks: SCREEN_SUBTASKS },
+      { name: 'logic-screen', label: 'Logic', subtasks: SCREEN_SUBTASKS },
+      { name: 'misconfig-web-screen', label: 'Web Misconfig', subtasks: SCREEN_SUBTASKS },
     ],
   },
   {
@@ -110,7 +125,16 @@ export const PIPELINE_PLAN: readonly PhaseSpec[] = [
       { name: 'auth-exploit', label: 'Auth', subtasks: EXPLOIT_SUBTASKS },
       { name: 'ssrf-exploit', label: 'SSRF', subtasks: EXPLOIT_SUBTASKS },
       { name: 'authz-exploit', label: 'Authz', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'logic-exploit', label: 'Logic', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'misconfig-web-exploit', label: 'Web Misconfig', subtasks: EXPLOIT_SUBTASKS },
     ],
+  },
+  {
+    id: 'oracle',
+    label: 'Adjudication',
+    // Post-exploitation oracle phase — runs as a worker service (no tracked
+    // agent), so this card carries no agents (task 013/017 fill the view).
+    agents: [],
   },
   {
     id: 'reporting',

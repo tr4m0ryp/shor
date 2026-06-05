@@ -16,16 +16,16 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { clusterFindings } from "../../services/dedup-judge/index.js";
+import { gradeFindings } from "../../services/grader/index.js";
+import { applyOracleDispositions } from "../../services/oracle/index.js";
+import { applyScreenVerdicts } from "../../services/screen-verdicts/index.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import { lookupEvidence, readEvidence } from "./evidence.js";
 import { gateAndMapFindings, readManualReviewAppendix } from "./gating.js";
 import { FINDING_CATEGORIES, readQueues } from "./queue.js";
 import { postFindings, readSinkConfig } from "./sink.js";
-import type {
-	FindingCategory,
-	FindingRecord,
-	FindingsSinkPayload,
-} from "./types.js";
+import type { FindingRecord, FindingsSinkPayload } from "./types.js";
 
 const ATTACK_SURFACE_FILE = "attack_surface_scenarios.json";
 
@@ -94,50 +94,6 @@ function applyImprovedText(
 	}
 }
 
-const SCREEN_REJECTED_SUFFIX = "_screen_rejected.json";
-
-/**
- * Read every `{category}_screen_rejected.json` audit file (written by the
- * adversarial screen agents) into a `category → (id → reason)` map. Each file is a
- * JSON array of `{ id, screen_reason }`. Best-effort: a missing or malformed file
- * is skipped (a screen that refuted nothing simply writes no rejections).
- */
-function readScreenRejections(
-	deliverablesPath: string,
-	logger: ActivityLogger,
-): Map<FindingCategory, Map<string, string>> {
-	const out = new Map<FindingCategory, Map<string, string>>();
-	for (const category of FINDING_CATEGORIES) {
-		const file = path.join(
-			deliverablesPath,
-			`${category}${SCREEN_REJECTED_SUFFIX}`,
-		);
-		try {
-			if (!fs.existsSync(file)) continue;
-			const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf8"));
-			if (!Array.isArray(parsed)) continue;
-			const byId = new Map<string, string>();
-			for (const entry of parsed) {
-				if (!entry || typeof entry !== "object") continue;
-				const rec = entry as Record<string, unknown>;
-				const id = typeof rec.id === "string" ? rec.id.trim() : "";
-				if (!id) continue;
-				byId.set(
-					id,
-					typeof rec.screen_reason === "string" ? rec.screen_reason : "",
-				);
-			}
-			if (byId.size > 0) out.set(category, byId);
-		} catch (err) {
-			logger.warn("Failed to read/parse screen-rejected file; skipping", {
-				file,
-				error: err instanceof Error ? err.message : String(err),
-			});
-		}
-	}
-	return out;
-}
-
 /**
  * Build the EMITTED finding records from the deliverables: read each category's
  * queue, enrich with the exploitation-evidence disposition + prose, apply the
@@ -177,32 +133,15 @@ export function collectFindings(
 		}
 	}
 
-	// Adversarial screen rejections (T4): the screen agent refuted these hypotheses
-	// before exploitation. Mark the matching queue entry (or synthesize one when the
-	// raw queue no longer carries it) `unverified_screen_rejected` so the gate routes
-	// it to the manual-review appendix and OUT of the emitted set — exactly like
-	// `unverified_out_of_scope`. A live PoC still wins: an `exploited` finding is
-	// never demoted.
-	const rejections = readScreenRejections(deliverablesPath, logger);
-	for (const [category, byId] of rejections) {
-		for (const [id, reason] of byId) {
-			const match = vulns.find((v) => v.category === category && v.id === id);
-			if (match) {
-				if (match.disposition !== "exploited") {
-					match.disposition = "unverified_screen_rejected";
-					if (reason.trim()) match.evidenceText = reason;
-				}
-			} else {
-				vulns.push({
-					category,
-					id,
-					raw: { ID: id },
-					disposition: "unverified_screen_rejected",
-					evidenceText: reason,
-				});
-			}
-		}
-	}
+	// Adversarial screen verdicts (T4) then oracle adjudication (T13) — ordered
+	// pass-through, both operating on the normalized queue BEFORE the emission gate.
+	// `applyScreenVerdicts` stamps screen-refuted hypotheses
+	// `unverified_screen_rejected` (its default preserves today's behavior: the gate
+	// routes them to the manual-review appendix and OUT of the emitted set, and a
+	// live `exploited` PoC is never demoted). `applyOracleDispositions` is an
+	// identity no-op until task 013 fills it. Both mutate `vulns` in place.
+	applyScreenVerdicts(vulns, deliverablesPath, logger);
+	applyOracleDispositions(vulns, deliverablesPath, logger);
 
 	// Observability: a category whose evidence file HAS entries but matched NONE of
 	// its queue IDs is the exact silent-failure signature behind the "nothing ever
@@ -238,8 +177,13 @@ export function collectFindings(
 	// Apply the coverage gate, map to §6.1, and keep only the EMITTED set (gated-
 	// out findings are routed to the manual-review appendix inside this call).
 	const emitted = gateAndMapFindings(deliverablesPath, vulns, logger);
+	const improved = applyImprovedText(deliverablesPath, emitted, logger);
 
-	return applyImprovedText(deliverablesPath, emitted, logger);
+	// Final emitted-set passes (ordered): cluster near-duplicates, then grade. Both
+	// are identity no-ops today (tasks 014/015 fill them), so the emitted set is
+	// unchanged.
+	const clustered = clusterFindings(improved, { deliverablesPath, logger });
+	return gradeFindings(clustered, { deliverablesPath, logger });
 }
 
 /**

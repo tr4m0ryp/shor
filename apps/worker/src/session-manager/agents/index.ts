@@ -21,6 +21,7 @@ import { preReconAgent, preReconValidator } from "./pre-recon.js";
 import { reconAgent, reconValidator } from "./recon.js";
 import { reportAgent, reportValidator } from "./reporting.js";
 import { screenAgents, screenValidators } from "./screen.js";
+import { threatModelAgent, threatModelValidator } from "./threat-model.js";
 import {
 	vulnerabilityAgents,
 	vulnerabilityValidators,
@@ -31,6 +32,7 @@ export const AGENTS: Readonly<Record<AgentName, AgentDefinition>> =
 	Object.freeze({
 		"pre-recon": preReconAgent,
 		recon: reconAgent,
+		"threat-model": threatModelAgent,
 		...vulnerabilityAgents,
 		...screenAgents,
 		...exploitationAgents,
@@ -43,6 +45,7 @@ export const AGENT_VALIDATORS: Record<AgentName, AgentValidator> =
 	Object.freeze({
 		"pre-recon": preReconValidator,
 		recon: reconValidator,
+		"threat-model": threatModelValidator,
 		...vulnerabilityValidators,
 		...screenValidators,
 		...exploitationValidators,
