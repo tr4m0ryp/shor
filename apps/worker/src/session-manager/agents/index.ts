@@ -34,6 +34,7 @@ export const AGENTS: Readonly<Record<AgentName, AgentDefinition>> =
 		recon: reconAgent,
 		...vulnerabilityAgents,
 		...exploitationAgents,
+		...exploitationRetryAgents,
 		report: reportAgent,
 		"attack-surface": attackSurfaceAgent,
 	});
@@ -45,6 +46,7 @@ export const AGENT_VALIDATORS: Record<AgentName, AgentValidator> =
 		recon: reconValidator,
 		...vulnerabilityValidators,
 		...exploitationValidators,
+		...exploitationRetryValidators,
 		report: reportValidator,
 		"attack-surface": attackSurfaceValidator,
 	});
