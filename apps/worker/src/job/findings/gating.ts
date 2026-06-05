@@ -123,6 +123,33 @@ function writeManualReviewAppendix(
 }
 
 /**
+ * Read back the manual-review appendix (the gated-out `unverified_out_of_scope`
+ * findings) so the dashboard can surface them under a dedicated "manual review"
+ * filter. Tolerates absence / malformed JSON → returns []. These findings are
+ * NEVER part of the emitted or attack-surface set; the dashboard segregates them
+ * purely by their `unverified_out_of_scope` disposition.
+ */
+export function readManualReviewAppendix(
+	deliverablesPath: string,
+	logger: ActivityLogger,
+): FindingRecord[] {
+	const file = path.join(deliverablesPath, MANUAL_REVIEW_APPENDIX_FILE);
+	try {
+		if (!fs.existsSync(file)) return [];
+		const doc = JSON.parse(fs.readFileSync(file, "utf8")) as {
+			findings?: FindingRecord[];
+		};
+		return Array.isArray(doc.findings) ? doc.findings : [];
+	} catch (err) {
+		logger.warn("Failed to read manual-review appendix; treating as empty", {
+			file,
+			error: err instanceof Error ? err.message : String(err),
+		});
+		return [];
+	}
+}
+
+/**
  * Shared gate primitive: mark every non-exploited vuln for which `shouldGate`
  * holds as `unverified_out_of_scope` (mutating `vulns` in place). An `exploited`
  * finding is never touched — a live PoC overrides missing source / a failed
