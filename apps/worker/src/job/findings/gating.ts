@@ -67,7 +67,7 @@ function enforcingTier(
  * `undefined` when it is absent/unparseable. Read SYNCHRONOUSLY on purpose: the
  * coverage module's async `readManifest` cannot be used without making
  * `collectFindings` async, which would break its synchronous callers
- * (sinas-finalization.ts). Absence MUST disable gating entirely.
+ * (cli-finalization.ts). Absence MUST disable gating entirely.
  */
 function readCoverageManifest(
 	deliverablesPath: string,
