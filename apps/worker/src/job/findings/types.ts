@@ -14,8 +14,35 @@
  */
 
 export type FindingSeverity = "critical" | "high" | "medium" | "low" | "info";
-export type FindingConfidence = "confirmed" | "firm" | "tentative";
+/**
+ * §6.1 confidence ladder, plus one worker-internal rung. `unverified` is used
+ * ONLY for `unverified_out_of_scope` findings (see {@link VulnDisposition}): it
+ * means "not seen in analyzed source, not live-confirmed". Such records are
+ * routed to the manual-review appendix and EXCLUDED from the emitted set, so
+ * this value is never POSTed to the dashboard sink.
+ */
+export type FindingConfidence =
+	| "confirmed"
+	| "firm"
+	| "tentative"
+	| "unverified";
 export type FindingStatus = "new" | "open" | "fixed" | "regressed";
+
+/**
+ * Disposition of a normalized vuln as it flows through collection.
+ *   - `exploited` — proven live (evidence markdown); never gated out.
+ *   - `blocked`   — attempted but validation/defense blocked it.
+ *   - `queued`    — a hypothesis from the analysis queue, not yet exploited.
+ *   - `unverified_out_of_scope` (T3, gating) — the tier that would enforce this
+ *     finding's control was NOT in the analyzed source AND it was not
+ *     live-confirmed. Terminal: excluded from the emitted findings and routed
+ *     to the manual-review appendix. Distinct from `tentative` (weak-but-seen).
+ */
+export type VulnDisposition =
+	| "exploited"
+	| "blocked"
+	| "queued"
+	| "unverified_out_of_scope";
 
 /** file:line location for code findings (§6.1). */
 export interface VulnerableCodeLocation {
@@ -47,6 +74,13 @@ export interface FindingRecord {
 	status: FindingStatus;
 	fingerprint: string;
 	partialFingerprints: Record<string, string>;
+	/**
+	 * Collection-time disposition (forwarded from the source vuln). Present so the
+	 * coverage gate can route `unverified_out_of_scope` records to the manual-
+	 * review appendix; emitted findings carry `exploited`/`blocked`/`queued`. Not
+	 * part of the web §6.1 surface — carried via the index signature below.
+	 */
+	disposition?: VulnDisposition;
 	[key: string]: unknown;
 }
 
@@ -72,8 +106,11 @@ export interface NormalizedVuln {
 	category: FindingCategory;
 	id: string;
 	raw: Record<string, unknown>;
-	/** `exploited` if the evidence MD lists it as proven; `queued` otherwise. */
-	disposition: "exploited" | "blocked" | "queued";
+	/**
+	 * `exploited` if the evidence MD lists it as proven; `queued` otherwise. The
+	 * coverage gate may later set `unverified_out_of_scope` (see {@link VulnDisposition}).
+	 */
+	disposition: VulnDisposition;
 	/** Exploitation-evidence prose for this VULN-ID, when present. */
 	evidenceText: string;
 }
