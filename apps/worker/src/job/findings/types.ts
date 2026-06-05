@@ -57,6 +57,10 @@ export type FindingStatus = "new" | "open" | "fixed" | "regressed";
  *   - `exploited` — proven live (evidence markdown); never gated out.
  *   - `blocked`   — attempted but validation/defense blocked it.
  *   - `queued`    — a hypothesis from the analysis queue, not yet exploited.
+ *   - `screen_uncertain` — the adversarial screen panel neither confirmed nor
+ *     refuted this hypothesis. NON-terminal: unlike the terminal
+ *     `unverified_screen_rejected`, it flows THROUGH to exploitation (treated like
+ *     a live hypothesis), so the screen alone never routes it to the appendix.
  *   - `unverified_out_of_scope` (T3, gating) — the tier that would enforce this
  *     finding's control was NOT in the analyzed source AND it was not
  *     live-confirmed. Terminal: excluded from the emitted findings and routed
@@ -71,8 +75,29 @@ export type VulnDisposition =
 	| "exploited"
 	| "blocked"
 	| "queued"
+	| "screen_uncertain"
 	| "unverified_out_of_scope"
 	| "unverified_screen_rejected";
+
+/**
+ * Reachability of a finding's vulnerable code from an external entrypoint, set by
+ * the reachability pass and carried on {@link FindingRecord}. Exported so the
+ * later precision modules import this union instead of re-declaring it.
+ *   - `REACHABLE`    — reached from an external / untrusted entrypoint.
+ *   - `HARNESS_ONLY` — only reachable via a test/harness, not live traffic.
+ *   - `UNCLEAR`      — reachability could not be determined.
+ */
+export type Reachability = "REACHABLE" | "HARNESS_ONLY" | "UNCLEAR";
+
+/**
+ * Outcome of the exploitation oracle's replay attempt for a finding — distinct
+ * from the collection-time {@link VulnDisposition}. Exported so the later
+ * precision modules import this union instead of re-declaring it.
+ *   - `exploited`      — the oracle replayed the PoC and it succeeded.
+ *   - `blocked`        — the replay was blocked (defense / WAF / auth / etc.).
+ *   - `not_replayable` — the PoC could not be deterministically replayed.
+ */
+export type OracleDisposition = "exploited" | "blocked" | "not_replayable";
 
 /** file:line location for code findings (§6.1). */
 export interface VulnerableCodeLocation {
@@ -119,6 +144,29 @@ export interface FindingRecord {
 	 * part of the web §6.1 surface — carried via the index signature below.
 	 */
 	disposition?: VulnDisposition;
+	/**
+	 * Reachability of the vulnerable code from an external entrypoint (set by the
+	 * reachability pass). OPTIONAL / back-compat: absent on records from emitters
+	 * that predate it. Not part of the web §6.1 surface — carried via the index
+	 * signature below.
+	 */
+	reachability?: Reachability;
+	/**
+	 * Stable key grouping near-duplicate findings into one cluster. Added ALONGSIDE
+	 * `fingerprint` (which is unchanged); a later task populates it. OPTIONAL /
+	 * back-compat.
+	 */
+	cluster_id?: string;
+	/**
+	 * Outcome of the exploitation oracle's replay attempt — distinct from the
+	 * collection-time `disposition`. OPTIONAL / back-compat.
+	 */
+	oracle_disposition?: OracleDisposition;
+	/**
+	 * Id of the threat / attack-scenario this finding maps to. OPTIONAL /
+	 * back-compat.
+	 */
+	threat_id?: string;
 	[key: string]: unknown;
 }
 
