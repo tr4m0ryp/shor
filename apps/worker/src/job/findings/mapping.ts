@@ -173,10 +173,16 @@ function normalizeConfidence(
 ): FindingConfidence {
 	if (disposition === "exploited") return "confirmed";
 	// Out-of-scope + unconfirmed: the enforcing tier was never in the analyzed
-	// source and nothing live-confirmed it. It MUST NOT read as firm/tentative
-	// (i.e. "as if seen") — give it its own rung. These records are excluded from
-	// the emitted set and routed to the manual-review appendix.
-	if (disposition === "unverified_out_of_scope") return "unverified";
+	// source and nothing live-confirmed it. A screen-rejected hypothesis was
+	// actively REFUTED by the adversarial screen. Neither may read as firm/tentative
+	// (i.e. "as if seen") — give them the dedicated `unverified` rung. Both are
+	// excluded from the emitted set and routed to the manual-review appendix.
+	if (
+		disposition === "unverified_out_of_scope" ||
+		disposition === "unverified_screen_rejected"
+	) {
+		return "unverified";
+	}
 	const v = value.toLowerCase().trim();
 	if (v === "high") return "firm";
 	if (v === "med" || v === "medium") return "firm";
