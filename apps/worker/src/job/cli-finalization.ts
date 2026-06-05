@@ -128,7 +128,7 @@ async function runCli<T>(
 	continueSession: boolean,
 	logger: ActivityLogger,
 ): Promise<T> {
-	const flags = ["-p", "--no-tools", "--output-format", "json", "--model", config.model];
+	const flags = ["-p", "--output-format", "json", "--model", config.model];
 	if (continueSession) flags.push("-c");
 
 	const [cmd, args]: [string, string[]] = config.cliPath.endsWith(".js")
