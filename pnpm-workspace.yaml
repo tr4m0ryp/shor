@@ -1,6 +1,7 @@
 packages:
   - "apps/worker"
   - "apps/web"
+  - "packages/shor-skill"
 
 catalog:
   "@anthropic-ai/claude-agent-sdk": ^0.2.38

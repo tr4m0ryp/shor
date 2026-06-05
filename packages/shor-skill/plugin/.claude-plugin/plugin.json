@@ -1,0 +1,9 @@
+{
+  "name": "shor",
+  "description": "Shor — autonomous AI web pentester. Provides the /shor-setup slash-command: an interactive wizard that guides you from zero to a running scan (black-box or white-box, GCP deployment included).",
+  "version": "1.0.0",
+  "author": {
+    "name": "tr4m0ryp",
+    "url": "https://github.com/tr4m0ryp/shor-x-sinas"
+  }
+}

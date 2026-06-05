@@ -1,0 +1,34 @@
+{
+  "name": "shor-skill",
+  "version": "1.0.0",
+  "description": "Claude Code skill for Shor — autonomous AI web pentester. Installs the /shor-setup slash-command into your local Claude Code instance.",
+  "type": "module",
+  "bin": {
+    "shor-skill": "./bin/install.mjs"
+  },
+  "files": [
+    "bin",
+    "plugin"
+  ],
+  "scripts": {
+    "prepublishOnly": "node bin/install.mjs --dry-run"
+  },
+  "keywords": [
+    "claude-code",
+    "claude-skill",
+    "pentesting",
+    "security",
+    "ai-pentester",
+    "shor"
+  ],
+  "author": "tr4m0ryp",
+  "license": "AGPL-3.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tr4m0ryp/shor-x-sinas.git",
+    "directory": "packages/shor-skill"
+  }
+}
