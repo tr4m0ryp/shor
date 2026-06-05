@@ -25,6 +25,14 @@ export const ALL_AGENTS = [
 	"auth-exploit",
 	"ssrf-exploit",
 	"authz-exploit",
+	// Retry pass: targeted second attempt for firm (blocked/queued) findings.
+	// Runs only for categories that have retryable findings after the primary
+	// exploit phase. Appends newly-confirmed findings to the existing evidence MD.
+	"injection-exploit-retry",
+	"xss-exploit-retry",
+	"auth-exploit-retry",
+	"ssrf-exploit-retry",
+	"authz-exploit-retry",
 	"report",
 	"attack-surface",
 ] as const;
