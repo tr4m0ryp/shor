@@ -113,6 +113,8 @@ importers:
         specifier: ^4.0.9
         version: 4.0.9
 
+  packages/shor-skill: {}
+
 packages:
 
   '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.2.141':
