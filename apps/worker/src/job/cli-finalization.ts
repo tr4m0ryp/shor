@@ -132,7 +132,7 @@ async function runCli<T>(
 function extractJson<T>(text: string): T {
 	try { return JSON.parse(text) as T; } catch { /* try alternatives */ }
 	const fence = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-	if (fence) try { return JSON.parse(fence[1]) as T; } catch { /* continue */ }
+	if (fence?.[1]) try { return JSON.parse(fence[1]) as T; } catch { /* continue */ }
 	const s = text.indexOf("{");
 	const e = text.lastIndexOf("}");
 	if (s !== -1 && e > s) try { return JSON.parse(text.slice(s, e + 1)) as T; } catch { /* continue */ }
