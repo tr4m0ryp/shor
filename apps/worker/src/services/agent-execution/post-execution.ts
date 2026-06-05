@@ -68,6 +68,46 @@ export async function checkSpendingCap(
 }
 
 /**
+ * Defense-in-depth check that catches the model declining the authorized task as
+ * "cyber content" and returning a short refusal instead of doing the work. The
+ * SDK reports success, so without this the refusal would pass through as "no
+ * findings" — the offensive lane produces no evidence and a real finding is
+ * stranded at `firm` instead of being promoted to `confirmed` (or honestly
+ * failing the lane). Rolls back and surfaces a RETRYABLE error: the retry
+ * re-runs under the strengthened authorization preamble; a persistent refusal
+ * fails the lane, which the findings gate turns into an honest
+ * `unverified_out_of_scope` demotion rather than an as-if-tested emission.
+ *
+ * Returns `null` when the behavior does not match a refusal (caller continues).
+ */
+export async function checkRefusal(
+	agentName: AgentName,
+	deliverablesPath: string,
+	auditSession: AuditSession,
+	logger: ActivityLogger,
+	attemptNumber: number,
+	result: ClaudePromptResult,
+): Promise<Result<AgentEndResult, PentestError> | null> {
+	if (!(result.success && (result.turns ?? 0) <= 2)) {
+		return null;
+	}
+	const resultText = result.result || "";
+	if (!isRefusalBehavior(result.turns ?? 0, resultText)) {
+		return null;
+	}
+	return failAgent(agentName, deliverablesPath, auditSession, logger, {
+		attemptNumber,
+		result,
+		rollbackReason: "model refusal",
+		errorMessage: `Model refused the authorized task: ${resultText.slice(0, 100)}`,
+		errorCode: ErrorCode.AGENT_EXECUTION_FAILED,
+		category: "validation",
+		retryable: true,
+		context: { agentName, turns: result.turns },
+	});
+}
+
+/**
  * Handle a non-success `ClaudePromptResult` by rolling back and surfacing the
  * SDK's retryable hint via `failAgent`.
  */
