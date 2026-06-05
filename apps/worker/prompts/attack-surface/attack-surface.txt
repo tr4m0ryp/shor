@@ -78,6 +78,14 @@ Per-vulnerability-type exploitation evidence (dispositions + proof, optional):
 Synthesis context:
 - `.storron/deliverables/comprehensive_security_assessment_report.md`
 - `.storron/deliverables/recon_deliverable.md`
+
+Coverage gate input (drives the unseen-tier exclusion in `<scope_gate>`):
+- `.storron/deliverables/coverage_manifest.json` — which architectural tiers
+  (`frontend`/`backend`/`config`/`schema`/`tests`) were analyzed FROM SOURCE
+  (`present`/`partial`) versus only observed live (`absent`). Shape:
+  `{ "tiers": {...}, "observedLiveOnly": [...], "notes": "..." }`. Read it; do
+  NOT fabricate one. A missing manifest means "no gating" (treat every finding
+  as in scope) — never invent an `absent` tier to gate something out.
 </input_files>
 
 <severity_rubric>
@@ -106,6 +114,48 @@ When ranking, prefer scenarios with proven exploits over hypotheses. Mark
 `exploit_unverified: true` when no proven exploit backs the chain.
 </severity_rubric>
 
+<scope_gate>
+COVERAGE-DRIVEN EXCLUSION (binding — apply BEFORE clustering). Build scenarios
+and attack chains ONLY from findings whose disposition is `exploited`,
+`confirmed`, `firm`, or `tentative`. A finding whose disposition is
+`unverified_out_of_scope` (use this EXACT string — it is the disposition the
+emission pipeline assigns) MUST NEVER appear in any scenario's
+`involved_findings`, in any `attack_chain` step, or in any kill chain. Route
+every such finding to the "Requires manual review (unseen tier)" appendix
+instead (see `<deliverable_instructions>`). The attack surface must not chain a
+finding that could not be verified.
+
+Derive `unverified_out_of_scope` yourself from the coverage manifest — the
+emission pipeline computes it the same way, and the per-finding manual-review
+appendix does not exist yet at this phase, so you reproduce the gate here:
+
+1. Read `.storron/deliverables/coverage_manifest.json`. A tier is COVERED when
+   its value is `present` or `partial`; only `absent` (or a missing tier) is
+   NOT covered. A missing/unparseable manifest disables gating entirely — then
+   treat every finding as in scope.
+2. Map each finding to its ENFORCING TIER — the tier whose source would
+   implement the control it concerns:
+   - injection, ssrf, auth, authz  -> backend
+   - xss                           -> frontend, but FALL BACK to backend when
+                                      the frontend tier is NOT covered
+                                      (server-rendered output-encoding is then a
+                                      backend concern)
+3. Assign disposition:
+   - `exploited` — a live proof exists in the matching evidence file. NEVER
+     gated out: a live PoC overrides any missing source.
+   - `confirmed` / `firm` / `tentative` — in scope: the enforcing tier IS
+     covered. Eligible for scenarios and attack chains.
+   - `unverified_out_of_scope` — NOT `exploited` AND its enforcing tier is NOT
+     covered (the tier that would enforce this control was not in the analyzed
+     source). Unverifiable from this scan: EXCLUDE from chains, route to the
+     manual-review appendix.
+
+Absence of a guard, validation, or sanitizer in the provided files proves
+NOTHING for an unseen-tier (`unverified_out_of_scope`) finding — there is unseen
+server code behind it. That is exactly why these are set aside for manual review
+rather than chained into a scenario.
+</scope_gate>
+
 <deliverable_instructions>
 You MUST write TWO files. Both files MUST describe the same scenarios in the
 same order and reference identical IDs.
@@ -119,7 +169,8 @@ commas, no single-quoted strings. Conform to this exact schema:
 ```
 {
   "scenarios": [ ... ],
-  "kill_chains": [ ... ]
+  "kill_chains": [ ... ],
+  "manual_review": [ ... ]
 }
 ```
 
@@ -166,6 +217,22 @@ required:
 }
 ```
 
+`manual_review` is the unseen-tier appendix from `<scope_gate>`: the findings
+that were EXCLUDED from every scenario because their disposition is
+`unverified_out_of_scope`. It is REQUIRED but MAY be an empty array `[]` when
+nothing was gated out. NEVER move any of these findings into `scenarios` or
+`kill_chains`. Each manual_review object MUST contain these fields, in this
+order, every field required:
+
+```
+{
+  "finding_id": "<VULN-ID, must appear in an input queue>",
+  "category": "injection | xss | auth | authz | ssrf",
+  "enforcing_tier": "frontend | backend",
+  "reason": "<short: the enforcing tier was absent from the analyzed source and the finding was not live-confirmed, so it cannot be verified from this scan>"
+}
+```
+
 2. `.storron/deliverables/attack_surface_scenarios.md`
 
 The same content rendered as human-readable Markdown. Use exactly these two
@@ -200,11 +267,22 @@ Involved scenarios: <comma-separated ATK-IDs>
 Primary ATT&CK tactics: <comma-separated tactic IDs>
 
 <narrative paragraph>
+
+## Requires Manual Review (Unseen Tier)
+- <VULN-ID> (<category>) — enforcing tier `<frontend|backend>` was not in the
+  analyzed source and the finding was not live-confirmed; cannot be verified
+  from this scan. Excluded from the attack surface above; review manually.
+- ...
 ```
+
+The `## Requires Manual Review (Unseen Tier)` section renders the same findings
+as the JSON `manual_review` array, in the same order, and MUST NOT repeat any
+finding that already appears in a scenario.
 
 If `scenarios` is empty for any reason, emit `## Scenarios` followed by the
 exact text `No scenarios produced.` so downstream renderers always find the
-header. Apply the same rule to `## Kill Chains` (`No kill chains produced.`).
+header. Apply the same rule to `## Kill Chains` (`No kill chains produced.`) and
+to `## Requires Manual Review (Unseen Tier)` (`No unseen-tier findings.`).
 </deliverable_instructions>
 
 <claude_code_prompt_template>
@@ -297,7 +375,8 @@ and recommends repeating the assessment with broader scope or more time budget.
   control values. Free-form prose fields MAY contain UTF-8.
 - Sort `scenarios` by severity in this order: Critical, High, Medium, Low,
   Informational. Within the same severity, sort by `ID` ascending. Sort
-  `kill_chains` by `ID` ascending.
+  `kill_chains` by `ID` ascending. Sort `manual_review` by `finding_id`
+  ascending.
 - Emit at most 8 scenarios and at most 3 kill_chains. Quality over quantity.
 - Every entry in `involved_findings` MUST reference a real VULN-ID that
   appears in one of the input queues. NEVER invent IDs. If a chain would
@@ -335,13 +414,18 @@ When citing weaknesses, use canonical IDs:
 </reference_taxonomy>
 
 <instructions>
-1. Read every input file listed above. Build an in-memory index of findings
-   keyed by VULN-ID. For each finding, resolve `disposition` as one of:
+1. Read every input file listed above (including `coverage_manifest.json`).
+   Build an in-memory index of findings keyed by VULN-ID. For each finding,
+   resolve `disposition` as one of:
    - `exploited` — appears under "Successfully Exploited Vulnerabilities" in
-     the matching evidence file.
+     the matching evidence file. NEVER gated out.
    - `blocked` — appears under a "Validation Blocked" or equivalent section,
      OR the evidence file explicitly notes the exploit attempt failed.
    - `hypothesis` — appears in the queue but has no matching evidence entry.
+   Then apply the coverage gate from `<scope_gate>`: any non-`exploited` finding
+   whose enforcing tier is NOT covered by the manifest is reclassified
+   `unverified_out_of_scope` and is EXCLUDED from clustering (steps 2-4). Collect
+   these into the `manual_review` appendix instead.
 2. Identify clusters of findings that compose realistic attack paths. Prefer
    chains that combine two or more findings into a single business-impact
    narrative over single-finding scenarios. A chain SHOULD touch at least
@@ -349,7 +433,10 @@ When citing weaknesses, use canonical IDs:
 3. Draft 1 to 8 scenarios. Score severity from the business impact per the
    <severity_rubric>, not from raw CVSS-style ratings of individual
    findings. Set `exploit_unverified: true` if and only if no finding in
-   `involved_findings` has disposition `exploited`.
+   `involved_findings` has disposition `exploited`. NEVER place an
+   `unverified_out_of_scope` finding in `involved_findings` — those go ONLY to
+   the `manual_review` appendix (build it now from the findings gated out in
+   step 1: one entry per gated-out VULN-ID, sorted by `finding_id` ascending).
 4. Draft 0 to 3 kill chains. A kill chain is a paragraph stitching two or
    more existing scenarios into a higher-order attack narrative (e.g.
    recon -> initial access -> credential theft -> lateral movement -> data
@@ -380,7 +467,10 @@ When citing weaknesses, use canonical IDs:
    c. Confirm both files contain the same set of `ATK-NN` IDs and the same
       set of `CHAIN-NN` IDs.
    d. Confirm every VULN-ID in every `involved_findings` array exists in at
-      least one input queue.
+      least one input queue, and that NO `unverified_out_of_scope` finding
+      appears in any `involved_findings` or `attack_chain` — every gated-out
+      finding appears ONLY in `manual_review` (JSON) and the "Requires Manual
+      Review (Unseen Tier)" section (Markdown), with matching IDs across both.
     e. Confirm every `claude_code_prompt` begins with the literal "REMEDIATION
       TASK (CONTEXT — DO NOT REMOVE):" anchor and ends with the literal "Do
       NOT" footer paragraph, and that its `Where:` line is a real `file:line`
