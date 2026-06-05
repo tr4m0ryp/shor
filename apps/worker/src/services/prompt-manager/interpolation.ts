@@ -10,13 +10,14 @@ import type { DistributedConfig } from "../../types/config.js";
 import { PentestError } from "../error-handling.js";
 import { buildAuthContext } from "./auth-context.js";
 import { buildLoginInstructions } from "./login-instructions.js";
+import { applyPromptContext, type PromptContext } from "./prompt-context.js";
 import type { PromptVariables } from "./types.js";
 
 /**
  * Replace every `{{VARIABLE}}` placeholder in a prompt template using values
  * from `variables`, the optional `DistributedConfig`, and (when applicable) the
- * assembled login instructions. Warns the logger about any leftover
- * placeholders without failing.
+ * assembled login instructions, and the optional per-round `PromptContext`.
+ * Warns the logger about any leftover placeholders without failing.
  */
 export async function interpolateVariables(
 	template: string,
@@ -24,6 +25,7 @@ export async function interpolateVariables(
 	config: DistributedConfig | null = null,
 	logger: ActivityLogger,
 	promptsBaseDir: string = PROMPTS_DIR,
+	context: PromptContext = {},
 ): Promise<string> {
 	try {
 		if (!template || typeof template !== "string") {
@@ -61,6 +63,12 @@ export async function interpolateVariables(
 				/{{DESCRIPTION}}/g,
 				config?.description ? `Description: ${config.description}` : "",
 			);
+
+		// Resolve the per-round prompt-context placeholders ({{THREAT_MODEL}},
+		// {{HISTORICAL_SEED}}, {{PARTITION}}, {{LENS}}, {{VOTER_INDEX}},
+		// {{IDENTITIES}}, {{FP_RULES}}). Absent values collapse to a neutral
+		// sentinel so none ever survives as a literal placeholder downstream.
+		result = applyPromptContext(result, context);
 
 		if (config) {
 			// Handle rules section - if both are empty, use cleaner messaging

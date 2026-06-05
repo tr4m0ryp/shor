@@ -5,7 +5,19 @@
 // as published by the Free Software Foundation.
 
 import { describe, expect, it } from "vitest";
+import { PROMPTS_DIR } from "../../paths.js";
+import type { ActivityLogger } from "../../types/activity-logger.js";
+import { interpolateVariables } from "./interpolation.js";
+import { loadPrompt } from "./loader.js";
+import { applyPromptContext } from "./prompt-context.js";
 import { RECOMMENDED, recommendedSkillsSection } from "./skill-recommendations.js";
+
+/** Swallow logger so the render path runs quietly. */
+const silentLogger: ActivityLogger = {
+	info: () => {},
+	warn: () => {},
+	error: () => {},
+};
 
 describe("recommendedSkillsSection", () => {
 	it("renders a recon agent as a checklist with breadth + justify rules", () => {
@@ -43,5 +55,47 @@ describe("recommendedSkillsSection", () => {
 	it("returns \"\" for an unknown agent name", () => {
 		expect(recommendedSkillsSection("attack-surface")).toBe("");
 		expect(recommendedSkillsSection("totally-unknown")).toBe("");
+	});
+});
+
+describe("prompt-context interpolation", () => {
+	it("renders an existing prompt with no leftover {{...}} placeholders", async () => {
+		const rendered = await loadPrompt(
+			"recon",
+			{ webUrl: "https://example.test", repoPath: "/tmp/repo" },
+			null,
+			silentLogger,
+		);
+		// Sanity: real variables landed, and nothing is left unresolved.
+		expect(rendered).toContain("https://example.test");
+		expect(rendered).not.toMatch(/\{\{[^}]+\}\}/);
+	});
+
+	it("lands a provided context value and resolves the rest to sentinels", async () => {
+		const out = await interpolateVariables(
+			"TM={{THREAT_MODEL}} | PART={{PARTITION}} | V={{VOTER_INDEX}} | ID={{IDENTITIES}}",
+			{ webUrl: "https://example.test", repoPath: "/tmp/repo" },
+			null,
+			silentLogger,
+			PROMPTS_DIR,
+			{ threatModel: "TM-SUMMARY", voterIndex: 2 },
+		);
+		expect(out).toContain("TM=TM-SUMMARY");
+		expect(out).toContain("V=2");
+		// Unsupplied vars fall back to the neutral sentinel, never a literal.
+		expect(out).toContain("PART=(none)");
+		expect(out).toContain("ID=(none)");
+		expect(out).not.toMatch(/\{\{[^}]+\}\}/);
+	});
+
+	it("substitutes neutral sentinels for absent context and honours index 0", () => {
+		expect(applyPromptContext("[{{FP_RULES}}]")).toBe("[(none)]");
+		expect(applyPromptContext("[{{LENS}}]", { lens: "discovery" })).toBe(
+			"[discovery]",
+		);
+		// A zero ordinal is a real value, not "absent".
+		expect(applyPromptContext("[{{VOTER_INDEX}}]", { voterIndex: 0 })).toBe(
+			"[0]",
+		);
 	});
 });

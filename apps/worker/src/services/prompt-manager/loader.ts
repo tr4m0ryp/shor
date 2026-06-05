@@ -12,6 +12,7 @@ import type { DistributedConfig } from "../../types/config.js";
 import { handlePromptError, PentestError } from "../error-handling.js";
 import { processIncludes } from "./includes.js";
 import { interpolateVariables } from "./interpolation.js";
+import type { PromptContext } from "./prompt-context.js";
 import { recommendedSkillsSection } from "./skill-recommendations.js";
 import { selectPreReconTemplate } from "./template-selection.js";
 import type { PromptVariables } from "./types.js";
@@ -42,7 +43,9 @@ async function resolvePromptFile(baseDir: string, filename: string): Promise<str
 /**
  * Load a named prompt template, resolve `@include(...)` directives, and
  * interpolate variables. The pre-recon agent always resolves to its
- * clearnet template.
+ * clearnet template. `context` carries the optional per-round prompt-context
+ * values ({{THREAT_MODEL}}, {{PARTITION}}, {{IDENTITIES}}, ...); omit it and the
+ * placeholders fall back to neutral sentinels.
  */
 export async function loadPrompt(
 	promptName: string,
@@ -50,6 +53,7 @@ export async function loadPrompt(
 	config: DistributedConfig | null = null,
 	logger: ActivityLogger,
 	promptDir?: string,
+	context: PromptContext = {},
 ): Promise<string> {
 	try {
 		// 1. Resolve prompt file path (promptDir override → default PROMPTS_DIR).
@@ -105,6 +109,7 @@ export async function loadPrompt(
 			config,
 			logger,
 			basePromptsDir,
+			context,
 		);
 		return interpolated + recommendedSkillsSection(promptName);
 	} catch (error) {
