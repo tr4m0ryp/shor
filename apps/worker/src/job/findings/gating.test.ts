@@ -23,6 +23,7 @@ import { COVERAGE_MANIFEST_FILENAME } from "../coverage/index.js";
 import type { CoverageManifest } from "../coverage/index.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import { collectFindings } from "./index.js";
+import { readManualReviewAppendix } from "./gating.js";
 
 // Silent logger — these tests assert on returned records / files, not logs.
 const logger = {
