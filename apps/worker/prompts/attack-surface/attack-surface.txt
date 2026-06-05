@@ -112,6 +112,39 @@ in `business_impact`.
 
 When ranking, prefer scenarios with proven exploits over hypotheses. Mark
 `exploit_unverified: true` when no proven exploit backs the chain.
+
+For `firm` (unconfirmed) findings, the `validation_note` field records WHY
+live confirmation failed. Use this to calibrate exploitability:
+
+- **"Blocked — WAF / security control"** — HIGHEST real-vuln likelihood. The
+  underlying code flaw exists and was reached; only the WAF stands between the
+  attacker and a confirmed exploit. Any attacker who bypasses or evades the WAF
+  has a working attack. Treat as functionally confirmed in business-impact prose;
+  note the WAF dependency explicitly.
+- **"Blocked — rate-limited"** — HIGH likelihood. The endpoint is reachable and
+  the probe reached it; rate-limiting stopped data collection, not the attack
+  path itself. A patient attacker or one with multiple source IPs can succeed.
+- **"Blocked — requires authenticated session"** — MEDIUM-HIGH. The flaw is real
+  but requires valid credentials. Pair with any auth/credential-theft finding in
+  the kill chain to model a realistic attack path (credential compromise → exploit).
+- **"Unproven — no live validation evidence produced"** — MEDIUM. The analysis
+  identified the flaw in code but no live attempt was made. Confidence comes
+  entirely from the static analysis. Use the queue entry's `confidence` field
+  (high/med/low) to further rank; high-confidence unproven findings are worth
+  including, low-confidence ones should appear in tentative scenarios only.
+- **"Blocked — internal access only"** — LOW for external attackers, HIGH for
+  insider/post-pivot scenarios. Route to a kill-chain step that models internal
+  lateral movement rather than as a direct external-facing scenario.
+
+Incorporate this ranking directly: a WAF-blocked firm finding should appear in
+the same scenario chain as a confirmed finding when they concern the same
+vulnerability class — the WAF-blocked variant is what an unassisted attacker
+faces; the confirmed variant is what they get after bypassing it.
+
+In `business_impact` for firm-only scenarios, open with a phrase like:
+"Code analysis identified [X]; live confirmation was prevented by [reason from
+validation_note]. An attacker who [specific bypass] would achieve [impact]."
+This gives the operator the exact precondition to fix or monitor.
 </severity_rubric>
 
 <scope_gate>
