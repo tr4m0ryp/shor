@@ -64,7 +64,7 @@ export function buildFirmRetryContext(
 		const blocking_notes: Record<string, string> = {};
 
 		for (const vuln of categoryVulns) {
-			const entry = evidenceMap.get(vuln.id);
+			const entry = lookupEvidence(evidenceMap, vuln.id);
 			if (!entry) {
 				// No evidence at all — the exploit agent produced no entry for this ID.
 				queued.push(vuln.id);
