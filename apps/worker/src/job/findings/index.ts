@@ -177,7 +177,33 @@ export function collectFindings(
 		}
 	}
 
-<<<<<<< HEAD
+	// Adversarial screen rejections (T4): the screen agent refuted these hypotheses
+	// before exploitation. Mark the matching queue entry (or synthesize one when the
+	// raw queue no longer carries it) `unverified_screen_rejected` so the gate routes
+	// it to the manual-review appendix and OUT of the emitted set — exactly like
+	// `unverified_out_of_scope`. A live PoC still wins: an `exploited` finding is
+	// never demoted.
+	const rejections = readScreenRejections(deliverablesPath, logger);
+	for (const [category, byId] of rejections) {
+		for (const [id, reason] of byId) {
+			const match = vulns.find((v) => v.category === category && v.id === id);
+			if (match) {
+				if (match.disposition !== "exploited") {
+					match.disposition = "unverified_screen_rejected";
+					if (reason.trim()) match.evidenceText = reason;
+				}
+			} else {
+				vulns.push({
+					category,
+					id,
+					raw: { ID: id },
+					disposition: "unverified_screen_rejected",
+					evidenceText: reason,
+				});
+			}
+		}
+	}
+
 	// Observability: a category whose evidence file HAS entries but matched NONE of
 	// its queue IDs is the exact silent-failure signature behind the "nothing ever
 	// confirmed" regression. Warn loudly per category and once in aggregate so the
@@ -206,32 +232,6 @@ export function collectFindings(
 				matched,
 				exploited,
 			});
-=======
-	// Adversarial screen rejections (T4): the screen agent refuted these hypotheses
-	// before exploitation. Mark the matching queue entry (or synthesize one when the
-	// raw queue no longer carries it) `unverified_screen_rejected` so the gate routes
-	// it to the manual-review appendix and OUT of the emitted set — exactly like
-	// `unverified_out_of_scope`. A live PoC still wins: an `exploited` finding is
-	// never demoted.
-	const rejections = readScreenRejections(deliverablesPath, logger);
-	for (const [category, byId] of rejections) {
-		for (const [id, reason] of byId) {
-			const match = vulns.find((v) => v.category === category && v.id === id);
-			if (match) {
-				if (match.disposition !== "exploited") {
-					match.disposition = "unverified_screen_rejected";
-					if (reason.trim()) match.evidenceText = reason;
-				}
-			} else {
-				vulns.push({
-					category,
-					id,
-					raw: { ID: id },
-					disposition: "unverified_screen_rejected",
-					evidenceText: reason,
-				});
-			}
->>>>>>> agent/agent-a06e840a35c31d20f
 		}
 	}
 
