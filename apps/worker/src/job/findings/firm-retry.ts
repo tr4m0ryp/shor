@@ -21,7 +21,7 @@ import path from "node:path";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import { readEvidence } from "./evidence.js";
 import { FINDING_CATEGORIES, QUEUE_FILES, readQueues } from "./queue.js";
-import type { FindingCategory, NormalizedVuln } from "./types.js";
+import type { FindingCategory } from "./types.js";
 
 export const FIRM_RETRY_CONTEXT_FILE = "firm_retry_context.json";
 
