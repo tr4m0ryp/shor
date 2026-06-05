@@ -32,6 +32,14 @@ export const PLAYWRIGHT_SESSION_MAPPING: Record<string, PlaywrightSession> =
 		"exploit-ssrf": "agent4",
 		"exploit-authz": "agent5",
 
+		// Phase 4b: Exploit retry pass (same session assignments; runs sequentially
+		// after the primary pass so there is no browser contention)
+		"exploit-injection-retry": "agent1",
+		"exploit-xss-retry": "agent2",
+		"exploit-auth-retry": "agent3",
+		"exploit-ssrf-retry": "agent4",
+		"exploit-authz-retry": "agent5",
+
 		// Phase 5: Reporting
 		"report-executive": "agent3",
 
