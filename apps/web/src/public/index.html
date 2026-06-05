@@ -2005,6 +2005,13 @@ function renderFindingRow(f, i) {
     tentative: 'Tentative — plausible, needs manual verification'
   }[conf.toLowerCase()] || 'Analyzer confidence in this finding';
   const confBadge = conf ? '<span class="confidence-badge" title="' + escapeHtml(confTip) + '">' + escapeHtml(conf) + '</span>' : '';
+  const disp = String(f.disposition || '').toLowerCase();
+  const validatedBadge = disp === 'exploited'
+    ? '<span class="validated-badge" title="Validated — proven by live exploitation during the scan">Validated</span>'
+    : '';
+  const reviewBadge = disp === 'unverified_out_of_scope'
+    ? '<span class="review-badge" title="Manual review — the enforcing tier was not in the analyzed source (or its validation lane failed) and it was not live-confirmed. Verify manually.">Manual review</span>'
+    : '';
 
   const detailRows = [];
   const push = (label, value, highlight) => {
