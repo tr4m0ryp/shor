@@ -24,6 +24,11 @@ import type { ActivityLogger } from "../types/activity-logger.js";
 import type { SessionMetadata } from "../types/audit.js";
 import type { ScanJobParams } from "./env.js";
 import { reportFindings } from "./findings/index.js";
+import {
+	firmRetryCategories,
+	hasFirmRetryTargets,
+	writeFirmRetryContext,
+} from "./findings/firm-retry.js";
 import { recordExploitLaneOutcome } from "./findings/lane-status.js";
 import { ProgressEmitter } from "./progress/index.js";
 
