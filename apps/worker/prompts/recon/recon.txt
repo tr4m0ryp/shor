@@ -163,6 +163,14 @@ Run in this dependency order (skip a step only if it is genuinely inapplicable, 
 **CRITICAL — probe the proxied API even if the direct backend port is closed.** {{WEB_URL}} is the externally reachable origin; a single-page app reverse-proxies its backend on the SAME origin under a path prefix. You MUST explicitly probe `{{WEB_URL}}/api/`, `{{WEB_URL}}/api/v1/`, `{{WEB_URL}}/api/health`, and `{{WEB_URL}}/graphql` (with `httpx`/`curl` via Bash). A closed direct backend port (:8000/:3000/:80) does NOT mean the backend is unreachable — the proxied `/api` path is the real, testable attack surface. Record the reachable API base path explicitly so the exploitation agents target it.
 
 **Honor the no-DoS per-host rate limits** baked into each skill and re-validate scope immediately before each network action. Write every live finding (open ports, services/versions, live HTTP endpoints, WAF, subdomains, params, reachable `/api` base) into the recon deliverable (Sections 2, 4, 5, 6) — these are now FIRST-HAND live results, not assumptions inherited from a prior phase.
+
+**STEP 0.5 — RECONCILE EVERY LIVE ENDPOINT AGAINST THE PROVIDED SOURCE (immediately after live discovery, before you finalize the map).** For every live endpoint/behaviour you discovered above, determine whether a corresponding handler exists in the provided source (use Task agents for the source side — never Read/Glob/Grep). This produces a per-endpoint white-box vs. black-box verdict:
+- **Endpoint WITH source** ⇒ **white-box**: downstream agents may analyse its handler code, guards, and dataflow.
+- **Endpoint WITHOUT source** ⇒ **BLACK-BOX ONLY**: record it in the coverage manifest's `observedLiveOnly` list at `.storron/deliverables/coverage_manifest.json`, and mark it black-box only. Downstream agents may conclude about it **only from observed responses**, NEVER from the absence of code. **The absence of a guard/validation in the provided files means NOTHING for these endpoints** — there is unseen server code behind them.
+
+The pre-recon coverage manifest (`.storron/deliverables/coverage_manifest.json`, shape `{ "tiers": {...}, "observedLiveOnly": [...], "notes": "..." }`) is your starting point: it already records which architectural tiers (`frontend`/`backend`/`config`/`schema`/`tests`) are `present`/`partial`/`absent` and may already list some `observedLiveOnly` entries. **Updating `observedLiveOnly` in that JSON is PREFERRED when straightforward** — you have Bash/Write/Edit tools: read it, append every new black-box-only endpoint path/behaviour you found, and write it back (preserve the existing shape; do NOT add top-level keys). If editing the JSON is not straightforward, you MUST AT MINIMUM document the full reconciliation in your markdown deliverable's "Live↔Source Reconciliation" subsection (see the deliverable structure below).
+
+**Why this matters:** the backend being reachable via the proxied `/api` path is the real, testable attack surface — but its IMPLEMENTATION being unseen means you (and every downstream agent) may draw **NO code-absence conclusions** about it. "I didn't find an auth check in the repo" is not a finding for a black-box-only endpoint; only observed live behaviour is.
 </live_recon_first>
 
 <systematic_approach>
@@ -188,6 +196,11 @@ You must follow this methodical process. STEP 0 (`<live_recon_first>`) runs FIRS
 3.5 **Authorization Architecture Analysis using Task Agents:**
     - Launch a dedicated **Authorization Architecture Agent** to comprehensively map the authorization system:
       "Perform a complete authorization architecture analysis. Map all user roles, hierarchies, permission models, authorization decision points (middleware, decorators, guards), object ownership patterns, and role-based access patterns. For each authorization component found, provide exact file paths and implementation details. Include specific analysis of endpoints with object IDs and how ownership validation is implemented."
+
+3.6 **Live↔Source Reconciliation (run STEP 0.5 from `<live_recon_first>` here):**
+    - Cross-reference EVERY live endpoint/behaviour from STEP 0 against the source-side findings from the Task agents in steps 3 and 3.5. For each, assign a verdict: **white-box** (a handler exists in the provided source) or **BLACK-BOX ONLY** (live but no implementation in the repo).
+    - For each BLACK-BOX-ONLY endpoint, append its path/behaviour to `observedLiveOnly` in `.storron/deliverables/coverage_manifest.json` (preferred; preserve the existing shape) AND record it in the "Live↔Source Reconciliation" subsection of your deliverable (mandatory minimum).
+    - Carry these verdicts forward: downstream agents must treat black-box-only endpoints as analysable ONLY from observed responses — absence of code/guards in the repo proves NOTHING for them.
 
 4.  **Enumerate and Document using Task Agent Findings:**
     - Synthesize findings from all parallel Task agents launched in steps 3 and 3.5
@@ -265,6 +278,21 @@ A table of all discovered network-accessible API endpoints with authorization de
 | DELETE | /api/orders/{order_id} | user | order_id | Bearer Token + order ownership | Deletes user order. See `orders.controller.ts`. |
 | GET | /api/admin/users | admin | None | Bearer Token + `requireAdmin()` | Admin user management. See `admin.controller.ts`. |
 | ... | ... | ... | ... | ... | ... |
+
+### Live↔Source Reconciliation
+*(Non-numbered subsection — intentionally NOT renumbered so the Section 4→5→6→7→8 contract that downstream parsers rely on stays intact. It belongs with Section 4 because it classifies the same endpoints.)*
+
+Cross-reference of the live endpoints you discovered in STEP 0 against the provided source. This tells every downstream agent which endpoints they may reason about from CODE (white-box) and which they may reason about ONLY from observed live responses (black-box only). It is grounded in the pre-recon coverage manifest (`.storron/deliverables/coverage_manifest.json`).
+
+| Live Endpoint/Behaviour | Implementation in Source? | Verdict | Source Pointer (if any) / Observed Evidence |
+|---|---|---|---|
+| **Verdict:** `white-box` (handler found in repo) or `BLACK-BOX ONLY` (live but no source) |
+| `GET /api/users/me` | Yes | white-box | `users.service.ts:42` |
+| `POST /api/import` | No — no handler in repo | BLACK-BOX ONLY | Responds 202; no server source. Recorded in `observedLiveOnly`. |
+
+**Coverage manifest sync (`observedLiveOnly`):** Every endpoint above marked **BLACK-BOX ONLY** MUST also appear in the `observedLiveOnly` array of `.storron/deliverables/coverage_manifest.json` (append to it — preferred path, you have shell/file tools — preserving the manifest's existing `{ tiers, observedLiveOnly, notes }` shape). If you could not edit the JSON, state that here and list the black-box-only endpoints in this subsection regardless.
+
+**Black-box-only ⇒ no code-absence conclusions (binding rule for all downstream agents):** For any endpoint marked BLACK-BOX ONLY, the absence of a guard, validation, or sanitizer in the provided files means **NOTHING** — there is unseen server code behind the proxied `/api` path. Conclude about these endpoints ONLY from observed responses, never from missing code. The backend being reachable via the proxy is the testable surface; its implementation being unseen forbids any "the repo has no check, therefore it's vulnerable/safe" reasoning.
 
 ## 5. Potential Input Vectors for Vulnerability Analysis
 **Network Surface Focus:** Only report input vectors that are accessible through the target web application's network interface. Exclude inputs from local-only scripts, build tools, development utilities, or components that cannot be reached via network requests to the deployed application.
