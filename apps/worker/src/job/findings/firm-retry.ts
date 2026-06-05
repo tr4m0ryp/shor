@@ -61,7 +61,7 @@ export function buildFirmRetryContext(
 
 		const blocked: string[] = [];
 		const queued: string[] = [];
-		const blocking_notes: Record<string, string> = [];
+		const blocking_notes: Record<string, string> = {};
 
 		for (const vuln of categoryVulns) {
 			const entry = evidenceMap.get(vuln.id);
