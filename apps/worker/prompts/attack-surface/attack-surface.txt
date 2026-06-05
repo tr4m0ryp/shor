@@ -302,6 +302,11 @@ The `## Requires Manual Review (Unseen Tier)` section renders the same findings
 as the JSON `manual_review` array, in the same order, and MUST NOT repeat any
 finding that already appears in a scenario.
 
+Append a `## Confidence Summary` section at the end of the Markdown file,
+after `## Requires Manual Review (Unseen Tier)`. Render the `confidence_summary`
+JSON object as a table with columns: Category | Confirmed | Firm | Tentative |
+Excluded. This gives readers an at-a-glance view of coverage depth per attack class.
+
 If `scenarios` is empty for any reason, emit `## Scenarios` followed by the
 exact text `No scenarios produced.` so downstream renderers always find the
 header. Apply the same rule to `## Kill Chains` (`No kill chains produced.`) and
