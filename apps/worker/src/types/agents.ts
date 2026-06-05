@@ -15,11 +15,18 @@
 export const ALL_AGENTS = [
 	"pre-recon",
 	"recon",
+	// Threat-model prerequisite: runs after recon, before the vuln pass, to frame
+	// the highest-value hypotheses for the category agents.
+	"threat-model",
 	"injection-vuln",
 	"xss-vuln",
 	"auth-vuln",
 	"ssrf-vuln",
 	"authz-vuln",
+	// +2 categories (logic flaws, web misconfiguration) run alongside the existing
+	// five in every phase.
+	"logic-vuln",
+	"misconfig-web-vuln",
 	// Adversarial screen pass: one agent per category independently tries to
 	// refute each hypothesis (blind to recon context) before exploitation.
 	"injection-screen",
@@ -27,11 +34,15 @@ export const ALL_AGENTS = [
 	"auth-screen",
 	"ssrf-screen",
 	"authz-screen",
+	"logic-screen",
+	"misconfig-web-screen",
 	"injection-exploit",
 	"xss-exploit",
 	"auth-exploit",
 	"ssrf-exploit",
 	"authz-exploit",
+	"logic-exploit",
+	"misconfig-web-exploit",
 	"report",
 	"attack-surface",
 ] as const;

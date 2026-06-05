@@ -23,6 +23,7 @@ import type { AgentName } from "../types/agents.js";
 import type { ActivityLogger } from "../types/activity-logger.js";
 import type { SessionMetadata } from "../types/audit.js";
 import type { ScanJobParams } from "./env.js";
+import { runOraclePhase } from "../services/oracle/index.js";
 import { reportFindings } from "./findings/index.js";
 import { recordExploitLaneOutcome } from "./findings/lane-status.js";
 import { ProgressEmitter } from "./progress/index.js";
@@ -39,10 +40,10 @@ import { ProgressEmitter } from "./progress/index.js";
  * isolated (logged, the others continue); report + attack-surface are best-effort
  * synthesis.
  */
-const PREREQ_AGENTS: readonly AgentName[] = ["pre-recon", "recon"];
-const VULN_AGENTS: readonly AgentName[] = ["injection-vuln", "xss-vuln", "auth-vuln", "ssrf-vuln", "authz-vuln"];
-const SCREEN_AGENTS: readonly AgentName[] = ["injection-screen", "xss-screen", "auth-screen", "ssrf-screen", "authz-screen"];
-const EXPLOIT_AGENTS: readonly AgentName[] = ["injection-exploit", "xss-exploit", "auth-exploit", "ssrf-exploit", "authz-exploit"];
+const PREREQ_AGENTS: readonly AgentName[] = ["pre-recon", "recon", "threat-model"];
+const VULN_AGENTS: readonly AgentName[] = ["injection-vuln", "xss-vuln", "auth-vuln", "ssrf-vuln", "authz-vuln", "logic-vuln", "misconfig-web-vuln"];
+const SCREEN_AGENTS: readonly AgentName[] = ["injection-screen", "xss-screen", "auth-screen", "ssrf-screen", "authz-screen", "logic-screen", "misconfig-web-screen"];
+const EXPLOIT_AGENTS: readonly AgentName[] = ["injection-exploit", "xss-exploit", "auth-exploit", "ssrf-exploit", "authz-exploit", "logic-exploit", "misconfig-web-exploit"];
 const SYNTHESIS_AGENTS: readonly AgentName[] = ["report", "attack-surface"];
 
 /** Max agents running at once within a parallel group. */
@@ -60,7 +61,12 @@ export interface PipelineRunResult {
 	completedAgents: AgentRunSummary[];
 }
 
-interface AgentContext {
+/**
+ * Per-scan context threaded through every agent run and the oracle phase.
+ * Exported so post-exploit phase services (e.g. `runOraclePhase`) can receive it
+ * without re-deriving the container/paths.
+ */
+export interface AgentContext {
 	params: ScanJobParams;
 	deliverablesPath: string;
 	container: Container;
@@ -178,6 +184,11 @@ export async function runScanPipeline(
 	await runGroup(VULN_AGENTS, GROUP_CONCURRENCY, ctx);
 	await runGroup(SCREEN_AGENTS, GROUP_CONCURRENCY, ctx);
 	await runGroup(EXPLOIT_AGENTS, GROUP_CONCURRENCY, ctx);
+
+	// 2b) Oracle phase — post-exploitation adjudication over the exploited/screened
+	// dispositions. No-op today (task 013 fills `runOraclePhase`); runs before
+	// synthesis so the report/attack-surface see the adjudicated set.
+	await runOraclePhase(ctx);
 
 	// 3) Synthesis — best-effort; a failure here must not discard the findings.
 	for (const agentName of SYNTHESIS_AGENTS) {
