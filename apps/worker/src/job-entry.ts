@@ -66,28 +66,7 @@ export async function runJob(): Promise<void> {
 			agentCount: result.completedAgents.length,
 		});
 
-		// If the user has connected Sinas, first run the "improvement findings"
-		// pass (Sonnet) that rewrites every finding's prose for readability; it
-		// writes improved_findings.json, which collectFindings overlays so the
-		// findings, report, and attack surface all use the cleaned text. Runs
-		// BEFORE the report/attack-surface so they see the improved findings.
-		await improveFindingsViaSinas(deliverablesPath, params.scanId, logger);
-
-		// Then offload attack-surface synthesis and report finalization to the
-		// instance (Opus). Both overwrite the local deliverables; each falls back
-		// to the engine output on any failure.
-		await finalizeAttackSurfaceViaSinas(
-			deliverablesPath,
-			params.scanId,
-			params.targetUrl,
-			logger,
-		);
-		await finalizeViaSinas(
-			deliverablesPath,
-			params.scanId,
-			params.targetUrl,
-			logger,
-		);
+		await finalizeViaCli(deliverablesPath, params.scanId, params.targetUrl, logger);
 
 		// Post findings + attack surface to the dashboard sink (best-effort; a
 		// failed POST is logged, never fatal).
