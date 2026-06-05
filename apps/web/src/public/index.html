@@ -1980,8 +1980,12 @@ function setSeverityFilter(sev) { state.severityFilter = sev; renderFindings(); 
 function setReviewFilter(v) { state.reviewFilter = v; renderFindings(); }
 
 // A finding the scan could not verify (enforcing tier not in the analyzed
-// source, or its validation lane failed) and that was not live-confirmed.
-function isManualReview(f) { return String((f && f.disposition) || '') === 'unverified_out_of_scope'; }
+// source, or its validation lane failed) and that was not live-confirmed, OR a
+// hypothesis the adversarial screen refuted before exploitation.
+function isManualReview(f) {
+  const d = String((f && f.disposition) || '');
+  return d === 'unverified_out_of_scope' || d === 'unverified_screen_rejected';
+}
 
 function renderFindings() {
   const panel = document.getElementById('panelFindings');
