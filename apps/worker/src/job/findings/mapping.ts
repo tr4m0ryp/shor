@@ -254,6 +254,7 @@ export function toFindingRecord(vuln: NormalizedVuln): FindingRecord {
 	);
 
 	const vulnerabilityType = firstString(raw, ["vulnerability_type"]);
+	const validation_note = synthesizeValidationNote(vuln.disposition, vuln.evidenceText);
 	return {
 		id: vuln.id,
 		title: synthTitle(vuln.category, vulnerabilityType),
