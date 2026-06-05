@@ -1999,12 +1999,21 @@ function renderFindingRow(f, i) {
   const loc = f.vulnerable_code_location || {};
   const locStr = loc.file ? loc.file + ':' + (loc.line != null ? loc.line : '?') : '';
   const summary = String(f.evidence || f.missing_defense || '');
-  const confTip = {
+  const validationNote = String(f.validation_note || '');
+  const confBase = {
     confirmed: 'Confirmed — proven by live exploitation during the scan',
-    firm: 'Firm — strong code/behaviour evidence, but not live-exploited',
-    tentative: 'Tentative — plausible, needs manual verification'
+    firm: 'Firm — strong code/behaviour evidence, but not live-exploited during this scan',
+    tentative: 'Tentative — plausible hypothesis; needs manual verification'
   }[conf.toLowerCase()] || 'Analyzer confidence in this finding';
-  const confBadge = conf ? '<span class="confidence-badge" title="' + escapeHtml(confTip) + '">' + escapeHtml(conf) + '</span>' : '';
+  // For non-confirmed findings, append the specific failure reason from validation_note.
+  const confTip = (conf.toLowerCase() !== 'confirmed' && validationNote)
+    ? confBase + '. ' + validationNote
+    : confBase;
+  // Non-confirmed badges get a visual indicator (·) so the tooltip is discoverable.
+  const confLabel = (conf.toLowerCase() !== 'confirmed' && validationNote)
+    ? escapeHtml(conf) + ' <span style="opacity:.55;font-size:9px">·</span>'
+    : escapeHtml(conf);
+  const confBadge = conf ? '<span class="confidence-badge confidence-' + escapeHtml(conf.toLowerCase()) + '" title="' + escapeHtml(confTip) + '" style="cursor:help">' + confLabel + '</span>' : '';
   const disp = String(f.disposition || '').toLowerCase();
   const validatedBadge = disp === 'exploited'
     ? '<span class="validated-badge" title="Validated — proven by live exploitation during the scan">Validated</span>'
