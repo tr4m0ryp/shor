@@ -1,0 +1,72 @@
+<firm_retry_pass>
+**RETRY PASS — TARGETED RE-VALIDATION OF FIRM FINDINGS.**
+
+The primary exploitation pass for this category has already run. Your mission is
+narrowly scoped: attempt confirmation for the findings that the primary pass could
+NOT confirm. Do not repeat work that already succeeded.
+
+**Step 1 — Read your targets.**
+Read `.storron/deliverables/firm_retry_context.json`. Find your category's entry.
+It lists two groups:
+- `blocked`  — IDs the primary pass attempted but a security control blocked.
+  For each, `blocking_notes[ID]` contains the prose from the original blocking event.
+- `queued`   — IDs present in the analysis queue that the primary pass produced
+  NO evidence entry for (not attempted, or run out of turns/time).
+
+If your category has no entry in the context file, or both lists are empty, stop
+immediately and leave the evidence file unchanged.
+
+**Step 2 — Read the existing evidence file.**
+Read `.storron/deliverables/<category>_exploitation_evidence.md`. This is the
+primary pass output. You MUST preserve ALL existing content verbatim. You will
+REWRITE the file at the end with the original content PLUS your new additions.
+Never delete or modify existing `## Successfully Exploited` or
+`## Potential Vulnerabilities (Validation Blocked)` entries.
+
+**Step 3 — Attempt alternative probes (per failure mode).**
+
+For `blocked` findings, the blocking_notes describe WHY the primary probe failed.
+Apply the matching alternative strategy:
+
+- **WAF / security control intercepted:**
+  Try alternative encodings: URL-encode special chars, hex-encode, Unicode
+  normalization (e.g. `<script>`), double-encoding, null-byte injection.
+  Try HTTP method variation: if `POST` was blocked, try `PUT`, `PATCH`, or `OPTIONS`
+  on the same route. Try parameter pollution (duplicate params, mixed case keys).
+  Try content-type switching: `application/json` → `application/x-www-form-urlencoded`
+  or multipart/form-data.
+
+- **Authentication / session required:**
+  Check the recon deliverable for any auth-bypass paths: JWT `alg:none`, algorithm
+  confusion (RS256 → HS256 with public key as secret), token fixation, or
+  unauthenticated proxy endpoints. If the login instructions provided credentials,
+  ensure the session is active and retry with a fresh authenticated browser session.
+  Do NOT attempt brute-force or credential stuffing.
+
+- **Rate-limited:**
+  Slow down: space each probe 5–10 seconds apart. Try a fresh Playwright session
+  (a different `--session` value) to rotate the client fingerprint. Reduce payload
+  concurrency to 1 request at a time.
+
+- **Internal / not externally reachable:**
+  Verify the endpoint is truly internal by checking whether the API is proxied at a
+  different public path (e.g. `/api/<path>` even though the direct port is closed).
+  If confirmed internal, mark it blocked with `OUT_OF_SCOPE_INTERNAL` — do NOT keep
+  attempting.
+
+For `queued` findings (no evidence at all):
+  Use the queue entry's `minimal_witness` field as your starting probe. If the
+  endpoint cannot be reached at all from the external origin, record it as blocked
+  with the specific reason. Do NOT leave it unaddressed — a deliberate verdict (even
+  `blocked`) is better than silence.
+
+**Step 4 — Write the updated evidence file.**
+REWRITE `.storron/deliverables/<category>_exploitation_evidence.md` with:
+- ALL original content exactly as-is.
+- New successful exploits APPENDED to `## Successfully Exploited Vulnerabilities`.
+- Newly-blocked findings APPENDED to `## Potential Vulnerabilities (Validation Blocked)`.
+
+If nothing new was confirmed or newly blocked, leave the file unchanged (do NOT
+touch it). The collection pipeline reads the evidence file at the end; appended
+entries are automatically picked up.
+</firm_retry_pass>
