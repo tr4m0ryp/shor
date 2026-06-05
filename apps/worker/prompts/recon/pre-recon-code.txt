@@ -211,6 +211,7 @@ deliverable or logs; reference its location and type instead.
    2. Use `Edit` to append each remaining section: match the last 2-3 lines of the file, replace with those lines plus the new section.
    3. Repeat until all sections are present.
    4. Run `save-deliverable --type CODE_ANALYSIS --file-path .storron/deliverables/pre_recon_deliverable.md`.
+4. **Coverage manifest (MANDATORY — structured scope contract for every downstream phase).** Confirm or override the deterministic coverage seed and write it as JSON. See `<coverage_manifest>` below for the exact shape and rules.
 
 **EXECUTION PATTERN:**
 1. Use TodoWrite to create todos for Phase 1 (3 items), Phase 2 (3 items), and Phase 3 synthesis.
@@ -235,6 +236,43 @@ deliverable or logs; reference its location and type instead.
 
 **ABSOLUTE RULE:** NEVER use Read, Glob, or Grep on source code directly. ALL code reading goes through Task agents.
 </task_agent_strategy>
+
+<coverage_manifest>
+**ARCHITECTURAL COVERAGE MANIFEST — classify which tiers the upload actually contains.**
+
+A foundational truth for the whole engagement: **the uploaded repository may NOT be the whole application.** A frontend-only React/Vue SPA upload still talks to a backend that is reachable on the live target but whose source you never received. Recording this explicitly stops every downstream agent from assuming "no server code in the repo" means "no server" — and lets the reporting phase mark findings that rest on unseen code as out-of-scope rather than fabricated.
+
+**Classify each architectural tier as `present`, `partial`, or `absent`, grounded in the source you actually read:**
+- `frontend` — client UI/SPA code: `*.tsx`/`*.jsx`/`*.vue`/`*.svelte`, `index.html`, CSS, a `package.json` with `react`/`vue`/`vite`/`next`, a `src/components` tree.
+- `backend` — server code: a server framework (`express`, `fastify`, `nestjs`, `django`/Flask, `spring`, Rails, Go `net/http`), route/controller/handler files, ORM models, server entrypoints (`server.ts`, `app.py`, `main.go`), or DB migrations.
+- `config` — deployment/runtime config: `Dockerfile`, `docker-compose.*`, `*.yaml`/`*.yml`, `nginx.conf`, `.env*`, CI workflows, k8s/Helm manifests.
+- `schema` — data contracts: `*.sql`, `schema.prisma`, `*.graphql`/`*.proto`/`*.schema.json`, migration files.
+- `tests` — `*.test.*`/`*.spec.*`, `__tests__/`, `test_*.py`, `*_test.go`.
+
+Use `partial` when a tier is only weakly represented (e.g. a couple of config files but no real deployment manifest), `absent` when you found NO source for it.
+
+**A deterministic heuristic seed may already exist at `.storron/deliverables/coverage_manifest.json`.** Read it (via Bash `cat`, NOT the source-reading Task agents). You are the authority: **confirm it where it matches your source analysis, or override any tier the seed got wrong.** Your Task-agent findings are ground truth; the seed is only a starting guess.
+
+**`observedLiveOnly`** — if your optional light live probe of {{WEB_URL}} revealed endpoints/behaviours with NO corresponding source in the repo (e.g. a responding `/api/...` while `backend` is `absent`), list those endpoint paths/behaviours here. This is the explicit "unseen trust boundary" record.
+
+**Write the manifest** to `.storron/deliverables/coverage_manifest.json` using the `Write` tool, with EXACTLY this shape (no extra top-level keys):
+
+```json
+{
+  "tiers": {
+    "frontend": "present",
+    "backend": "absent",
+    "config": "partial",
+    "schema": "absent",
+    "tests": "present"
+  },
+  "observedLiveOnly": ["GET /api/health responds 200 but no server source in repo"],
+  "notes": "Frontend-only React 19 SPA; no backend code in the upload. Live API on the same origin is an unseen trust boundary."
+}
+```
+
+When the upload is client-only (`frontend` present, `backend` absent), `notes` MUST state that the live backend is an unseen trust boundary not covered by source. This manifest is read by the recon phase and by the findings/reporting phases; keep it accurate and minimal.
+</coverage_manifest>
 
 Please structure your report using the exact following Markdown headings. Section numbers and names are a downstream parsing contract — do not rename, renumber, or reorder.
 
@@ -528,6 +566,7 @@ For each sink, you MUST also note: (a) is the destination URL fully user-control
 
 2. **Deliverable Generation.** These files MUST exist:
    - `.storron/deliverables/pre_recon_deliverable.md` (via `save-deliverable` with `--file-path`, NEVER inline `--content`).
+   - `.storron/deliverables/coverage_manifest.json` (the architectural coverage manifest from `<coverage_manifest>`, confirmed/overridden from your source analysis).
    - `.storron/deliverables/schemas/` directory with all discovered schema files copied (if any).
 
 3. **Section Contract.** Every section heading specified above MUST appear with the exact number and name. Sections 3, 5, 7, 8, 9, 10 are parsed by downstream agents — breaking these names breaks the pipeline.
