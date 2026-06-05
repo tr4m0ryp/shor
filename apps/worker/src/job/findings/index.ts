@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import { readEvidence } from "./evidence.js";
-import { toFindingRecords } from "./mapping.js";
+import { gateAndMapFindings } from "./gating.js";
 import { FINDING_CATEGORIES, readQueues } from "./queue.js";
 import { postFindings, readSinkConfig } from "./sink.js";
 import type { FindingRecord, FindingsSinkPayload } from "./types.js";
@@ -91,8 +91,19 @@ function applyImprovedText(
 }
 
 /**
- * Build the finding records from the deliverables: read each category's queue,
- * enrich with the exploitation-evidence disposition + prose, then map to §6.1.
+ * Build the EMITTED finding records from the deliverables: read each category's
+ * queue, enrich with the exploitation-evidence disposition + prose, apply the
+ * coverage gate, then map to §6.1.
+ *
+ * Coverage gate (T3): a finding whose enforcing tier was NOT in the analyzed
+ * source AND that was not live-exploited cannot be verified from this scan. It
+ * is marked `unverified_out_of_scope`, EXCLUDED from the returned (emitted) set,
+ * and written to a separate manual-review appendix deliverable. Exploited
+ * findings are NEVER gated (a live PoC overrides missing source). When no
+ * manifest exists, no gating is applied (full-stack scans must not regress).
+ *
+ * The return type stays `FindingRecord[]` (the emitted set) so the synchronous
+ * callers in sinas-finalization.ts are untouched.
  */
 export function collectFindings(
 	deliverablesPath: string,
@@ -115,7 +126,11 @@ export function collectFindings(
 		}
 	}
 
-	return applyImprovedText(deliverablesPath, toFindingRecords(vulns), logger);
+	// Apply the coverage gate, map to §6.1, and keep only the EMITTED set (gated-
+	// out findings are routed to the manual-review appendix inside this call).
+	const emitted = gateAndMapFindings(deliverablesPath, vulns, logger);
+
+	return applyImprovedText(deliverablesPath, emitted, logger);
 }
 
 /**
