@@ -78,6 +78,14 @@ export interface VulnerableCodeLocation {
 export interface FindingRecord {
 	id: string;
 	/**
+	 * Human-readable explanation of why this finding is not `confirmed`. Empty
+	 * for `exploited` (confirmed) dispositions. Populated for `blocked`,
+	 * `queued`, and `unverified_out_of_scope`. Use the `ValidationFailureReason`
+	 * enum values but stored as a plain string for forward-compatibility.
+	 * Example: "Blocked — WAF / security control intercepted the probe".
+	 */
+	validation_note: string;
+	/**
 	 * Human-readable finding title (e.g. "Stored XSS", "Token Management Issue").
 	 * Always synthesized at mapping time from the weakness type so the dashboard
 	 * never falls back to the bare category ("xss"/"auth"); the Sinas improver may
