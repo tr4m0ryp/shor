@@ -24,6 +24,8 @@ import type { Container } from "../container.js";
 import { PentestError } from "../error-handling.js";
 import { createGitCheckpoint } from "../git-manager.js";
 import { loadPrompt } from "../prompt-manager.js";
+import type { PromptContext } from "../prompt-manager/prompt-context.js";
+import { assembleScanPromptContext } from "../threat-model/index.js";
 
 /**
  * Resolve the distributed config from any of the accepted forms (pre-parsed
@@ -42,7 +44,9 @@ export async function loadDistributedConfig(
 
 /**
  * Render the prompt template for the given agent, wrapping any failure in a
- * `PROMPT_LOAD_FAILED` `PentestError`.
+ * `PROMPT_LOAD_FAILED` `PentestError`. `promptContext` carries the assembled
+ * per-scan values ({{THREAT_MODEL}} and siblings); absent fields fall back to
+ * the neutral "(none)" sentinel inside `loadPrompt`.
  */
 export async function loadAgentPrompt(
 	agentName: AgentName,
@@ -51,6 +55,7 @@ export async function loadAgentPrompt(
 	distributedConfig: import("../../types/config.js").DistributedConfig | null,
 	logger: ActivityLogger,
 	promptDir: string | undefined,
+	promptContext: PromptContext = {},
 ): Promise<Result<string, PentestError>> {
 	const promptTemplate = AGENTS[agentName].promptTemplate;
 	try {
@@ -60,6 +65,7 @@ export async function loadAgentPrompt(
 			distributedConfig,
 			logger,
 			promptDir,
+			promptContext,
 		);
 		return ok(prompt);
 	} catch (error) {
@@ -142,6 +148,15 @@ export async function runPreExecution(
 	}
 	const distributedConfig = configResult.value;
 
+	// 1b. Assemble the per-scan prompt context (threat model + sibling artifacts).
+	// Every source is optional — early agents (before threat_model.json exists)
+	// get an empty context and the placeholders render as "(none)".
+	const promptContext = await assembleScanPromptContext(
+		deliverablesPath,
+		distributedConfig,
+		process.env,
+	);
+
 	// 2. Load prompt
 	const promptResult = await loadAgentPrompt(
 		agentName,
@@ -150,6 +165,7 @@ export async function runPreExecution(
 		distributedConfig,
 		logger,
 		promptDir,
+		promptContext,
 	);
 	if (isErr(promptResult)) {
 		return promptResult;
