@@ -13,16 +13,32 @@
  */
 
 import { spawn } from "node:child_process";
-import { promises as fsp } from "node:fs";
+import { promises as fsp, readFileSync } from "node:fs";
 import path from "node:path";
+import { PROMPTS_DIR } from "../paths.js";
 import type { ActivityLogger } from "../types/activity-logger.js";
 import { collectFindings } from "./findings/index.js";
 import type { FindingRecord } from "./findings/types.js";
 
 const REPORT_FILENAME = "comprehensive_security_assessment_report.md";
 const ATTACK_SURFACE_FILE = "attack_surface_scenarios.json";
+const ATTACK_SURFACE_MD = "attack_surface_scenarios.md";
 const IMPROVED_FINDINGS_FILE = "improved_findings.json";
 const STAGE_TIMEOUT_MS = 10 * 60 * 1000;
+
+// Full SINAS-era finalize prompts (recovered from infra/sinas/agents). Loaded
+// from prompts/finalize/*.txt rather than inlined — they carry fenced-code
+// examples and long-form instructions that don't survive TS template literals.
+// Cached on first read; these files ship alongside the engine prompt templates.
+const FINALIZE_PROMPT_DIR = path.join(PROMPTS_DIR, "finalize");
+const promptCache = new Map<string, string>();
+function finalizePrompt(name: string): string {
+	const cached = promptCache.get(name);
+	if (cached !== undefined) return cached;
+	const text = readFileSync(path.join(FINALIZE_PROMPT_DIR, name), "utf8").trim();
+	promptCache.set(name, text);
+	return text;
+}
 
 const AUTH_PREAMBLE =
 	"CONTEXT: We are an internal cybersecurity team conducting an authorized " +
@@ -35,13 +51,13 @@ const AUTH_PREAMBLE =
 // Config
 // ---------------------------------------------------------------------------
 
-interface CliConfig {
+export interface CliConfig {
 	cliPath: string;
 	model: string;
 	cwd: string;
 }
 
-function resolveCliConfig(cwd: string): CliConfig | null {
+export function resolveCliConfig(cwd: string): CliConfig | null {
 	if (process.env.SHOR_CLI_FINALIZE === "0") return null;
 	const hasAuth = !!(process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY);
 	if (!hasAuth) return null;
@@ -186,55 +202,48 @@ function compactFindings(findings: FindingRecord[]): object[] {
 // Stage prompts
 // ---------------------------------------------------------------------------
 
+// Each stage is SELF-CONTAINED: the caller prepends AUTH_PREAMBLE and the
+// findings are inlined into every stage's prompt, so no stage depends on a `-c`
+// session carrying context from a prior one (a stage failure never cascades).
+// Each stage also appends an explicit JSON-output contract, because the CLI
+// path has no equivalent of the structured-output schema the SINAS agents used.
+
 function buildStage1Prompt(findings: FindingRecord[]): string {
 	return (
-		AUTH_PREAMBLE +
-		"STAGE 1 — FINDINGS IMPROVEMENT\n\n" +
-		`Rewrite these ${findings.length} vulnerability findings for clarity, correct formatting, ` +
-		"and proper fenced code blocks (bash/http/json). Preserve every finding's exact id.\n\n" +
-		'Return ONLY a JSON object: {"findings": [{id, title, evidence, missing_defense, remediation, safe_poc, repro_steps}]}. ' +
-		"No surrounding text.\n\n" +
+		`${finalizePrompt("findings-improver.txt")}\n\n` +
+		'Return ONLY a JSON object — no prose before or after — of the form ' +
+		'{"findings": [{"id", "title", "evidence", "missing_defense", "remediation", ' +
+		'"safe_poc", "repro_steps"}]}, containing EVERY finding keyed by its exact id.\n\n' +
 		`FINDINGS JSON:\n${JSON.stringify(fullFindings(findings))}`
 	);
 }
 
-function buildStage2Prompt(
-	scanId: string,
-	target: string,
-	findings: FindingRecord[],
-	inline: boolean,
-): string {
+function buildStage2Prompt(scanId: string, target: string, findings: FindingRecord[]): string {
 	const counts = severityCounts(findings);
-	const header =
-		"STAGE 2 — ATTACK-SURFACE SYNTHESIS\n\n" +
-		`Produce chained attack-surface scenarios for scan ${scanId} (target ${target}). ` +
-		"Chain related findings into end-to-end attack paths, most-severe-first. " +
-		"Every critical and high finding MUST appear in at least one scenario's required_findings.\n\n" +
-		`Severity counts: ${JSON.stringify(counts)}. Total findings: ${findings.length}.\n\n` +
-		'Return ONLY a JSON object: {"scenarios": [{title, description, severity, required_findings, attack_chain, impact}]}. ' +
-		"No surrounding text.";
-	if (!inline) return header;
-	return header + `\n\nFINDINGS JSON:\n${JSON.stringify(compactFindings(findings))}`;
+	return (
+		`${finalizePrompt("attack-surface.txt")}\n\n` +
+		`This is scan ${scanId}, target ${target}. ` +
+		`Severity counts over all findings: ${JSON.stringify(counts)}; total findings: ${findings.length}.\n\n` +
+		'Return ONLY a JSON object — no prose before or after — of the form ' +
+		'{"scenarios": [{"id", "title", "severity", "required_findings", "explanation", ' +
+		'"kill_chain", "how_to_reproduce", "business_impact", "remediation", "claude_code_prompt"}]}, ' +
+		"most-dangerous-first." +
+		`\n\nFINDINGS JSON:\n${JSON.stringify(compactFindings(findings))}`
+	);
 }
 
-function buildStage3Prompt(
-	scanId: string,
-	target: string,
-	findings: FindingRecord[],
-	inline: boolean,
-): string {
+function buildStage3Prompt(scanId: string, target: string, findings: FindingRecord[]): string {
 	const counts = severityCounts(findings);
-	const header =
-		"STAGE 3 — EXECUTIVE REPORT\n\n" +
-		`Produce the finalized executive security report for scan ${scanId} (target ${target}).\n` +
-		`Use EXACTLY these severity_counts: ${JSON.stringify(counts)}.\n` +
-		"Include EVERY critical and high finding individually in the findings array. " +
-		"Set overall_risk from the worst confirmed issues.\n\n" +
-		"Return ONLY a JSON object: {report_title, target, scanned_at, overall_risk, " +
-		"severity_counts, executive_summary, findings: [{id, title, severity, confidence, " +
-		"evidence, remediation, fix_prompt}]}. No surrounding text.";
-	if (!inline) return header;
-	return header + `\n\nFINDINGS JSON:\n${JSON.stringify(compactFindings(findings))}`;
+	return (
+		`${finalizePrompt("report.txt")}\n\n` +
+		`This is scan ${scanId}, target ${target}. ` +
+		`Use EXACTLY these severity_counts (do not recompute): ${JSON.stringify(counts)}.\n\n` +
+		'Return ONLY a JSON object — no prose before or after — of the form ' +
+		'{"report_title", "target", "scanned_at", "overall_risk", "severity_counts", ' +
+		'"executive_summary", "findings": [{"id", "title", "severity", "confidence", ' +
+		'"evidence", "remediation", "fix_prompt"}]}.' +
+		`\n\nFINDINGS JSON:\n${JSON.stringify(compactFindings(findings))}`
+	);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,14 +320,175 @@ interface ImprovedDoc {
 	}>;
 }
 
+interface AttackScenario {
+	id?: string;
+	title?: string;
+	severity?: string;
+	required_findings?: string[];
+	explanation?: string;
+	kill_chain?: string[];
+	how_to_reproduce?: string[];
+	business_impact?: string;
+	remediation?: string;
+	claude_code_prompt?: string;
+}
+
 interface AttackSurfaceDoc {
-	scenarios?: unknown[];
+	scenarios?: AttackScenario[];
+}
+
+function renderAttackSurfaceMarkdown(doc: AttackSurfaceDoc): string {
+	const scenarios = (doc.scenarios ?? []).filter(
+		(s): s is AttackScenario => !!s && typeof s === "object",
+	);
+	const lines: string[] = ["# Attack Surface", ""];
+	if (scenarios.length === 0) {
+		lines.push("_No attack-surface scenarios were synthesized._");
+		return `${lines.join("\n")}\n`;
+	}
+	const numbered = (label: string, items?: string[]): void => {
+		if (!items?.length) return;
+		lines.push(`**${label}**`, "");
+		items.forEach((step, i) => lines.push(`${i + 1}. ${step}`));
+		lines.push("");
+	};
+	scenarios.forEach((s, idx) => {
+		const sev = (s.severity ?? "info").toUpperCase();
+		lines.push(`## ${idx + 1}. [${sev}] ${s.title ?? s.id ?? "Untitled scenario"}`, "");
+		if (s.explanation) lines.push(s.explanation, "");
+		numbered("Kill chain", s.kill_chain);
+		numbered("How to reproduce", s.how_to_reproduce);
+		if (s.business_impact) lines.push(`**Business impact:** ${s.business_impact}`, "");
+		if (s.remediation) lines.push(`**Remediation:** ${s.remediation}`, "");
+		if (s.required_findings?.length) {
+			lines.push(`**Findings used:** ${s.required_findings.join(", ")}`, "");
+		}
+		if (s.claude_code_prompt) {
+			lines.push("**Fix prompt**", "", "```", s.claude_code_prompt, "```", "");
+		}
+	});
+	return `${lines.join("\n")}\n`;
 }
 
 /**
- * Run the three-stage finalization pipeline over a single Claude Code CLI
- * session. Best-effort: each stage writes its deliverable on success and falls
- * back to the engine's local output on failure.
+ * Overlay stage-1's improved prose onto the raw findings, matched by id, so the
+ * downstream stages reason over the cleaned title/evidence/remediation. Identity
+ * fields (severity, category, cwe, location, id) are never touched. Returns the
+ * original list unchanged when there is nothing to overlay.
+ */
+function overlayImproved(
+	findings: FindingRecord[],
+	improved: ImprovedDoc["findings"],
+): FindingRecord[] {
+	if (!improved?.length) return findings;
+	const byId = new Map(improved.map((f) => [String(f.id), f]));
+	const PROSE = ["title", "evidence", "missing_defense", "remediation", "safe_poc"] as const;
+	return findings.map((f) => {
+		const imp = byId.get(f.id);
+		if (!imp) return f;
+		const merged: FindingRecord = { ...f };
+		for (const k of PROSE) {
+			const v = imp[k];
+			if (typeof v === "string" && v.length > 0) merged[k] = v;
+		}
+		if (Array.isArray(imp.repro_steps) && imp.repro_steps.length > 0) {
+			merged.repro_steps = imp.repro_steps;
+		}
+		return merged;
+	});
+}
+
+/** Result of the three-stage finalize, independent of any file IO. */
+export interface FinalizeResult {
+	/** Stage-1 rewritten prose, keyed by finding id (empty if stage 1 failed). */
+	improved: NonNullable<ImprovedDoc["findings"]>;
+	/** Raw findings overlaid with stage-1 prose — what stages 2-3 reasoned over. */
+	effective: FindingRecord[];
+	attackSurface?: AttackSurfaceDoc;
+	attackSurfaceMarkdown?: string;
+	report?: ReportDoc;
+	reportMarkdown?: string;
+}
+
+/**
+ * Run the three-stage finalize (findings improvement → attack-surface →
+ * report) over the Claude Code CLI and RETURN the documents — no file IO, no
+ * DB. Each stage is an INDEPENDENT, self-contained invocation: the authorization
+ * preamble and the findings are inlined into every stage, so no stage relies on
+ * a `-c` session carrying context from a prior one — a stage failing never
+ * starves the next. Stages 2-3 reason over stage-1's improved prose when it
+ * succeeded. This is the reusable core: `finalizeViaCli` wraps it with the
+ * pipeline's deliverable-file writes; an off-pipeline rerun can feed findings
+ * straight from the DB and persist however it likes.
+ */
+export async function finalizeFindings(
+	findings: FindingRecord[],
+	scanId: string,
+	targetUrl: string,
+	config: CliConfig,
+	logger: ActivityLogger,
+): Promise<FinalizeResult> {
+	const result: FinalizeResult = { improved: [], effective: findings };
+
+	// Stage 1: findings improvement. Stages 2-3 then reason over `effective`,
+	// the raw findings overlaid with whatever prose stage 1 cleaned up.
+	try {
+		const doc = await runCli<ImprovedDoc>(
+			config,
+			AUTH_PREAMBLE + buildStage1Prompt(findings),
+			false,
+			logger,
+		);
+		const improved = doc.findings ?? [];
+		if (improved.length > 0) {
+			result.improved = improved;
+			result.effective = overlayImproved(findings, improved);
+		}
+		logger.info("CLI stage 1 complete: findings improved", { count: improved.length });
+	} catch (err) {
+		logger.warn("CLI findings improvement failed; using raw findings", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+
+	// Stage 2: attack-surface synthesis. Fresh session, findings re-inlined.
+	try {
+		const prompt = AUTH_PREAMBLE + buildStage2Prompt(scanId, targetUrl, result.effective);
+		const doc = await runCli<AttackSurfaceDoc>(config, prompt, false, logger);
+		if (doc.scenarios && Array.isArray(doc.scenarios)) {
+			result.attackSurface = doc;
+			result.attackSurfaceMarkdown = renderAttackSurfaceMarkdown(doc);
+		}
+		logger.info("CLI stage 2 complete: attack surface", {
+			scenarios: Array.isArray(doc.scenarios) ? doc.scenarios.length : 0,
+		});
+	} catch (err) {
+		logger.warn("CLI attack-surface synthesis failed; keeping engine output", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+
+	// Stage 3: executive report. Fresh session, findings re-inlined.
+	try {
+		const prompt = AUTH_PREAMBLE + buildStage3Prompt(scanId, targetUrl, result.effective);
+		const report = await runCli<ReportDoc>(config, prompt, false, logger);
+		result.report = report;
+		result.reportMarkdown = renderMarkdown(report);
+		logger.info("CLI stage 3 complete: report written");
+	} catch (err) {
+		logger.warn("CLI report generation failed; keeping local report", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+
+	return result;
+}
+
+/**
+ * Pipeline finalize: read the engine's deliverables, run the three-stage CLI
+ * finalize, and overwrite the deliverable files. Best-effort — each deliverable
+ * is written only if its stage produced output, else the engine's local file
+ * stands. No-op when CLI auth is absent or there are no findings.
  */
 export async function finalizeViaCli(
 	deliverablesPath: string,
@@ -338,59 +508,25 @@ export async function finalizeViaCli(
 		model: config.model,
 	});
 
-	let sessionActive = false;
+	const r = await finalizeFindings(findings, scanId, targetUrl, config, logger);
 
-	// Stage 1: findings improvement (establishes session + auth context)
-	try {
-		const doc = await runCli<ImprovedDoc>(config, buildStage1Prompt(findings), false, logger);
-		const improved = doc.findings ?? [];
-		if (improved.length > 0) {
-			await fsp.writeFile(
-				path.join(deliverablesPath, IMPROVED_FINDINGS_FILE),
-				`${JSON.stringify({ findings: improved })}\n`,
-			);
-		}
-		sessionActive = true;
-		logger.info("CLI stage 1 complete: findings improved", { count: improved.length });
-	} catch (err) {
-		logger.warn("CLI findings improvement failed; using raw findings", {
-			error: err instanceof Error ? err.message : String(err),
-		});
+	if (r.improved.length > 0) {
+		await fsp.writeFile(
+			path.join(deliverablesPath, IMPROVED_FINDINGS_FILE),
+			`${JSON.stringify({ findings: r.improved })}\n`,
+		);
 	}
-
-	// Stage 2: attack-surface synthesis (-c continues stage 1's session)
-	try {
-		const prompt = sessionActive
-			? buildStage2Prompt(scanId, targetUrl, findings, false)
-			: AUTH_PREAMBLE + buildStage2Prompt(scanId, targetUrl, findings, true);
-		const doc = await runCli<AttackSurfaceDoc>(config, prompt, sessionActive, logger);
-		if (doc.scenarios && Array.isArray(doc.scenarios)) {
-			await fsp.writeFile(
-				path.join(deliverablesPath, ATTACK_SURFACE_FILE),
-				`${JSON.stringify(doc, null, 2)}\n`,
-			);
-		}
-		if (!sessionActive) sessionActive = true;
-		logger.info("CLI stage 2 complete: attack surface", {
-			scenarios: Array.isArray(doc.scenarios) ? doc.scenarios.length : 0,
-		});
-	} catch (err) {
-		logger.warn("CLI attack-surface synthesis failed; keeping engine output", {
-			error: err instanceof Error ? err.message : String(err),
-		});
+	if (r.attackSurface) {
+		await fsp.writeFile(
+			path.join(deliverablesPath, ATTACK_SURFACE_FILE),
+			`${JSON.stringify(r.attackSurface, null, 2)}\n`,
+		);
+		await fsp.writeFile(
+			path.join(deliverablesPath, ATTACK_SURFACE_MD),
+			r.attackSurfaceMarkdown ?? "",
+		);
 	}
-
-	// Stage 3: executive report (-c continues the session)
-	try {
-		const prompt = sessionActive
-			? buildStage3Prompt(scanId, targetUrl, findings, false)
-			: AUTH_PREAMBLE + buildStage3Prompt(scanId, targetUrl, findings, true);
-		const report = await runCli<ReportDoc>(config, prompt, sessionActive, logger);
-		await fsp.writeFile(path.join(deliverablesPath, REPORT_FILENAME), renderMarkdown(report));
-		logger.info("CLI stage 3 complete: report written");
-	} catch (err) {
-		logger.warn("CLI report generation failed; keeping local report", {
-			error: err instanceof Error ? err.message : String(err),
-		});
+	if (r.reportMarkdown) {
+		await fsp.writeFile(path.join(deliverablesPath, REPORT_FILENAME), r.reportMarkdown);
 	}
 }

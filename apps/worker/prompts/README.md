@@ -27,3 +27,16 @@ prompt-manager is preserved (`shared/_vuln-scope.txt`, `_exploit-scope.txt`,
 all `vuln-*` / `exploit-*`). It is intentionally omitted from `attack-surface`
 (pure synthesis) and `report-executive` (reporting) — neither runs offensive
 tools.
+
+## `finalize/` — post-scan finalization prompts (recovered SINAS layer)
+
+`finalize/{findings-improver,attack-surface,report}.txt` are the **full system
+prompts for the finalize layer** that runs after the engine pipeline
+(`job/cli-finalization.ts`): findings rewrite → attack-surface synthesis →
+executive report, over a single Claude CLI session. They are the recovered
+SINAS Opus/Sonnet v2 prompts (severity-complete, no top-N cap, with a worked
+formatting example), restored after the SINAS backend was retired. Each stage
+appends an explicit JSON-output contract at call time because the CLI path has
+no structured-output schema enforcement. These are distinct from the
+`attack-surface.txt` / `report-executive.txt` at the root, which are the
+per-scan **engine pipeline** agents.
