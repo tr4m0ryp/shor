@@ -17,6 +17,13 @@ import {
 
 const CONFIDENCES: readonly FindingConfidence[] = ['confirmed', 'firm', 'tentative'] as const;
 
+// Allowed values for the OPTIONAL precision fields the worker may attach. Their
+// canonical unions (`Reachability`, `OracleDisposition`) live in the worker's
+// findings/types.ts; the web sink cannot import across the package boundary, so it
+// mirrors the literals here — exactly as it already does for confidences above.
+const REACHABILITY_VALUES = ['REACHABLE', 'HARNESS_ONLY', 'UNCLEAR'] as const;
+const ORACLE_DISPOSITION_VALUES = ['exploited', 'blocked', 'not_replayable'] as const;
+
 /** A validation failure: which finding (by index) and what was wrong. */
 export interface FindingValidationIssue {
   readonly index: number;
@@ -37,6 +44,11 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'string');
+}
+
+/** Type guard: `value` is one of the allowed string-literal members. */
+function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value);
 }
 
 /**
@@ -92,6 +104,27 @@ export function validateFinding(candidate: unknown, index: number): FindingValid
   const loc = candidate.vulnerable_code_location;
   if (loc !== undefined && !isObject(loc)) {
     push('vulnerable_code_location', 'must be an object { file, line } when present');
+  }
+
+  // New OPTIONAL precision fields (the worker attaches these on later-stage
+  // findings). Back-compat: absent => valid; present => the enum fields must match
+  // the allowed value set and the id fields must be strings. They are never
+  // required, so emitters that predate them keep validating unchanged.
+  const reachability = candidate.reachability;
+  if (reachability !== undefined && !isOneOf(reachability, REACHABILITY_VALUES)) {
+    push('reachability', `must be one of ${REACHABILITY_VALUES.join('|')} when present`);
+  }
+
+  const oracleDisposition = candidate.oracle_disposition;
+  if (oracleDisposition !== undefined && !isOneOf(oracleDisposition, ORACLE_DISPOSITION_VALUES)) {
+    push('oracle_disposition', `must be one of ${ORACLE_DISPOSITION_VALUES.join('|')} when present`);
+  }
+
+  const optionalIdStrings: readonly (keyof FindingRecord)[] = ['cluster_id', 'threat_id'];
+  for (const key of optionalIdStrings) {
+    if (candidate[key] !== undefined && typeof candidate[key] !== 'string') {
+      push(String(key), 'must be a string when present');
+    }
   }
 
   return issues;
