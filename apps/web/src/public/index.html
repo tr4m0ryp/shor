@@ -514,6 +514,19 @@ body.guest .sidebar nav { display: none; }
   font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
   background: var(--card-hover); color: var(--text-secondary); border: 1px solid var(--border);
 }
+/* Live-validated (disposition: exploited) — proven by live exploitation. */
+.validated-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px;
+  font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  background: #15321F; color: #4ADE80; border: 1px solid rgba(74,222,128,.35);
+}
+.validated-badge::before { content: '\2713'; font-weight: 700; }
+/* Set aside for manual review (disposition: unverified_out_of_scope). */
+.review-badge {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px;
+  font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
+  background: #332B12; color: #F5C147; border: 1px solid rgba(245,193,71,.3);
+}
 
 /* === Severity badges === */
 .severity-badge {
