@@ -1,8 +1,10 @@
 # Shor — Autonomous AI Pentester
 
-**Shor** is a fully autonomous web-application penetration tester. Point it at a live
-app — URL only, or URL plus source code — and it runs a complete security assessment:
-recon, vulnerability discovery, exploit proof-of-concept, and a written report.
+Just like Shor's algorithm breaks encryption, **Shor** breaks your app's security — before someone else does.
+
+An LLM-based pentester that runs 30 hacking tools simultaneously, reasons over the output, and hands you exploit PoCs and a written report. Point it at a URL and walk away.
+
+> Optimised for Claude.
 
 ---
 
