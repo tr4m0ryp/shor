@@ -26,11 +26,7 @@ import { reportFindings } from "./job/findings/index.js";
 import { ConsoleActivityLogger } from "./job/logger.js";
 import { runScanPipeline } from "./job/pipeline.js";
 import { materializeRepo } from "./job/repo.js";
-import {
-	finalizeAttackSurfaceViaSinas,
-	finalizeViaSinas,
-	improveFindingsViaSinas,
-} from "./job/sinas-finalization.js";
+import { finalizeViaCli } from "./job/cli-finalization.js";
 import { deliverablesDir } from "./paths.js";
 
 export { readScanJobParams } from "./job/env.js";
