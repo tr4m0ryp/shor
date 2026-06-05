@@ -13,7 +13,12 @@ import {
 	attackSurfaceAgent,
 	attackSurfaceValidator,
 } from "./attack-surface.js";
-import { exploitationAgents, exploitationValidators } from "./exploitation.js";
+import {
+	exploitationAgents,
+	exploitationRetryAgents,
+	exploitationRetryValidators,
+	exploitationValidators,
+} from "./exploitation.js";
 import { preReconAgent, preReconValidator } from "./pre-recon.js";
 import { reconAgent, reconValidator } from "./recon.js";
 import { reportAgent, reportValidator } from "./reporting.js";
