@@ -161,6 +161,21 @@ export class AgentExecutionService {
 			return capResult;
 		}
 
+		// 6b. Model refusal check - defense-in-depth. A safety refusal returns as
+		// a "successful" short result; catch it so it retries under the
+		// authorization preamble instead of passing through as "no findings".
+		const refusalResult = await checkRefusal(
+			agentName,
+			deliverablesPath,
+			auditSession,
+			logger,
+			attemptNumber,
+			result,
+		);
+		if (refusalResult) {
+			return refusalResult;
+		}
+
 		// 7. Handle execution failure
 		if (!result.success) {
 			return handleExecutionFailure(
