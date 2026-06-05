@@ -91,6 +91,12 @@ export async function startScan(
     runEnv.push({ name: 'SHOR_REPO_GCS_URI', value: gsUri(codebaseVersion.gcsPrefix) });
   }
 
+  // When the project has an auth config, serialize it as JSON (valid YAML) so the
+  // worker's config-loader can parse it and inject auth context into agent prompts.
+  if (project.authConfig) {
+    runEnv.push({ name: 'SHOR_CONFIG_YAML', value: JSON.stringify(project.authConfig) });
+  }
+
   // When Sinas-mode is configured, forward the connection to the worker so the
   // reporting step offloads finalization to the user's Sinas instance.
   if (process.env.SINAS_ENABLED === '1') {
