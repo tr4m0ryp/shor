@@ -22,9 +22,11 @@ export function calculatePhaseMetrics(
 	const phases: Record<PhaseName, AgentAuditMetrics[]> = {
 		"pre-recon": [],
 		recon: [],
+		"threat-model": [],
 		"vulnerability-analysis": [],
 		"adversarial-screen": [],
 		exploitation: [],
+		oracle: [],
 		reporting: [],
 		"attack-surface": [],
 	};
