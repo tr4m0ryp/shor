@@ -31,9 +31,24 @@ import type {
 	FindingCategory,
 	FindingRecord,
 	NormalizedVuln,
+	VulnDisposition,
 } from "./types.js";
 
 export const MANUAL_REVIEW_APPENDIX_FILE = "manual_review_appendix.json";
+
+/**
+ * Dispositions that are EXCLUDED from the emitted set and routed to the
+ * manual-review appendix: T3 coverage / failed-lane (`unverified_out_of_scope`)
+ * and T4 adversarial-screen rejection (`unverified_screen_rejected`). Both are
+ * terminal — a later gate must never overwrite one with the other (the appendix
+ * keeps WHY each finding was set aside).
+ */
+function isGatedOut(disposition: VulnDisposition | undefined): boolean {
+	return (
+		disposition === "unverified_out_of_scope" ||
+		disposition === "unverified_screen_rejected"
+	);
+}
 
 /**
  * Architectural tier whose source would implement/enforce each finding class's
@@ -87,10 +102,11 @@ function readCoverageManifest(
 }
 
 /**
- * Persist the gated-out (`unverified_out_of_scope`) findings to a separate
- * deliverable so a reviewer can see what was set aside. Best-effort: a write
- * failure never blocks emission. No file is written when nothing was gated out,
- * keeping the no-manifest / full-coverage path identical to before.
+ * Persist the gated-out findings (`unverified_out_of_scope` or
+ * `unverified_screen_rejected`) to a separate deliverable so a reviewer can see
+ * what was set aside. Best-effort: a write failure never blocks emission. No file
+ * is written when nothing was gated out, keeping the no-manifest / full-coverage
+ * path identical to before.
  */
 function writeManualReviewAppendix(
 	deliverablesPath: string,
@@ -101,16 +117,18 @@ function writeManualReviewAppendix(
 	const file = path.join(deliverablesPath, MANUAL_REVIEW_APPENDIX_FILE);
 	try {
 		const doc = {
-			disposition: "unverified_out_of_scope",
 			note:
-				"Findings that could not be verified from this scan — either the " +
-				"enforcing tier was not in the analyzed source, or the category's " +
-				"validation lane failed — and that were not live-confirmed. Excluded " +
-				"from the emitted attack surface; review manually.",
+				"Findings set aside from the emitted attack surface and preserved for " +
+				"manual review. Each carries its own disposition: " +
+				"`unverified_out_of_scope` (enforcing tier not in the analyzed source, " +
+				"or the category's validation lane failed, and not live-confirmed) or " +
+				"`unverified_screen_rejected` (the adversarial screen refuted the " +
+				"hypothesis before exploitation). Excluded from the emitted attack " +
+				"surface; review manually.",
 			findings: appendix,
 		};
 		fs.writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
-		logger.info("Wrote manual-review appendix (out-of-scope unconfirmed)", {
+		logger.info("Wrote manual-review appendix (gated-out unconfirmed findings)", {
 			file,
 			count: appendix.length,
 		});
@@ -123,11 +141,11 @@ function writeManualReviewAppendix(
 }
 
 /**
- * Read back the manual-review appendix (the gated-out `unverified_out_of_scope`
- * findings) so the dashboard can surface them under a dedicated "manual review"
- * filter. Tolerates absence / malformed JSON → returns []. These findings are
- * NEVER part of the emitted or attack-surface set; the dashboard segregates them
- * purely by their `unverified_out_of_scope` disposition.
+ * Read back the manual-review appendix (the gated-out findings:
+ * `unverified_out_of_scope` and `unverified_screen_rejected`) so the dashboard can
+ * surface them under a dedicated "manual review" filter. Tolerates absence /
+ * malformed JSON → returns []. These findings are NEVER part of the emitted or
+ * attack-surface set; the dashboard segregates them purely by their disposition.
  */
 export function readManualReviewAppendix(
 	deliverablesPath: string,
@@ -162,6 +180,8 @@ function markUnverifiedWhere(
 ): void {
 	for (const vuln of vulns) {
 		if (vuln.disposition === "exploited") continue;
+		// Already terminal (e.g. screen-rejected) — keep its specific disposition.
+		if (isGatedOut(vuln.disposition)) continue;
 		if (shouldGate(vuln)) vuln.disposition = "unverified_out_of_scope";
 	}
 }
@@ -217,12 +237,8 @@ export function gateAndMapFindings(
 	applyFailedLaneGate(deliverablesPath, vulns, logger);
 
 	const records = toFindingRecords(vulns);
-	const appendix = records.filter(
-		(r) => r.disposition === "unverified_out_of_scope",
-	);
-	const emitted = records.filter(
-		(r) => r.disposition !== "unverified_out_of_scope",
-	);
+	const appendix = records.filter((r) => isGatedOut(r.disposition));
+	const emitted = records.filter((r) => !isGatedOut(r.disposition));
 	writeManualReviewAppendix(deliverablesPath, appendix, logger);
 	return emitted;
 }

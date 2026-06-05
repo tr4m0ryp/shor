@@ -24,35 +24,26 @@ import type { ActivityLogger } from "../types/activity-logger.js";
 import type { SessionMetadata } from "../types/audit.js";
 import type { ScanJobParams } from "./env.js";
 import { reportFindings } from "./findings/index.js";
-import {
-	firmRetryCategories,
-	hasFirmRetryTargets,
-	writeFirmRetryContext,
-} from "./findings/firm-retry.js";
 import { recordExploitLaneOutcome } from "./findings/lane-status.js";
 import { ProgressEmitter } from "./progress/index.js";
 
 /**
  * Pipeline stages (ADR-051). pre-recon and recon are prerequisites and run
- * sequentially (fail-fast — the vuln agents read their deliverables). The 5 vuln
- * agents are mutually independent, as are the 5 exploit agents, so each group
- * runs CONCURRENTLY (2-wide — keeps us under the flash rate limit and ~2 headless
- * browsers within the job's RAM). Within a group an agent failure is isolated
- * (logged, the others continue); report + attack-surface are best-effort synthesis.
+ * sequentially (fail-fast — the vuln agents read their deliverables). The vuln,
+ * screen, and exploit agents are each mutually independent within their group, so
+ * each group runs CONCURRENTLY (2-wide — keeps us under the flash rate limit and
+ * ~2 headless browsers within the job's RAM). The adversarial screen agents run
+ * between discovery and exploitation: each independently tries to refute its
+ * category's hypotheses (blind to recon context) so the exploit agents receive a
+ * pre-filtered, higher-confidence queue. Within a group an agent failure is
+ * isolated (logged, the others continue); report + attack-surface are best-effort
+ * synthesis.
  */
 const PREREQ_AGENTS: readonly AgentName[] = ["pre-recon", "recon"];
 const VULN_AGENTS: readonly AgentName[] = ["injection-vuln", "xss-vuln", "auth-vuln", "ssrf-vuln", "authz-vuln"];
+const SCREEN_AGENTS: readonly AgentName[] = ["injection-screen", "xss-screen", "auth-screen", "ssrf-screen", "authz-screen"];
 const EXPLOIT_AGENTS: readonly AgentName[] = ["injection-exploit", "xss-exploit", "auth-exploit", "ssrf-exploit", "authz-exploit"];
 const SYNTHESIS_AGENTS: readonly AgentName[] = ["report", "attack-surface"];
-
-/** Map from category to its retry agent name. */
-const CATEGORY_RETRY_AGENT: Record<string, AgentName> = {
-	injection: "injection-exploit-retry",
-	xss: "xss-exploit-retry",
-	auth: "auth-exploit-retry",
-	ssrf: "ssrf-exploit-retry",
-	authz: "authz-exploit-retry",
-};
 
 /** Max agents running at once within a parallel group. */
 const GROUP_CONCURRENCY = 2;
@@ -180,30 +171,13 @@ export async function runScanPipeline(
 		await runAgent(agentName, ctx);
 	}
 
-	// 2) Vulnerability analysis, then exploitation — each 2-wide, fault-isolated.
+	// 2) Vulnerability analysis → adversarial screen → exploitation — each 2-wide
+	// and fault-isolated. The screen agents independently try to refute each
+	// hypothesis before the exploit agents see it, so the exploit pass works from a
+	// pre-filtered, higher-confidence queue (T6).
 	await runGroup(VULN_AGENTS, GROUP_CONCURRENCY, ctx);
+	await runGroup(SCREEN_AGENTS, GROUP_CONCURRENCY, ctx);
 	await runGroup(EXPLOIT_AGENTS, GROUP_CONCURRENCY, ctx);
-
-	// 2b) Firm-retry phase — targeted second pass for findings that the primary
-	// exploit pass could not confirm (blocked by WAF/auth/rate-limit, or simply
-	// not attempted). Only categories with retryable findings get a retry agent;
-	// the rest are skipped so the synthesis phase is not delayed unnecessarily.
-	const retryCtx = writeFirmRetryContext(ctx.deliverablesPath, ctx.logger);
-	if (hasFirmRetryTargets(retryCtx)) {
-		const retryCategories = firmRetryCategories(retryCtx);
-		const retryAgents = retryCategories
-			.map((cat) => CATEGORY_RETRY_AGENT[cat])
-			.filter((name): name is AgentName => name !== undefined);
-		ctx.logger.info("Running firm-retry phase", {
-			scanId: ctx.params.scanId,
-			categories: retryCategories,
-		});
-		await runGroup(retryAgents, GROUP_CONCURRENCY, ctx);
-	} else {
-		ctx.logger.info("Firm-retry phase skipped: no retryable findings", {
-			scanId: ctx.params.scanId,
-		});
-	}
 
 	// 3) Synthesis — best-effort; a failure here must not discard the findings.
 	for (const agentName of SYNTHESIS_AGENTS) {

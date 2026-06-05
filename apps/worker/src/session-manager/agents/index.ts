@@ -15,8 +15,6 @@ import {
 } from "./attack-surface.js";
 import {
 	exploitationAgents,
-	exploitationRetryAgents,
-	exploitationRetryValidators,
 	exploitationValidators,
 } from "./exploitation.js";
 import { preReconAgent, preReconValidator } from "./pre-recon.js";
@@ -36,7 +34,6 @@ export const AGENTS: Readonly<Record<AgentName, AgentDefinition>> =
 		...vulnerabilityAgents,
 		...screenAgents,
 		...exploitationAgents,
-		...exploitationRetryAgents,
 		report: reportAgent,
 		"attack-surface": attackSurfaceAgent,
 	});
@@ -49,7 +46,6 @@ export const AGENT_VALIDATORS: Record<AgentName, AgentValidator> =
 		...vulnerabilityValidators,
 		...screenValidators,
 		...exploitationValidators,
-		...exploitationRetryValidators,
 		report: reportValidator,
 		"attack-surface": attackSurfaceValidator,
 	});
