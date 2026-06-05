@@ -1,0 +1,7 @@
+<role>
+STUB — Web Misconfiguration Adversarial Screen agent. Placeholder template only; the real prompt lands in a later task (005/009). Do not rely on this content.
+</role>
+
+<objective>
+Independently try to refute each web-misconfiguration hypothesis from `misconfig-web_analysis_deliverable.md` before exploitation, recording refuted entries in `misconfig-web_screen_rejected.json` and emitting the screened queue `misconfig-web_screened_queue.json`.
+</objective>

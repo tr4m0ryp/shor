@@ -61,6 +61,18 @@ function createScreenValidator(vulnType: VulnType): AgentValidator {
 	};
 }
 
+/**
+ * Stub validator for the +2 new-category screen agents (logic, misconfig-web).
+ * Mirrors the recon/exploit presence validators; task 005/009 fills the real
+ * prompt and tightens this to the screened-queue structure check.
+ */
+function createNewCategoryScreenValidator(
+	deliverableFilename: string,
+): AgentValidator {
+	return async (sourceDir: string): Promise<boolean> =>
+		fs.pathExists(path.join(sourceDir, deliverableFilename));
+}
+
 export const screenAgents: Readonly<
 	Record<Extract<AgentName, `${string}-screen`>, AgentDefinition>
 > = Object.freeze({
@@ -104,6 +116,22 @@ export const screenAgents: Readonly<
 		deliverableFilename: "authz_screened_queue.json",
 		modelTier: "medium",
 	},
+	"logic-screen": {
+		name: "logic-screen",
+		displayName: "Logic screen agent",
+		prerequisites: ["logic-vuln"],
+		promptTemplate: "screen-logic",
+		deliverableFilename: "logic_screened_queue.json",
+		modelTier: "medium",
+	},
+	"misconfig-web-screen": {
+		name: "misconfig-web-screen",
+		displayName: "Web misconfig screen agent",
+		prerequisites: ["misconfig-web-vuln"],
+		promptTemplate: "screen-misconfig-web",
+		deliverableFilename: "misconfig-web_screened_queue.json",
+		modelTier: "medium",
+	},
 });
 
 export const screenValidators: Record<
@@ -115,4 +143,8 @@ export const screenValidators: Record<
 	"auth-screen": createScreenValidator("auth"),
 	"ssrf-screen": createScreenValidator("ssrf"),
 	"authz-screen": createScreenValidator("authz"),
+	"logic-screen": createNewCategoryScreenValidator("logic_screened_queue.json"),
+	"misconfig-web-screen": createNewCategoryScreenValidator(
+		"misconfig-web_screened_queue.json",
+	),
 });
