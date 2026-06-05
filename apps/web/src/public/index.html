@@ -510,9 +510,21 @@ body.guest .sidebar nav { display: none; }
 .finding-field.highlight dt { color: var(--accent); }
 .finding-field.highlight dd { font-weight: 500; }
 .confidence-badge {
-  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px;
+  display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 9999px;
   font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
   background: var(--card-hover); color: var(--text-secondary); border: 1px solid var(--border);
+}
+/* Confirmed — live PoC proven. Green tint to match the validated-badge. */
+.confidence-confirmed {
+  background: #15321F; color: #4ADE80; border-color: rgba(74,222,128,.3);
+}
+/* Firm — strong code evidence but not live-confirmed. Amber tint. */
+.confidence-firm {
+  background: #2C2510; color: #F5C147; border-color: rgba(245,193,71,.3);
+}
+/* Tentative — weak hypothesis. Stays muted (default). */
+.confidence-tentative {
+  background: var(--card-hover); color: var(--text-secondary); border-color: var(--border);
 }
 /* Live-validated (disposition: exploited) — proven by live exploitation. */
 .validated-badge {
