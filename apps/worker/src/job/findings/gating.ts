@@ -123,6 +123,23 @@ function writeManualReviewAppendix(
 }
 
 /**
+ * Shared gate primitive: mark every non-exploited vuln for which `shouldGate`
+ * holds as `unverified_out_of_scope` (mutating `vulns` in place). An `exploited`
+ * finding is never touched — a live PoC overrides missing source / a failed
+ * validation lane. Both the coverage gate (T3) and the failed-lane gate (T5)
+ * route through here so the demotion path stays identical.
+ */
+function markUnverifiedWhere(
+	vulns: NormalizedVuln[],
+	shouldGate: (vuln: NormalizedVuln) => boolean,
+): void {
+	for (const vuln of vulns) {
+		if (vuln.disposition === "exploited") continue;
+		if (shouldGate(vuln)) vuln.disposition = "unverified_out_of_scope";
+	}
+}
+
+/**
  * Coverage gate (T3): a finding whose enforcing tier was NOT in the analyzed
  * source AND that was not live-exploited is marked `unverified_out_of_scope`.
  * Mutates `vulns` in place. No manifest ⇒ no-op (full-stack scans must not
@@ -135,12 +152,10 @@ function applyCoverageGate(
 ): void {
 	const manifest = readCoverageManifest(deliverablesPath, logger);
 	if (!manifest) return;
-	for (const vuln of vulns) {
-		if (vuln.disposition === "exploited") continue;
-		if (!isTierCovered(manifest, enforcingTier(vuln.category, manifest))) {
-			vuln.disposition = "unverified_out_of_scope";
-		}
-	}
+	markUnverifiedWhere(
+		vulns,
+		(vuln) => !isTierCovered(manifest, enforcingTier(vuln.category, manifest)),
+	);
 }
 
 /**
@@ -157,12 +172,7 @@ function applyFailedLaneGate(
 	logger: ActivityLogger,
 ): void {
 	const laneStatus = readLaneStatus(deliverablesPath, logger);
-	for (const vuln of vulns) {
-		if (vuln.disposition === "exploited") continue;
-		if (laneStatus[vuln.category] === "failed") {
-			vuln.disposition = "unverified_out_of_scope";
-		}
-	}
+	markUnverifiedWhere(vulns, (vuln) => laneStatus[vuln.category] === "failed");
 }
 
 /**

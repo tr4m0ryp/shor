@@ -19,7 +19,7 @@ import { deliverablesDir } from "../paths.js";
 import { getOrCreateContainer } from "../services/container.js";
 import { AGENTS } from "../session-manager.js";
 import type { Container } from "../services/container.js";
-import { type AgentName } from "../types/agents.js";
+import type { AgentName } from "../types/agents.js";
 import type { ActivityLogger } from "../types/activity-logger.js";
 import type { SessionMetadata } from "../types/audit.js";
 import type { ScanJobParams } from "./env.js";

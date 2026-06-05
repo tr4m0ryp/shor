@@ -30,7 +30,7 @@ export const VALIDATION_LANE_STATUS_FILE = "validation_lane_status.json";
 /**
  * Outcome of a category's exploitation (validation) lane:
  *   - `validated` — the exploit agent ran to completion (even if it exploited
- *     nothing to exploit; "ran and did not throw").
+ *     nothing; "ran and did not throw").
  *   - `failed`    — the exploit agent THREW; its analysis findings were never
  *     validated and must be demoted out of the emitted set.
  *   - `skipped`   — the lane was intentionally not run.
