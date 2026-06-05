@@ -190,6 +190,27 @@ export async function runScanPipeline(
 	await runGroup(VULN_AGENTS, GROUP_CONCURRENCY, ctx);
 	await runGroup(EXPLOIT_AGENTS, GROUP_CONCURRENCY, ctx);
 
+	// 2b) Firm-retry phase — targeted second pass for findings that the primary
+	// exploit pass could not confirm (blocked by WAF/auth/rate-limit, or simply
+	// not attempted). Only categories with retryable findings get a retry agent;
+	// the rest are skipped so the synthesis phase is not delayed unnecessarily.
+	const retryCtx = writeFirmRetryContext(ctx.deliverablesPath, ctx.logger);
+	if (hasFirmRetryTargets(retryCtx)) {
+		const retryCategories = firmRetryCategories(retryCtx);
+		const retryAgents = retryCategories
+			.map((cat) => CATEGORY_RETRY_AGENT[cat])
+			.filter((name): name is AgentName => name !== undefined);
+		ctx.logger.info("Running firm-retry phase", {
+			scanId: ctx.params.scanId,
+			categories: retryCategories,
+		});
+		await runGroup(retryAgents, GROUP_CONCURRENCY, ctx);
+	} else {
+		ctx.logger.info("Firm-retry phase skipped: no retryable findings", {
+			scanId: ctx.params.scanId,
+		});
+	}
+
 	// 3) Synthesis — best-effort; a failure here must not discard the findings.
 	for (const agentName of SYNTHESIS_AGENTS) {
 		try {
