@@ -160,6 +160,12 @@ export async function reportFindings(
 	let attackSurface: Record<string, unknown> | undefined;
 	try {
 		findings = collectFindings(deliverablesPath, logger);
+		// Surface the gated-out manual-review findings to the DASHBOARD as well —
+		// they carry the `unverified_out_of_scope` disposition, so the UI segregates
+		// them behind a "manual review" filter and they never enter the attack
+		// surface. Other `collectFindings` callers (e.g. Sinas finalize) stay clean.
+		const manualReview = readManualReviewAppendix(deliverablesPath, logger);
+		if (manualReview.length > 0) findings = [...findings, ...manualReview];
 		attackSurface = readAttackSurface(deliverablesPath, logger);
 	} catch (err) {
 		// Mapping should not throw, but never let it block the status POST.
