@@ -53,6 +53,11 @@ export async function createExternalProject(principal: Principal, body: Record<s
     return badRequest('whitebox projects require a repoRef (one of the connected repos)');
   }
 
+  const authConfig =
+    typeof body.authConfig === 'object' && body.authConfig !== null && !Array.isArray(body.authConfig)
+      ? (body.authConfig as Record<string, unknown>)
+      : null;
+
   const input: NewProject = {
     tenantId,
     name,
@@ -62,7 +67,7 @@ export async function createExternalProject(principal: Principal, body: Record<s
     repoFullName: mode === 'whitebox' ? repoFullName : null,
     mode,
     schedule: null,
-    authConfig: null,
+    authConfig,
   };
 
   try {
