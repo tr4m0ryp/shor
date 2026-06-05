@@ -30,6 +30,31 @@ import type { CoveragePolicy } from "./types.js";
 /** Maximum number of in-process coverage continuation rounds per agent. */
 export const MAX_COVERAGE_ROUNDS = 2;
 
+/**
+ * Maximum number of findings-discovery continuation rounds per agent (task 007
+ * — loop-until-dry). ABOVE the breadth floor, the loop keeps re-prompting while
+ * each round still yields a NEW finding; this is the hard ceiling so a target
+ * that keeps dribbling findings cannot loop unbounded. It is >=
+ * `MAX_COVERAGE_ROUNDS`: breadth is reached first (bounded by that), then up to
+ * this many continuations drive findings to convergence (the loop reports — does
+ * NOT silently truncate — when this cap, rather than a dry round, stops it).
+ */
+export const MAX_DISCOVERY_ROUNDS = 4;
+
+/**
+ * Discovery lenses cycled across continuation rounds (task 007). Each round
+ * adopts the next lens so successive passes attack the SAME target from a
+ * different angle — by endpoint, by tainted dataflow, by component, by prior
+ * exploit history — accumulating into the same queue. Sized to
+ * `MAX_DISCOVERY_ROUNDS` so every round gets a distinct angle before repeating.
+ */
+export const DISCOVERY_LENSES: readonly string[] = [
+	"by-endpoint",
+	"by-taint",
+	"by-component",
+	"by-history",
+];
+
 /** Policy body minus `candidates` (which is derived from `RECOMMENDED`). */
 type PolicyThresholds = Pick<CoveragePolicy, "required" | "minCount">;
 
