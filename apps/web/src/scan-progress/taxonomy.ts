@@ -37,6 +37,7 @@ export interface PhaseSpec {
 // Sub-task method phases the vuln/exploit prompts run internally (shared shape;
 // these agents have no named sub-agents, only numbered method sections).
 const VULN_SUBTASKS = ['Enumerate sources', 'Analyze sink classes', 'Confirm vectors', 'Write findings queue'];
+const SCREEN_SUBTASKS = ['Load hypotheses', 'Independent exploitability check', 'Refutation attempt', 'Write screened queue'];
 const EXPLOIT_SUBTASKS = ['Plan attack', 'Probe payloads', 'Bypass defenses', 'Capture evidence'];
 
 export const PIPELINE_PLAN: readonly PhaseSpec[] = [
@@ -87,6 +88,17 @@ export const PIPELINE_PLAN: readonly PhaseSpec[] = [
       { name: 'auth-vuln', label: 'Auth', subtasks: VULN_SUBTASKS },
       { name: 'ssrf-vuln', label: 'SSRF', subtasks: VULN_SUBTASKS },
       { name: 'authz-vuln', label: 'Authz', subtasks: VULN_SUBTASKS },
+    ],
+  },
+  {
+    id: 'adversarial-screen',
+    label: 'Adversarial Screen',
+    agents: [
+      { name: 'injection-screen', label: 'Injection', subtasks: SCREEN_SUBTASKS },
+      { name: 'xss-screen', label: 'XSS', subtasks: SCREEN_SUBTASKS },
+      { name: 'auth-screen', label: 'Auth', subtasks: SCREEN_SUBTASKS },
+      { name: 'ssrf-screen', label: 'SSRF', subtasks: SCREEN_SUBTASKS },
+      { name: 'authz-screen', label: 'Authz', subtasks: SCREEN_SUBTASKS },
     ],
   },
   {
