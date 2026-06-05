@@ -13,6 +13,13 @@
 
 export { evaluateCoverage, policyFor } from "./evaluate.js";
 export type { SkillReader } from "./evaluate.js";
-export { COVERAGE_POLICY, MAX_COVERAGE_ROUNDS } from "./policy.js";
+export { makeQueueFindingsReader } from "./findings.js";
+export type { FindingsReader } from "./findings.js";
+export {
+	COVERAGE_POLICY,
+	DISCOVERY_LENSES,
+	MAX_COVERAGE_ROUNDS,
+	MAX_DISCOVERY_ROUNDS,
+} from "./policy.js";
 export { agentForPrompt, promptForAgent } from "./reconcile.js";
 export type { CoveragePolicy, CoverageResult } from "./types.js";
