@@ -24,6 +24,7 @@ import type { ActivityLogger } from "../types/activity-logger.js";
 import type { SessionMetadata } from "../types/audit.js";
 import type { ScanJobParams } from "./env.js";
 import { reportFindings } from "./findings/index.js";
+import { recordExploitLaneOutcome } from "./findings/lane-status.js";
 import { ProgressEmitter } from "./progress/index.js";
 
 /**
@@ -102,14 +103,23 @@ async function runAgent(agentName: AgentName, ctx: AgentContext): Promise<void> 
 	}
 }
 
-/** Run `agents` with at most `concurrency` in flight; an agent failure is isolated (logged), the rest continue. */
+/**
+ * Run `agents` with at most `concurrency` in flight; an agent failure is isolated
+ * (logged), the rest continue. For EXPLOIT_AGENTS we also record the per-category
+ * validation-lane outcome (T5): a clean completion marks the lane `validated`, a
+ * THROW marks it `failed` so its non-exploited findings are demoted out of the
+ * emitted set by the findings gate. `recordExploitLaneOutcome` no-ops for any
+ * non-exploit agent, so it is safe to call here for every agent in the group.
+ */
 async function runGroup(agents: readonly AgentName[], concurrency: number, ctx: AgentContext): Promise<void> {
 	const queue = [...agents];
 	const worker = async (): Promise<void> => {
 		for (let next = queue.shift(); next; next = queue.shift()) {
 			try {
 				await runAgent(next, ctx);
+				recordExploitLaneOutcome(ctx.deliverablesPath, next, "validated", ctx.logger);
 			} catch (err) {
+				recordExploitLaneOutcome(ctx.deliverablesPath, next, "failed", ctx.logger);
 				ctx.logger.error(`Agent ${next} failed; group continues`, {
 					scanId: ctx.params.scanId,
 					error: err instanceof Error ? err.message : String(err),

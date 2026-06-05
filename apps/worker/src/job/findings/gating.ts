@@ -25,6 +25,7 @@ import {
 	normalizeManifest,
 } from "../coverage/index.js";
 import type { CoverageManifest, CoverageTier } from "../coverage/index.js";
+import { readLaneStatus } from "./lane-status.js";
 import { toFindingRecords } from "./mapping.js";
 import type {
 	FindingCategory,
@@ -102,9 +103,10 @@ function writeManualReviewAppendix(
 		const doc = {
 			disposition: "unverified_out_of_scope",
 			note:
-				"Findings whose enforcing tier was not in the analyzed source and that " +
-				"were not live-confirmed. Excluded from the emitted attack surface; " +
-				"review manually.",
+				"Findings that could not be verified from this scan — either the " +
+				"enforcing tier was not in the analyzed source, or the category's " +
+				"validation lane failed — and that were not live-confirmed. Excluded " +
+				"from the emitted attack surface; review manually.",
 			findings: appendix,
 		};
 		fs.writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
@@ -121,25 +123,61 @@ function writeManualReviewAppendix(
 }
 
 /**
- * Apply the coverage gate, then map to `FindingRecord`s and return ONLY the
- * EMITTED set (gated-out records are written to the manual-review appendix).
- * The returned type stays `FindingRecord[]` so `collectFindings`'s synchronous
- * callers are untouched.
+ * Coverage gate (T3): a finding whose enforcing tier was NOT in the analyzed
+ * source AND that was not live-exploited is marked `unverified_out_of_scope`.
+ * Mutates `vulns` in place. No manifest ⇒ no-op (full-stack scans must not
+ * regress).
+ */
+function applyCoverageGate(
+	deliverablesPath: string,
+	vulns: NormalizedVuln[],
+	logger: ActivityLogger,
+): void {
+	const manifest = readCoverageManifest(deliverablesPath, logger);
+	if (!manifest) return;
+	for (const vuln of vulns) {
+		if (vuln.disposition === "exploited") continue;
+		if (!isTierCovered(manifest, enforcingTier(vuln.category, manifest))) {
+			vuln.disposition = "unverified_out_of_scope";
+		}
+	}
+}
+
+/**
+ * Failed-lane gate (T5): when a category's exploitation (validation) lane FAILED
+ * (the exploit agent threw), its non-exploited findings were never validated and
+ * must not pass through as `firm`/`tentative` as if confirmed. Demote them to
+ * `unverified_out_of_scope` — the SAME exclusion + manual-review-appendix path as
+ * the coverage gate. An `exploited` finding still stands (a live PoC needs no
+ * lane). Absence of `validation_lane_status.json` ⇒ no-op (no regression).
+ */
+function applyFailedLaneGate(
+	deliverablesPath: string,
+	vulns: NormalizedVuln[],
+	logger: ActivityLogger,
+): void {
+	const laneStatus = readLaneStatus(deliverablesPath, logger);
+	for (const vuln of vulns) {
+		if (vuln.disposition === "exploited") continue;
+		if (laneStatus[vuln.category] === "failed") {
+			vuln.disposition = "unverified_out_of_scope";
+		}
+	}
+}
+
+/**
+ * Apply the coverage gate + the failed-lane gate, then map to `FindingRecord`s
+ * and return ONLY the EMITTED set (gated-out records are written to the manual-
+ * review appendix). The returned type stays `FindingRecord[]` so
+ * `collectFindings`'s synchronous callers are untouched.
  */
 export function gateAndMapFindings(
 	deliverablesPath: string,
 	vulns: NormalizedVuln[],
 	logger: ActivityLogger,
 ): FindingRecord[] {
-	const manifest = readCoverageManifest(deliverablesPath, logger);
-	if (manifest) {
-		for (const vuln of vulns) {
-			if (vuln.disposition === "exploited") continue;
-			if (!isTierCovered(manifest, enforcingTier(vuln.category, manifest))) {
-				vuln.disposition = "unverified_out_of_scope";
-			}
-		}
-	}
+	applyCoverageGate(deliverablesPath, vulns, logger);
+	applyFailedLaneGate(deliverablesPath, vulns, logger);
 
 	const records = toFindingRecords(vulns);
 	const appendix = records.filter(
