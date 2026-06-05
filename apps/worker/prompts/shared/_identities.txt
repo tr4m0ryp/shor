@@ -1,0 +1,10 @@
+<!-- scaffold: filled by the identity-set phase (task 008). Supply the rendered
+     identity list via PromptContext.identities, and/or replace this framing
+     prose. METADATA ONLY — labels and roles, NEVER credentials (ADR-050, same
+     rule as auth-context.ts). Until then the {{IDENTITIES}} slot renders the
+     neutral sentinel. -->
+<identities>
+Identities available for this engagement (labels and roles only — credentials are
+provisioned out-of-band by the harness at runtime and MUST NOT appear here):
+{{IDENTITIES}}
+</identities>

@@ -1,0 +1,9 @@
+<!-- scaffold: filled by the historical-seed phase (task 006). Supply the
+     rendered hot-spots via PromptContext.historicalSeed, and/or replace this
+     framing prose. Until then the {{HISTORICAL_SEED}} slot renders the
+     neutral sentinel. -->
+<historical_seed>
+Prior-exploit hot-spots on this target — areas where issues were previously found
+and which are worth re-checking first:
+{{HISTORICAL_SEED}}
+</historical_seed>

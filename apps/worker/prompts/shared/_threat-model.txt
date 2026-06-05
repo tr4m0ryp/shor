@@ -1,0 +1,8 @@
+<!-- scaffold: filled by the threat-model phase (task 005). Supply the rendered
+     summary via PromptContext.threatModel, and/or replace this framing prose.
+     Until then the {{THREAT_MODEL}} slot renders the neutral sentinel. -->
+<threat_model>
+Threat-model summary for this engagement (the assets, trust boundaries, and
+abuse cases this round should prioritise):
+{{THREAT_MODEL}}
+</threat_model>

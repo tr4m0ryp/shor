@@ -1,0 +1,9 @@
+<!-- scaffold: filled by the false-positive-rules phase (task 016). Supply the
+     rendered precedents via PromptContext.fpRules, and/or replace this framing
+     prose. Until then the {{FP_RULES}} slot renders the neutral sentinel. -->
+<false_positive_rules>
+Organisation false-positive precedents — findings matching these patterns have
+been reviewed before and judged non-issues; do not re-report them without new,
+materially stronger evidence:
+{{FP_RULES}}
+</false_positive_rules>
