@@ -505,6 +505,10 @@ When citing weaknesses, use canonical IDs:
       appears in any `involved_findings` or `attack_chain` — every gated-out
       finding appears ONLY in `manual_review` (JSON) and the "Requires Manual
       Review (Unseen Tier)" section (Markdown), with matching IDs across both.
+      Confirm each scenario has a `confidence_tier` value of `confirmed`,
+      `firm`, or `tentative`, consistent with the dispositions of its
+      `involved_findings`. Confirm `confidence_summary` has an entry for all
+      five categories with non-negative integer counts.
     e. Confirm every `claude_code_prompt` begins with the literal "REMEDIATION
       TASK (CONTEXT — DO NOT REMOVE):" anchor and ends with the literal "Do
       NOT" footer paragraph, and that its `Where:` line is a real `file:line`
