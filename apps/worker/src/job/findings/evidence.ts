@@ -81,7 +81,7 @@ function dispositionForHeading(heading: string): Disposition | undefined {
  * positive signal and won't fire on hypothetical "would-be" prose.
  */
 const CONFIRMED_MARKERS =
-	/confirmed live|live[- ]confirmed|successfully exploited|exploitation succeeded|exploit succeeded|proof of impact|account takeover achieved|extracted (?:the |a |gcp |aws |an? )?(?:access[- ]?token|credential|secret|service account)/i;
+	/confirmed live|live[- ]confirmed|confirmed exploitable|successfully exploited|exploitation succeeded|exploit succeeded|proof of impact|account takeover achieved|(?:ssrf|xss|sqli|injection|idor|rce|alg:none)\s+confirmed|confirmed\s+(?:ssrf|xss|sqli|rce|exploit)|verified live|extracted\b[^.\n]{0,40}?(?:access[- ]?token|credential|secret|service[- ]?account|api[- ]?key)|payload (?:executed|fired)|alert\([^)]*\)\s*(?:fired|executed|popped)|returned (?:http )?200|responded (?:with )?(?:http )?200/i;
 
 /** Markers that a probe was actively stopped — used only under drifted headings. */
 const BLOCKED_MARKERS =
