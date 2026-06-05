@@ -2039,11 +2039,13 @@ function renderFindingRow(f, i) {
   const confTip = (conf.toLowerCase() !== 'confirmed' && validationNote)
     ? confBase + '. ' + validationNote
     : confBase;
-  // Non-confirmed badges get a visual indicator (·) so the tooltip is discoverable.
-  const confLabel = (conf.toLowerCase() !== 'confirmed' && validationNote)
+  // Non-confirmed badges get a visual indicator (·) so the hover tooltip is discoverable.
+  const confLabel = (conf.toLowerCase() !== 'confirmed')
     ? escapeHtml(conf) + ' <span style="opacity:.55;font-size:9px">·</span>'
     : escapeHtml(conf);
-  const confBadge = conf ? '<span class="confidence-badge confidence-' + escapeHtml(conf.toLowerCase()) + '" title="' + escapeHtml(confTip) + '" style="cursor:help">' + confLabel + '</span>' : '';
+  // `data-tip` drives a real CSS hover bubble (see .confidence-badge[data-tip]);
+  // keep `aria-label` for assistive tech. The reason text appears immediately on hover.
+  const confBadge = conf ? '<span class="confidence-badge confidence-' + escapeHtml(conf.toLowerCase()) + '" data-tip="' + escapeHtml(confTip) + '" aria-label="' + escapeHtml(confTip) + '">' + confLabel + '</span>' : '';
   const disp = String(f.disposition || '').toLowerCase();
   const validatedBadge = disp === 'exploited'
     ? '<span class="validated-badge" title="Validated — proven by live exploitation during the scan">Validated</span>'
