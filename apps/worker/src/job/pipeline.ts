@@ -43,7 +43,23 @@ import { ProgressEmitter } from "./progress/index.js";
 const PREREQ_AGENTS: readonly AgentName[] = ["pre-recon", "recon"];
 const VULN_AGENTS: readonly AgentName[] = ["injection-vuln", "xss-vuln", "auth-vuln", "ssrf-vuln", "authz-vuln"];
 const EXPLOIT_AGENTS: readonly AgentName[] = ["injection-exploit", "xss-exploit", "auth-exploit", "ssrf-exploit", "authz-exploit"];
+const EXPLOIT_RETRY_AGENTS: readonly AgentName[] = [
+	"injection-exploit-retry",
+	"xss-exploit-retry",
+	"auth-exploit-retry",
+	"ssrf-exploit-retry",
+	"authz-exploit-retry",
+];
 const SYNTHESIS_AGENTS: readonly AgentName[] = ["report", "attack-surface"];
+
+/** Map from category to its retry agent name. */
+const CATEGORY_RETRY_AGENT: Record<string, AgentName> = {
+	injection: "injection-exploit-retry",
+	xss: "xss-exploit-retry",
+	auth: "auth-exploit-retry",
+	ssrf: "ssrf-exploit-retry",
+	authz: "authz-exploit-retry",
+};
 
 /** Max agents running at once within a parallel group. */
 const GROUP_CONCURRENCY = 2;
