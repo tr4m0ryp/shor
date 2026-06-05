@@ -1947,6 +1947,11 @@ function relatedFindingIds(scenario) {
 }
 
 function setSeverityFilter(sev) { state.severityFilter = sev; renderFindings(); }
+function setReviewFilter(v) { state.reviewFilter = v; renderFindings(); }
+
+// A finding the scan could not verify (enforcing tier not in the analyzed
+// source, or its validation lane failed) and that was not live-confirmed.
+function isManualReview(f) { return String((f && f.disposition) || '') === 'unverified_out_of_scope'; }
 
 function renderFindings() {
   const panel = document.getElementById('panelFindings');
@@ -1955,17 +1960,35 @@ function renderFindings() {
     panel.innerHTML = '<div class="panel-empty">No findings for this scan.</div>';
     return;
   }
+  const review = state.reviewFilter || 'actionable';
+  const actionable = all.filter((f) => !isManualReview(f));
+  const manual = all.filter(isManualReview);
+  const base = review === 'manual' ? manual : actionable;
+
+  // View filter — only shown when there ARE manual-review findings to separate.
+  let viewRow = '';
+  if (manual.length > 0) {
+    const tab = (key, label) => '<button class="findings-filter' + (review === key ? ' active' : '') +
+      '" onclick="setReviewFilter(\'' + key + '\')">' + label + '</button>';
+    viewRow = '<div class="findings-filters"><span class="findings-filter-label">View</span>' +
+      tab('actionable', 'Findings (' + actionable.length + ')') +
+      tab('manual', 'Manual review (' + manual.length + ')') + '</div>';
+  }
+
   const severities = ['all', 'critical', 'high', 'medium', 'low', 'info'];
-  const filters = '<div class="findings-filters"><span class="findings-filter-label">Severity</span>' +
+  const sevRow = '<div class="findings-filters"><span class="findings-filter-label">Severity</span>' +
     severities.map((s) => '<button class="findings-filter' + (state.severityFilter === s ? ' active' : '') +
       '" onclick="setSeverityFilter(\'' + s + '\')">' + s + '</button>').join('') + '</div>';
 
-  const rows = all
+  const rows = base
     .filter((f) => state.severityFilter === 'all' || String(f.severity || '').toLowerCase() === state.severityFilter)
     .map((f, i) => renderFindingRow(f, i))
     .join('');
 
-  panel.innerHTML = filters + (rows || '<div class="panel-empty">No findings at this severity.</div>');
+  const emptyMsg = review === 'manual'
+    ? 'No findings set aside for manual review.'
+    : 'No findings at this severity.';
+  panel.innerHTML = viewRow + sevRow + (rows || '<div class="panel-empty">' + emptyMsg + '</div>');
 }
 
 function renderFindingRow(f, i) {
