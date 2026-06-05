@@ -39,6 +39,7 @@ import type { Container } from "../container.js";
 import type { PentestError } from "../error-handling.js";
 import { runWithCoverage } from "./coverage-loop.js";
 import {
+	checkRefusal,
 	checkSpendingCap,
 	failOnHardMissing,
 	finalizeSuccess,
