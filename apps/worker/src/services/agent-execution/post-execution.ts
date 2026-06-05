@@ -26,6 +26,7 @@ import type { AgentEndResult } from "../../types/audit.js";
 import { ErrorCode } from "../../types/errors.js";
 import { ok, type Result } from "../../types/result.js";
 import { isSpendingCapBehavior } from "../../utils/billing-detection.js";
+import { isRefusalBehavior } from "../../utils/refusal-detection.js";
 import { failAgent } from "../agent-execution-internal.js";
 import type { CoverageResult } from "../coverage/index.js";
 import type { PentestError } from "../error-handling.js";
