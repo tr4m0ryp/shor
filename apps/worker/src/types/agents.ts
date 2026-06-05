@@ -20,6 +20,13 @@ export const ALL_AGENTS = [
 	"auth-vuln",
 	"ssrf-vuln",
 	"authz-vuln",
+	// Adversarial screen pass: one agent per category independently tries to
+	// refute each hypothesis (blind to recon context) before exploitation.
+	"injection-screen",
+	"xss-screen",
+	"auth-screen",
+	"ssrf-screen",
+	"authz-screen",
 	"injection-exploit",
 	"xss-exploit",
 	"auth-exploit",
