@@ -1891,7 +1891,10 @@ async function loadScanFindings(scanId) {
     const data = await gapi('GET', '/scans/' + scanId + '/findings');
     state.findingsCache = (data.findings || []).map((f) => f.data || f);
     assignFindingNumbers(state.findingsCache);
-    document.getElementById('findingsCount').textContent = String(state.findingsCache.length);
+    // Header count reflects actionable findings only; manual-review items
+    // (disposition unverified_out_of_scope) are surfaced behind their own filter.
+    const actionableCount = state.findingsCache.filter((f) => !isManualReview(f)).length;
+    document.getElementById('findingsCount').textContent = String(actionableCount);
     renderFindings();
   } catch (err) {
     panel.innerHTML = '<div class="panel-empty">' + escapeHtml(err.message) + '</div>';
