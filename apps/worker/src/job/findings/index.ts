@@ -50,7 +50,7 @@ function readAttackSurface(
 const IMPROVED_FINDINGS_FILE = "improved_findings.json";
 
 /**
- * Overlay the Sinas "improvement findings" pass (sinas-finalization.ts) onto the
+ * Overlay the Sinas "improvement findings" pass (cli-finalization.ts) onto the
  * mapped records: if `improved_findings.json` exists, replace each record's prose
  * fields (title/evidence/missing_defense/remediation/safe_poc/repro_steps) with
  * the cleaned versions, matched by id. Identity (fingerprint, severity, cwe,
@@ -103,7 +103,7 @@ function applyImprovedText(
  * manifest exists, no gating is applied (full-stack scans must not regress).
  *
  * The return type stays `FindingRecord[]` (the emitted set) so the synchronous
- * callers in sinas-finalization.ts are untouched.
+ * callers in cli-finalization.ts are untouched.
  */
 export function collectFindings(
 	deliverablesPath: string,
