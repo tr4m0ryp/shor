@@ -170,6 +170,12 @@ do NOT replace it.
   which leaked credentials are actually live.
 - `osv-scanner` — dependency CVEs via OSV (SCA); flag vulnerable libraries that
   introduce category risk (e.g. a deserialization or SSRF CVE in a dependency).
+- `git-security-history` — mine THIS repo's OWN git history for prior
+  security/fix commits and map them to recurring "hot files", folding in the
+  `osv-scanner` (dependency CVEs) and `gitleaks` (history secrets) reports you
+  already produced. It writes `.storron/deliverables/historical_signal.json` —
+  the "previously-exploited surface" seed every downstream agent reads. It is
+  LOCAL-ONLY (`git log` + reading those reports); it makes NO network calls.
 
 Run these read-only against the cloned repo only; never against a live host.
 Honor the secret-redaction rule — never echo a discovered secret into the
@@ -214,9 +220,18 @@ deliverable or logs; reference its location and type instead.
    3. Repeat until all sections are present.
    4. Run `save-deliverable --type CODE_ANALYSIS --file-path .storron/deliverables/pre_recon_deliverable.md`.
 4. **Coverage manifest (MANDATORY — structured scope contract for every downstream phase).** Confirm or override the deterministic coverage seed and write it as JSON. See `<coverage_manifest>` below for the exact shape and rules.
+5. **Historical-exploit seed (MANDATORY — "what's been exploited before").** Run the `git-security-history` skill to mine the cloned repo's OWN history for prior security/fix commits and emit `.storron/deliverables/historical_signal.json`. If you ran `osv-scanner`/`gitleaks` this phase, first write their JSON to `.storron/deliverables/osv.json` and `.storron/deliverables/gitleaks.json` (gitleaks with `--redact`), then pass both so dependency-CVE and history-secret signals fold in:
+   ```bash
+   skills/static-analysis/history/git-security-history/mine.sh \
+     --repo {{REPO_PATH}} \
+     --out  {{REPO_PATH}}/.storron/deliverables/historical_signal.json \
+     --osv  {{REPO_PATH}}/.storron/deliverables/osv.json \
+     --gitleaks {{REPO_PATH}}/.storron/deliverables/gitleaks.json
+   ```
+   `--osv`/`--gitleaks` are optional — drop either if you have no report. This is LOCAL-ONLY (`git log` + reading those files); it makes NO network calls. ALWAYS emit the file even when history is thin (it will simply be small). Then seed TodoWrite from it (see Section 11) so the previously-exploited surface is re-examined, and summarize it in Section 11 of the deliverable.
 
 **EXECUTION PATTERN:**
-1. Use TodoWrite to create todos for Phase 1 (3 items), Phase 2 (3 items), and Phase 3 synthesis.
+1. Use TodoWrite to create todos for Phase 1 (3 items), Phase 2 (3 items), and Phase 3 synthesis (including the coverage manifest, the historical-exploit seed, and one re-examination todo per top historical hot file / dep CVE — see Section 11).
 2. Phase 1: launch all three discovery agents in a SINGLE message with three Task calls.
 3. WAIT for all three to complete before starting Phase 2.
 4. Mark Phase 1 todos completed.
@@ -558,6 +573,16 @@ For each sink, you MUST also note: (a) is the destination URL fully user-control
 - Infrastructure metadata fetchers
 - Service mesh configuration retrievers
 
+## 11. Previously-Exploited Surface (Historical Seed)
+**SOURCE:** `historical_signal.json` produced by the `git-security-history` skill (Phase 3, step 5). This is the "what's been exploited before" oracle — code patched for a security reason once is the highest-yield place to re-examine.
+
+Summarize the seed (do NOT paste the whole JSON — reference it):
+- **Hot files** — for each top entry in `hotFiles[]`: the file, how many security/fix commits touched it, the referenced CVE ids (if any), and a one-line "re-examine because…" rationale (e.g. "patched for an auth bypass in 2024 — re-check the fix is complete and not regressed").
+- **Dependency CVEs** — for each entry in `depCves[]`: `package@version` → advisory id, severity, and fixed version; note whether the vulnerable code path looks reachable from an in-scope entry point.
+- **History secrets** — files flagged by `gitleaks` in history appear as hot files with a `history secret (...)` commit; flag the path for rotation/leak review. NEVER echo a secret value (the seed is already redacted — keep it that way).
+
+**TodoWrite seeding (REQUIRED):** create one re-examination todo per top hot file and per dep CVE, phrased as a concrete hypothesis to re-test live downstream (e.g. "Re-examine `src/auth/login.ts` — patched for CVE-2024-XXXX before; verify still not bypassable", "Verify `lodash@4.17.20` CVE-2021-23337 is reachable"). These bias Phase-1 discovery of the live engagement toward the proven-weak surface.
+
 <conclusion_trigger>
 **COMPLETION REQUIREMENTS (ALL must be satisfied):**
 
@@ -569,6 +594,7 @@ For each sink, you MUST also note: (a) is the destination URL fully user-control
 2. **Deliverable Generation.** These files MUST exist:
    - `.storron/deliverables/pre_recon_deliverable.md` (via `save-deliverable` with `--file-path`, NEVER inline `--content`).
    - `.storron/deliverables/coverage_manifest.json` (the architectural coverage manifest from `<coverage_manifest>`, confirmed/overridden from your source analysis).
+   - `.storron/deliverables/historical_signal.json` (the historical-exploit seed from the `git-security-history` skill — Phase 3 step 5; LOCAL-ONLY, no network).
    - `.storron/deliverables/schemas/` directory with all discovered schema files copied (if any).
 
 3. **Section Contract.** Every section heading specified above MUST appear with the exact number and name. Sections 3, 5, 7, 8, 9, 10 are parsed by downstream agents — breaking these names breaks the pipeline.

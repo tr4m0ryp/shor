@@ -28,9 +28,13 @@ import path from "node:path";
  * Most names map 1:1 (Go binaries, venv console scripts). The wrappers the
  * Dockerfile lays down under /usr/local/bin keep the same name as the skill
  * dir (`sqlmap`, `commix`, `sstimap`, `xsstrike`, `ssrfmap`, `jwt_tool`,
- * `generate-totp`). Two skills carry `null`:
+ * `generate-totp`). Three skills carry `null`:
  *   - `authz-recipe` — a broken-access-control METHODOLOGY (its own SKILL.md
  *     says there is no drop-in CLI; it drives curl + playwright + ffuf).
+ *   - `git-security-history` — a historical-exploit-seeding RECIPE that ships
+ *     its own bundled scripts (`mine.sh` + `assemble.py`) in the skill dir and
+ *     drives only base-image tools (`git` + `python3`); it lays down no command
+ *     of its own on PATH, so probing PATH for it would be a false alarm.
  *   - `hydra` — documented as a skill but DEFERRED from the image (README
  *     "DEFAULT-marked tools … NOT in this image"; absent from tools.lock and
  *     both Dockerfiles). The skill doc ships; the binary is intentionally not
@@ -67,6 +71,7 @@ export const SKILL_BINARIES: Readonly<Record<string, string | null>> = {
 	sstimap: "sstimap",
 	xsstrike: "xsstrike",
 	// static-analysis
+	"git-security-history": null, // bundled recipe (git + python3), no own CLI
 	gitleaks: "gitleaks",
 	"osv-scanner": "osv-scanner",
 	semgrep: "semgrep",

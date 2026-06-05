@@ -1,9 +1,23 @@
-<!-- scaffold: filled by the historical-seed phase (task 006). Supply the
-     rendered hot-spots via PromptContext.historicalSeed, and/or replace this
-     framing prose. Until then the {{HISTORICAL_SEED}} slot renders the
-     neutral sentinel. -->
 <historical_seed>
-Prior-exploit hot-spots on this target — areas where issues were previously found
-and which are worth re-checking first:
+PREVIOUSLY-EXPLOITED SURFACE — mined from the target's OWN history (security/fix
+commits, dependency CVEs, history-leaked secrets) by the git-security-history
+skill. Treat every line as a HIGH-PRIORITY HYPOTHESIS, not a confirmed finding:
+code that was patched for a security reason once is the single highest-yield
+place to look again.
+
+How to use this seed:
+- Re-examine listed hot files FIRST. "This file was patched for X before" means:
+  confirm the fix is complete, was not later regressed, and cannot be bypassed by
+  a sibling code path the original patch missed.
+- For each dependency CVE: VERIFY it is still reachable from an in-scope entry
+  point in THIS app before relying on it — a vulnerable version present is not
+  proof of an exploitable path. Prefer the noted fixed-version as remediation.
+- Files flagged via history secrets are rotation/leak-review leads. The seed is
+  already redacted; NEVER echo a secret value, only its location and type.
+- Map each hot file back to the live attack surface and bias discovery toward it.
+
+If this section is empty or "(none)", no prior signal was mined (e.g. a shallow
+clone or a young repo) — proceed with normal coverage; absence is not assurance.
+
 {{HISTORICAL_SEED}}
 </historical_seed>
