@@ -12,15 +12,12 @@
  * resending. Auth routes through the OAuth token (Claude Max subscription).
  */
 
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { promises as fsp } from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 import type { ActivityLogger } from "../types/activity-logger.js";
 import { collectFindings } from "./findings/index.js";
 import type { FindingRecord } from "./findings/types.js";
-
-const run = promisify(execFile);
 
 const REPORT_FILENAME = "comprehensive_security_assessment_report.md";
 const ATTACK_SURFACE_FILE = "attack_surface_scenarios.json";
