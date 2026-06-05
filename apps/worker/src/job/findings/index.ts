@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import { readEvidence } from "./evidence.js";
-import { gateAndMapFindings } from "./gating.js";
+import { gateAndMapFindings, readManualReviewAppendix } from "./gating.js";
 import { FINDING_CATEGORIES, readQueues } from "./queue.js";
 import { postFindings, readSinkConfig } from "./sink.js";
 import type { FindingRecord, FindingsSinkPayload } from "./types.js";
