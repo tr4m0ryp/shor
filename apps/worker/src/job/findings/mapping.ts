@@ -127,6 +127,39 @@ function inferSeverity(
 	return disposition === "exploited" ? escalated : base;
 }
 
+/**
+ * Derive a human-readable explanation of why the finding is not `confirmed`.
+ * Pattern-matches the exploitation evidence prose for specific blocking reasons;
+ * falls back to a generic label per disposition. Empty for `exploited` findings.
+ */
+function synthesizeValidationNote(
+	disposition: NormalizedVuln["disposition"],
+	evidenceText: string,
+): string {
+	if (disposition === "exploited") return "";
+	if (disposition === "unverified_out_of_scope") {
+		return "Excluded — enforcing tier not in analyzed source; could not be verified from this scan";
+	}
+	if (disposition === "blocked") {
+		const e = evidenceText.toLowerCase();
+		if (/waf|cloudflare|akamai|imperva|block(ed)?\s+by\s+(waf|security|firewall)/.test(e)) {
+			return "Blocked — WAF / security control intercepted the probe";
+		}
+		if (/rate.?limit|429|too many requests|throttl/.test(e)) {
+			return "Blocked — rate-limited during exploitation attempt";
+		}
+		if (/internal|vpn|tailscale|private.?network|not externally|requires.*(vpn|internal)/.test(e)) {
+			return "Blocked — endpoint requires internal network access (not externally reachable)";
+		}
+		if (/401|403|unauthorized|forbidden|authentication required|session required|login required/.test(e)) {
+			return "Blocked — requires authenticated session not available during testing";
+		}
+		return "Blocked — security control prevented exploitation; finding unconfirmed";
+	}
+	// disposition === "queued": no evidence entry for this finding
+	return "Unproven — no live validation evidence produced; finding remains a code-analysis hypothesis";
+}
+
 /** Map a queue confidence + disposition to the §6.1 confidence enum. */
 function normalizeConfidence(
 	value: string,
