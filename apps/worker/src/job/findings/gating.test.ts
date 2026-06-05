@@ -178,3 +178,26 @@ describe("collectFindings coverage gating", () => {
 		expect(await readAppendix(dir)).toBeUndefined();
 	});
 });
+
+describe("readManualReviewAppendix (dashboard surfacing)", () => {
+	it("returns the gated-out findings collectFindings set aside", async () => {
+		const dir = await mkDeliverables();
+		await writeAuthzQueue(dir);
+		await writeManifest(dir, manifest("absent"));
+
+		const emitted = collectFindings(dir, logger);
+		expect(emitted).toHaveLength(0); // gated out of the emitted set
+
+		const manual = readManualReviewAppendix(dir, logger);
+		const item = manual.find((f) => f.id === AUTHZ_ID);
+		expect(item).toBeDefined();
+		expect(item?.disposition).toBe("unverified_out_of_scope");
+	});
+
+	it("returns [] when no appendix exists (full-coverage / no-manifest scan)", () => {
+		// Synchronous: no file on disk → tolerated, empty.
+		expect(readManualReviewAppendix("/nonexistent/deliverables", logger)).toEqual(
+			[],
+		);
+	});
+});
