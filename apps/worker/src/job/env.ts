@@ -68,6 +68,8 @@ export function readScanJobParams(): ScanJobParams {
 	};
 	const configPath = optional("SHOR_CONFIG_PATH");
 	if (configPath) params.configPath = configPath;
+	const configYaml = optional("SHOR_CONFIG_YAML");
+	if (configYaml) params.configYaml = configYaml;
 	const provider = optional("SHOR_PROVIDER");
 	if (provider) params.provider = provider;
 	return params;
