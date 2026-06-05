@@ -2032,6 +2032,10 @@ function renderFindingRow(f, i) {
   push('CWE', cwe);
   push('OWASP', String(f.owasp_category || ''));
   push('Location', locStr);
+  // Show validation_note for non-confirmed findings — explains the specific failure reason.
+  if (conf.toLowerCase() !== 'confirmed' && validationNote) {
+    push('Validation note', validationNote);
+  }
   push('Evidence', String(f.evidence || ''));
   push('Missing defense', String(f.missing_defense || ''));
   push('Remediation', String(f.remediation || ''), true);
