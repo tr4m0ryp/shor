@@ -235,6 +235,26 @@ order, every field required:
 }
 ```
 
+`confidence_summary` is a per-category breakdown of how many findings were
+confirmed (live proof), firm (analysis-identified but unconfirmed), tentative
+(weak-signal hypothesis), or excluded (unseen tier). It gives the reader a
+one-glance view of where the confidence coverage stands per attack class.
+
+```
+{
+  "injection": { "confirmed": <int>, "firm": <int>, "tentative": <int>, "excluded": <int> },
+  "xss":       { "confirmed": <int>, "firm": <int>, "tentative": <int>, "excluded": <int> },
+  "auth":      { "confirmed": <int>, "firm": <int>, "tentative": <int>, "excluded": <int> },
+  "authz":     { "confirmed": <int>, "firm": <int>, "tentative": <int>, "excluded": <int> },
+  "ssrf":      { "confirmed": <int>, "firm": <int>, "tentative": <int>, "excluded": <int> }
+}
+```
+
+Populate from the input queues and evidence files, using the same disposition
+logic as the scope gate: `exploited` → confirmed; `blocked`/`queued` with
+covered tier → firm or tentative; `unverified_out_of_scope` → excluded. A
+category with no queue entries gets all-zero counts; do NOT omit the category.
+
 2. `.storron/deliverables/attack_surface_scenarios.md`
 
 The same content rendered as human-readable Markdown. Use exactly these two
