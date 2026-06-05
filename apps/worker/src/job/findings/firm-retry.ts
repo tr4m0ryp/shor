@@ -19,7 +19,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ActivityLogger } from "../../types/activity-logger.js";
-import { readEvidence } from "./evidence.js";
+import { lookupEvidence, readEvidence } from "./evidence.js";
 import { FINDING_CATEGORIES, QUEUE_FILES, readQueues } from "./queue.js";
 import type { FindingCategory } from "./types.js";
 
