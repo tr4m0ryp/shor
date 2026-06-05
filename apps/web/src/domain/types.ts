@@ -213,6 +213,15 @@ export interface FindingRecord {
   /** SARIF-style fuzzy fallback. */
   readonly partialFingerprints: Record<string, string>;
 
+  /**
+   * Human-readable explanation of why this finding is not `confirmed`. Empty
+   * string for `confirmed` findings. Set by the worker on emission; surfaces in
+   * the dashboard so "firm" always shows a specific failure reason rather than a
+   * bare label. Examples: "Blocked — WAF intercepted the probe",
+   * "Unproven — no live validation evidence produced".
+   */
+  readonly validation_note?: string;
+
   /** Forward-compatible: tolerate additional fields from the emitter. */
   readonly [key: string]: unknown;
 }
