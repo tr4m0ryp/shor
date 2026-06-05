@@ -98,6 +98,7 @@ async function runAgent(agentName: AgentName, ctx: AgentContext): Promise<void> 
 				deliverablesPath,
 				attemptNumber: 1,
 				...(params.configPath !== undefined && { configPath: params.configPath }),
+				...(params.configYaml !== undefined && { configYAML: params.configYaml }),
 			},
 			auditSession,
 			logger,
