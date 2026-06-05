@@ -465,6 +465,12 @@ When citing weaknesses, use canonical IDs:
    `unverified_out_of_scope` finding in `involved_findings` — those go ONLY to
    the `manual_review` appendix (build it now from the findings gated out in
    step 1: one entry per gated-out VULN-ID, sorted by `finding_id` ascending).
+   Set `confidence_tier` as follows:
+   - `"confirmed"` — at least one finding in `involved_findings` is `exploited`
+     (live proof exists).
+   - `"firm"` — no exploited finding, but at least one is `blocked` or `queued`
+     with a covered enforcing tier (code-analysis hypothesis, unconfirmed live).
+   - `"tentative"` — all involved findings are `tentative` (weakest signal).
 4. Draft 0 to 3 kill chains. A kill chain is a paragraph stitching two or
    more existing scenarios into a higher-order attack narrative (e.g.
    recon -> initial access -> credential theft -> lateral movement -> data
