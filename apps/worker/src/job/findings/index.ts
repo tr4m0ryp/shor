@@ -195,7 +195,32 @@ export async function collectFindings(
  * Returns `true` if the POST succeeded (2xx) or there was nothing to do because
  * the sink is unconfigured; `false` if a configured POST failed.
  */
-export async function reportFindings(
+/**
+ * Serialize concurrent emissions. The pipeline calls {@link reportFindings} in
+ * EVERY agent's `finally`, so at full group width up to N agents emit near-
+ * simultaneously. The reads are safe (each agent owns its files), but the sink
+ * POST should not be thrashed by N overlapping cumulative payloads — chain them
+ * so they post in order. A failure never breaks the chain.
+ */
+let emitChain: Promise<unknown> = Promise.resolve();
+
+export function reportFindings(
+	deliverablesPath: string,
+	scanId: string,
+	status: "completed" | "failed" | "running",
+	logger: ActivityLogger,
+): Promise<boolean> {
+	const run = emitChain.then(() =>
+		emitFindings(deliverablesPath, scanId, status, logger),
+	);
+	emitChain = run.then(
+		() => undefined,
+		() => undefined,
+	);
+	return run;
+}
+
+async function emitFindings(
 	deliverablesPath: string,
 	scanId: string,
 	status: "completed" | "failed" | "running",
