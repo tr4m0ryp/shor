@@ -192,6 +192,14 @@ kind = go-install
 module = github.com/trufflesecurity/trufflehog/v3
 ref = @latest
 
+[trivy]
+kind = go-install
+module = github.com/aquasecurity/trivy/cmd/trivy
+ref = @latest
+note = all-in-one SCA (npm + NuGet) + IaC/Docker/K8s misconfig + filesystem
+       secret scan. Pulls its vuln DB from ghcr.io on first run (cache under
+       /tmp); CGO off → portable glibc binary like the other go-install tools.
+
 # ---------------------------------------------------------------------------
 # pip tools into the shared venv /opt/shor/venv (ADR-026). Versions float to
 # the latest glibc wheel at build time (semgrep/playwright pin transitively).
