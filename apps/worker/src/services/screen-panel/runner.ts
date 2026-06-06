@@ -179,13 +179,20 @@ export async function runScreenPanel(
 
 			// Render the base screen prompt once per category (lens-agnostic — the
 			// lens is layered per voter). Reused across all candidates + voters.
+			// Voters get the scan-wide assembled context (threat model, identities,
+			// FP rules) so the diverse-lens verification is context-aware, not blind.
+			const promptContext = await assembleScanPromptContext(
+				deliverablesPath,
+				config,
+				process.env,
+			);
 			const basePrompt = await loadPrompt(
 				def.promptTemplate,
 				{ webUrl: params.targetUrl, repoPath: params.repoPath },
 				config,
 				logger,
 				undefined,
-				{},
+				promptContext,
 			);
 
 			const entries: ScreenVerdictEntry[] = [];
