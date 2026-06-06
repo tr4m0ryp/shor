@@ -59,6 +59,12 @@ RUN retry go install -v github.com/ffuf/ffuf/v2@latest && \
     retry go install -v github.com/tomnomnom/waybackurls@latest
 RUN retry go install -v github.com/zricethezav/gitleaks/v8@latest && \
     retry go install -v github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
+# Secret detection with live-verification + the all-in-one SCA/IaC/secret scanner.
+# trufflehog was declared in tools.lock but missing from the build (the binary
+# never shipped, so its skill no-op'd at runtime); trivy adds NuGet/npm SCA plus
+# Docker/K8s/IaC misconfig that semgrep's generic rules cover poorly.
+RUN retry go install -v github.com/trufflesecurity/trufflehog/v3@latest && \
+    retry go install -v github.com/aquasecurity/trivy/cmd/trivy@latest
 
 # --- naabu needs CGO + libpcap ---
 ENV CGO_ENABLED=1
