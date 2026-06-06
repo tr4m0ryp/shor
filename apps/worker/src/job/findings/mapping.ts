@@ -22,8 +22,21 @@ import type {
 	FindingRecord,
 	FindingSeverity,
 	NormalizedVuln,
+	OracleDisposition,
 	VulnerableCodeLocation,
 } from "./types.js";
+
+/** Valid executable-oracle verdicts (T9), stamped on `raw` by the oracle phase. */
+const ORACLE_DISPOSITIONS: ReadonlySet<string> = new Set<OracleDisposition>([
+	"exploited",
+	"blocked",
+	"not_replayable",
+]);
+
+/** Type guard for the oracle verdict that `applyOracleDispositions` stashes on `raw`. */
+function isOracleDisposition(v: unknown): v is OracleDisposition {
+	return typeof v === "string" && ORACLE_DISPOSITIONS.has(v);
+}
 
 /** Readable class label per category (the dashboard shows the short code badge). */
 const CLASS_LABEL: Record<FindingCategory, string> = {
@@ -219,6 +232,7 @@ function computeFingerprint(
 export function toFindingRecord(vuln: NormalizedVuln): FindingRecord {
 	const meta = CATEGORY_META[vuln.category];
 	const raw = vuln.raw;
+	const oracleDisp = raw.oracle_disposition;
 
 	const cwe = explicitCwe(raw) || meta.defaultCwe;
 	const locText =
@@ -291,6 +305,8 @@ export function toFindingRecord(vuln: NormalizedVuln): FindingRecord {
 		validation_note,
 		// Forward-compatible: keep raw queue fields + disposition for the sink.
 		disposition: vuln.disposition,
+		// Executable-oracle verdict (T9), when the oracle phase stamped one on `raw`.
+		...(isOracleDisposition(oracleDisp) && { oracle_disposition: oracleDisp }),
 		vulnerability_type: vulnerabilityType,
 		externally_exploitable: raw.externally_exploitable === true,
 	};
