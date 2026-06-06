@@ -51,6 +51,16 @@ export const PLAYWRIGHT_SESSION_MAPPING: Record<string, PlaywrightSession> =
 		"exploit-logic": "agent6",
 		"exploit-misconfig-web": "agent7",
 
+		// Phase 3b: Adversarial screen panel (lens-voters; browserless — sessions
+		// declared per-category, unused, so no screen agent silently falls back).
+		"screen-injection": "agent1",
+		"screen-xss": "agent2",
+		"screen-auth": "agent3",
+		"screen-ssrf": "agent4",
+		"screen-authz": "agent5",
+		"screen-logic": "agent6",
+		"screen-misconfig-web": "agent7",
+
 		// Phase 4b: Exploit retry pass (same session assignments; runs sequentially
 		// after the primary pass so there is no browser contention)
 		"exploit-injection-retry": "agent1",
