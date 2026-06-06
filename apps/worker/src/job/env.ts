@@ -30,6 +30,12 @@ export interface ScanJobParams {
 	configYaml?: string;
 	/** Optional provider label (anthropic|openai|…) for logging/routing. */
 	provider?: string;
+	/**
+	 * Max agents per parallel group (vuln / screen / exploit). Unset → full group
+	 * width (all agents at once). Set `SHOR_GROUP_CONCURRENCY` to dial it down
+	 * (e.g. to spare a fragile target). Must be a positive integer.
+	 */
+	groupConcurrency?: number;
 }
 
 function required(name: string): string {
