@@ -172,18 +172,21 @@ A closed direct port on `:80` does NOT mean the backend is unreachable. Record t
 
 **CAPTURE ANY LIVE API SPEC.** If you find a live OpenAPI/Swagger doc (`/swagger`, `/swagger/index.html`, `/swagger.json`, `/openapi.json`, `/v3/api-docs`), DOWNLOAD the spec JSON into `.storron/deliverables/schemas/` (e.g. `live_openapi.json`) with `curl`. A machine-readable contract of the live API is the single highest-value recon artifact — it gives every downstream agent the full endpoint/parameter/schema inventory directly. Reference it in Section 4.
 
+**AUTHENTICATE THROUGH THE NAMED SESSION, NOT A ONE-OFF CURL (so the credential is reusable).** When you need to log in to reach the backend, drive the login/OIDC flow through the **named Playwright session** (`-s={{PLAYWRIGHT_SESSION}}`) so the resulting cookies/token persist to that session's storage-state — the runtime seam every later phase **automatically replays**. A token you grab with a single ad-hoc `curl` and hold only in your head dies with this phase: downstream agents then have to re-crack auth from scratch. If you must hit the API directly with `curl`, take the token FROM the established session rather than minting a throwaway one.
+
 **RECORD A CREDENTIAL-FREE API-ACCESS RECIPE (so downstream reuses your discovery).** Once you know how to reach AND authenticate to the backend, write `.storron/deliverables/api_access.json` — the *recipe*, never the secret — so every downstream agent re-acquires access in one step instead of re-cracking the flow you already solved. Exact shape (all fields credential-free):
 ```json
 {
   "apiBase": "http://HOST:PORT/base-path",
   "authScheme": "oidc-bearer | session-cookie | api-key-header | none",
   "identityLabel": "primary",
-  "tokenAcquisition": "HOW to obtain auth — which endpoint/port, which grant, which identity label — DESCRIBED, not the token value",
+  "tokenSource": "WHERE downstream gets the live token WITHOUT it appearing here — e.g. 'named Playwright session storage-state, localStorage key access_token' or 'replay the {{PLAYWRIGHT_SESSION}} session'",
+  "tokenAcquisition": "HOW to obtain auth if no live session — which endpoint/port, which grant, which identity label — DESCRIBED, not the token value",
   "openApiSpec": ".storron/deliverables/schemas/live_openapi.json",
   "notes": "anything else needed to hit the API"
 }
 ```
-**NEVER put a secret in this file** — no tokens, passwords, cookies, JWTs, or API keys. Record the identity LABEL and the STEPS to get a token, never the token itself; secret-hygiene is enforced and a leaked credential here is a failure. Set `authScheme` to `none` only if the API genuinely needs no auth. Reference this file in Section 4.
+For any token-bearing scheme (`oidc-bearer`, `bearer`, `api-key-header`) you MUST fill `tokenSource` — it is the credential-free pointer that lets downstream pull the live token from the reusable session instead of re-deriving it. **NEVER put a secret in this file** — no tokens, passwords, cookies, JWTs, or API keys. Record the identity LABEL, the token's LOCATION, and the STEPS to get one — never the token itself; secret-hygiene is enforced and a leaked credential here is a failure. Set `authScheme` to `none` only if the API genuinely needs no auth. Reference this file in Section 4.
 
 **Honor the no-DoS per-host rate limits** baked into each skill and re-validate scope immediately before each network action. Write every live finding (open ports, services/versions, live HTTP endpoints, WAF, subdomains, params, reachable `/api` base) into the recon deliverable (Sections 2, 4, 5, 6) — these are now FIRST-HAND live results, not assumptions inherited from a prior phase.
 
