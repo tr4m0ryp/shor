@@ -76,24 +76,30 @@ export async function loadPrompt(
 			);
 		}
 
-		// 2. Assign Playwright session based on agent name
+		// 2. Assign Playwright session by agent prompt. FAIL FAST on an undeclared
+		//    agent — NEVER silently fall back to a shared session. The old `agent1`
+		//    fallback let unmapped agents (threat-model, screen voters, logic/
+		//    misconfig-web) collide on one browser profile and ran them outside their
+		//    intended isolation. The map MUST be exhaustive (a unit test enforces it);
+		//    a gap is a config bug to fix, not something to paper over at runtime.
 		const enhancedVariables: PromptVariables = { ...variables };
 
+		if (!(promptName in PLAYWRIGHT_SESSION_MAPPING)) {
+			throw new PentestError(
+				`No Playwright session declared for agent prompt "${promptName}". ` +
+					`Every agent MUST be declared in PLAYWRIGHT_SESSION_MAPPING — refusing ` +
+					`to silently fall back to a shared session.`,
+				"prompt",
+				false,
+				{ promptName },
+			);
+		}
 		const session =
 			PLAYWRIGHT_SESSION_MAPPING[
 				promptName as keyof typeof PLAYWRIGHT_SESSION_MAPPING
 			];
-		if (session) {
-			enhancedVariables.PLAYWRIGHT_SESSION = session;
-			logger.info(
-				`Assigned ${promptName} -> ${enhancedVariables.PLAYWRIGHT_SESSION}`,
-			);
-		} else {
-			enhancedVariables.PLAYWRIGHT_SESSION = "agent1";
-			logger.warn(
-				`Unknown agent ${promptName}, using fallback -> ${enhancedVariables.PLAYWRIGHT_SESSION}`,
-			);
-		}
+		enhancedVariables.PLAYWRIGHT_SESSION = session;
+		logger.info(`Assigned ${promptName} -> ${session}`);
 
 		// 3. Read template file
 		let template = await fs.readFile(promptPath, "utf8");
