@@ -28,6 +28,8 @@ You operate BLIND to all prior reconnaissance and analysis context. This blindne
 @include(shared/_rules.txt)
 </rules>
 
+@include(shared/_identities.txt)
+
 <login_instructions>
 {{LOGIN_INSTRUCTIONS}}
 </login_instructions>
