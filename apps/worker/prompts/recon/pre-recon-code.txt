@@ -163,13 +163,26 @@ do NOT replace it.
 
 - `semgrep` — taint/pattern SAST across the repo. Your fastest way to enumerate
   candidate source->sink flows for every category (injection, XSS, SSRF, weak
-  auth, missing authz) and to feed Section-level sink inventories.
-- `gitleaks` — scan the working tree AND git history for committed secrets
-  (keys, tokens, signing secrets) that widen the attack surface.
-- `trufflehog` — secret discovery with live provider verification, to rank
-  which leaked credentials are actually live.
+  auth, missing authz) and to feed Section-level sink inventories. CRITICAL:
+  run the LANGUAGE pack for the backend stack you found (e.g. `--config p/csharp`
+  for .NET, `p/java`, `p/python`, `p/golang`) STACKED with `p/owasp-top-ten`
+  (and `p/nosql` for a Mongo data layer). `--config auto` alone over-weights
+  config/YAML rules and routinely returns ONLY infrastructure findings while
+  missing the application backend entirely — do not stop at an infra-only result.
+- `gitleaks` — secret scanning. Default to `gitleaks dir <repo>` (working tree):
+  uploaded repos usually arrive with NO `.git`, so history-only mode finds
+  nothing — run `gitleaks git <repo>` ADDITIONALLY only when a `.git` dir exists.
+  Never conclude "no secrets" off an empty history scan.
+- `trufflehog` — secret discovery with live provider verification, to rank which
+  leaked credentials are actually live. Default to `trufflehog filesystem <repo>`
+  (uploads have no `.git`); add `git` history mode only when `.git` is present.
 - `osv-scanner` — dependency CVEs via OSV (SCA); flag vulnerable libraries that
   introduce category risk (e.g. a deserialization or SSRF CVE in a dependency).
+- `trivy` — all-in-one: SCA across MANY ecosystems (notably **NuGet/.NET**, which
+  osv-scanner misses without a committed lockfile) + IaC/Docker/Kubernetes
+  misconfig (deeper than semgrep's generic infra rules) + a filesystem secret
+  sweep. Use `trivy fs <repo> --scanners vuln,misconfig,secret`. Cross-check its
+  SCA against osv-scanner (different DBs) and its secrets against gitleaks.
 - `git-security-history` — mine THIS repo's OWN git history for prior
   security/fix commits and map them to recurring "hot files", folding in the
   `osv-scanner` (dependency CVEs) and `gitleaks` (history secrets) reports you
