@@ -225,6 +225,7 @@ export async function runScreenPanel(
 			}
 
 			writeVerdicts(deliverablesPath, category, entries, logger);
+			await progress.completed_(screenAgent, Date.now() - startedAt);
 			logger.info("screen-panel: category complete", {
 				category,
 				candidates: candidates.length,
@@ -236,6 +237,7 @@ export async function runScreenPanel(
 				error: err instanceof Error ? err.message : String(err),
 			});
 			writeVerdicts(deliverablesPath, category, [], logger);
+			await progress.failed(screenAgent, Date.now() - startedAt);
 		}
 	}
 }
