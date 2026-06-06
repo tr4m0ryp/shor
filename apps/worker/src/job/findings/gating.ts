@@ -63,6 +63,11 @@ const CATEGORY_ENFORCING_TIER: Record<FindingCategory, CoverageTier> = {
 	auth: "backend",
 	authz: "backend",
 	xss: "frontend",
+	// Business-logic invariants (workflow/state, mass assignment, race, GraphQL
+	// authz) and web-security misconfiguration (CORS/CSP, redirects, smuggling,
+	// JWT verification) are both enforced server-side.
+	logic: "backend",
+	"misconfig-web": "backend",
 };
 
 /** Tier whose coverage decides whether `category` is in/out of analyzed scope. */
