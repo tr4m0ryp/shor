@@ -106,4 +106,46 @@ describe("evaluateCoverage", () => {
 		);
 		expect(result.ran).toEqual(["sqlmap"]);
 	});
+
+	describe("below-floor shortfall signal (T4)", () => {
+		it("attaches a structured shortfall when below the floor", () => {
+			// injection-vuln floor is 2; one tool used → below floor.
+			const result = evaluateCoverage(
+				"injection-vuln",
+				readerFor("injection-vuln", ["sqlmap"]),
+			);
+			expect(result.ok).toBe(false);
+			expect(result.shortfall).toEqual({
+				belowFloor: true,
+				ranTools: 1,
+				requiredFloor: 2,
+				missing: result.missing,
+			});
+		});
+
+		it("omits the shortfall when the floor is met", () => {
+			const result = evaluateCoverage(
+				"injection-vuln",
+				readerFor("injection-vuln", ["sqlmap", "commix"]),
+			);
+			expect(result.ok).toBe(true);
+			expect(result.shortfall).toBeUndefined();
+		});
+
+		it("omits the shortfall for an agent with no policy", () => {
+			// "report" has no policy → ok with no shortfall.
+			expect(evaluateCoverage("report", () => []).shortfall).toBeUndefined();
+		});
+
+		it("shortfall.ranTools / requiredFloor mirror ran.length / floor", () => {
+			// recon floor is 6; only two distinct candidates exercised.
+			const result = evaluateCoverage(
+				"recon",
+				readerFor("recon", ["httpx", "nmap"]),
+			);
+			expect(result.ok).toBe(false);
+			expect(result.shortfall?.ranTools).toBe(result.ran.length);
+			expect(result.shortfall?.requiredFloor).toBe(result.floor);
+		});
+	});
 });
