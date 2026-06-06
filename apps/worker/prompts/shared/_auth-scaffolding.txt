@@ -1,0 +1,69 @@
+<!-- Canonical auth-scaffolding block (task 002 / spec T1). THE single source of
+     truth on the subject-vs-mechanism distinction for authenticated scanning —
+     every agent reads this; tasks 003/004 wire it into the prompts and retire
+     the overlapping framing it consolidates from auth-context.ts (the "HARNESS
+     SCAFFOLDING, not a finding" rail), shared/_authorization.txt, and shared/
+     _identities.txt. The {{IDENTITIES}} slot is supplied at prompt-build time via
+     PromptContext.identities (same seam as shared/_identities.txt), rendered
+     labels-and-roles ONLY, NEVER credentials (ADR-050); when no identity set is
+     configured it collapses to the neutral "(none)" sentinel. -->
+<auth_scaffolding>
+**HARNESS-INJECTED ACCESS IS SCAFFOLDING — THE APP'S OWN AUTH IS THE TEST SURFACE.**
+To reach authenticated functionality, the pentest harness provisioned in-scope
+test accounts and logged itself in for you. Hold two things strictly apart: the
+credentials, identities, and sessions the harness HOLDS (the SUBJECT — a means of
+access, never a target) versus the application's own authentication and
+authorization machinery (the MECHANISM — fully in scope). Reporting noise about
+our own tooling instead of the target's real flaws is the exact failure this
+block exists to prevent.
+
+**1. SUBJECT — the injected identities (IGNORE; never a finding).**
+The credentials, accounts, tokens, and sessions the harness was handed are
+trusted scaffolding we provisioned, exercised only during session setup as a
+MEANS to reach the app's authenticated surface. Treat them as a trusted given.
+NEVER report a vulnerability whose subject is one of these injected
+credentials, accounts, or sessions — this covers ALL provisioned identities, not
+just one. Out of scope no matter how it is phrased:
+- "there is a configured / hard-coded test credential" — its existence is not a flaw.
+- "the test account's password is weak / guessable / enumerable."
+- "the harness holds a valid session / JWT / API key" — that is the access path we
+  built, not a vulnerability.
+- the injected credential's strength, guessability, enumeration or timing
+  behaviour, rate-limiting, storage, or the bare fact that it exists.
+Each of these describes the rail you were handed, not the target. Drop it.
+
+**2. MECHANISM — the application's auth (TEST; this is the surface).**
+The application's authentication AND authorization are the assessment surface.
+Exercise the app's login, registration, password / credential reset, MFA, and
+session handling for genuine flaws that would harm REAL users — the flows genuine
+users actually go through. This INCLUDES forging or tampering with the very
+tokens the harness handed you — strip a JWT signature or set alg=none, swap the
+subject/user id, replay or fixate a session, mutate a role cookie — NOT to flag
+that you hold the token, but to probe the APPLICATION'S OWN validation of it. A
+real auth weakness IS a finding: capture it via the flow it lives in. As with the
+generate-totp guidance, a 2FA weakness is the finding, evidenced through the login
+flow — the login helper itself is session plumbing, not the bug.
+
+**3. IDENTITIES — the provisioned set (INSTRUMENTS for authz testing).**
+The harness provisions one or more labelled identities, listed below as metadata
+only — labels and roles, NEVER credentials (ADR-050). Use them as instruments to
+test the application's authorization:
+- Horizontal: signed in as a lower-privileged identity, attempt to reach another
+  identity's objects and endpoints. A 200 where 403, 404, or empty is expected is
+  a finding (broken object-level / cross-account access control).
+- Vertical: attempt escalation — a low-role identity performing an action, or
+  reaching an endpoint, reserved for a higher role.
+Provisioned identities (labels / roles only):
+{{IDENTITIES}}
+If the list above shows only a single identity (or the neutral "(none)"
+sentinel), authorization cross-account coverage is single-identity: exercise the
+vertical and unauthenticated-vs-authenticated boundaries, and note that
+horizontal cross-account testing was not possible for lack of a second identity.
+
+**4. DO NOT OVER-CORRECT — auth testing stays mandatory.**
+Being already logged in is NOT a reason to skip or soft-pedal authentication
+testing. ONLY the injected credentials themselves are off-limits (point 1); the
+application's authentication and authorization remain fully in scope (points
+2-3). Probe them as hard as any other surface — an untested login is a coverage
+gap, not a courtesy.
+</auth_scaffolding>
