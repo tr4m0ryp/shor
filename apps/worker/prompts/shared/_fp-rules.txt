@@ -1,9 +1,16 @@
-<!-- scaffold: filled by the false-positive-rules phase (task 016). Supply the
-     rendered precedents via PromptContext.fpRules, and/or replace this framing
-     prose. Until then the {{FP_RULES}} slot renders the neutral sentinel. -->
+<!-- Org false-positive precedents (task 016). The rendered rules are supplied at
+     prompt-build time via PromptContext.fpRules — assembleScanPromptContext reads
+     the SHOR_FP_RULES env var; when none are configured the {{FP_RULES}} slot
+     renders the neutral "(none)" sentinel and this whole block is a no-op. Applies
+     at the VERIFICATION / SCREEN lane only — never at discovery, where suppressing
+     a candidate would cost recall. -->
 <false_positive_rules>
-Organisation false-positive precedents — findings matching these patterns have
-been reviewed before and judged non-issues; do not re-report them without new,
-materially stronger evidence:
+The operator has flagged these patterns as known false positives for THIS system.
+When verifying or screening a finding, do not flag findings that match them; treat
+them as out-of-scope precedents — already adjudicated, not re-litigated here:
+
 {{FP_RULES}}
+
+If the block above reads "(none)", no org-specific false-positive rules are
+configured; this section is a no-op — screen normally and suppress nothing.
 </false_positive_rules>
