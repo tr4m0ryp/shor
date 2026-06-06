@@ -499,7 +499,7 @@ export async function finalizeViaCli(
 	const config = resolveCliConfig(deliverablesPath);
 	if (!config) return;
 
-	const findings = collectFindings(deliverablesPath, logger);
+	const findings = await collectFindings(deliverablesPath, logger);
 	if (findings.length === 0) return;
 
 	logger.info("CLI finalization starting", {

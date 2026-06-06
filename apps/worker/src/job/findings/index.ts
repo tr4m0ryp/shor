@@ -106,13 +106,14 @@ function applyImprovedText(
  * findings are NEVER gated (a live PoC overrides missing source). When no
  * manifest exists, no gating is applied (full-stack scans must not regress).
  *
- * The return type stays `FindingRecord[]` (the emitted set) so the synchronous
- * callers in cli-finalization.ts are untouched.
+ * Returns the emitted set. ASYNC: the dedup-judge pass (T12, opt-in) runs an LLM
+ * per finding, so this and its callers await it; when the judge is disabled the
+ * pass is an immediate identity no-op (the emitted set is byte-for-byte unchanged).
  */
-export function collectFindings(
+export async function collectFindings(
 	deliverablesPath: string,
 	logger: ActivityLogger,
-): FindingRecord[] {
+): Promise<FindingRecord[]> {
 	const vulns = readQueues(deliverablesPath, logger);
 
 	// Enrich each vuln with its evidence disposition + prose (per category). The
@@ -179,10 +180,10 @@ export function collectFindings(
 	const emitted = gateAndMapFindings(deliverablesPath, vulns, logger);
 	const improved = applyImprovedText(deliverablesPath, emitted, logger);
 
-	// Final emitted-set passes (ordered): cluster near-duplicates, then grade. Both
-	// are identity no-ops today (tasks 014/015 fill them), so the emitted set is
-	// unchanged.
-	const clustered = clusterFindings(improved, { deliverablesPath, logger });
+	// Final emitted-set passes (ordered): cluster near-duplicates by root cause
+	// (T12, async + opt-in), then grade. `gradeFindings` is an identity no-op today
+	// (task 015); the dedup pass is identity unless the judge is enabled.
+	const clustered = await clusterFindings(improved, { deliverablesPath, logger });
 	return gradeFindings(clustered, { deliverablesPath, logger });
 }
 
@@ -212,7 +213,7 @@ export async function reportFindings(
 	let findings: FindingRecord[] = [];
 	let attackSurface: Record<string, unknown> | undefined;
 	try {
-		findings = collectFindings(deliverablesPath, logger);
+		findings = await collectFindings(deliverablesPath, logger);
 		// Surface the gated-out manual-review findings to the DASHBOARD as well —
 		// they carry the `unverified_out_of_scope` disposition, so the UI segregates
 		// them behind a "manual review" filter and they never enter the attack
