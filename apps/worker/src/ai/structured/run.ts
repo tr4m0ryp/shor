@@ -88,6 +88,7 @@ export async function runStructured<T>(args: RunStructuredArgs): Promise<Structu
     deliverablesSubdir,
     providerConfig,
     extraEnv,
+    maxTurns,
   } = args;
 
   let raw: ClaudePromptResult;
