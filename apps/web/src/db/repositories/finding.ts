@@ -62,6 +62,32 @@ export const findingRepo = {
     return rows.map((r) => r.fingerprint);
   },
 
+  /**
+   * Refresh an existing finding's `data` JSONB in place (idempotent re-ingest of
+   * the same fingerprint within a scan). The worker posts findings incrementally
+   * as agents finish — the first post lands the analysis hypothesis (`queued` →
+   * `firm`), and later posts carry the live-exploitation disposition
+   * (`exploited` → `confirmed`) and improved prose. Without this update the first
+   * write froze every finding at `firm`. Optionally refreshes the `status` column
+   * (kept as-is when `status` is null/omitted so a computed diff status survives).
+   */
+  async updateData(
+    tenantId: TenantId,
+    id: FindingId,
+    data: NewFinding['data'],
+    status?: FindingStatus | null,
+  ): Promise<Finding | null> {
+    const { rows } = await query<FindingRow>(
+      `UPDATE finding f SET data = $3, status = COALESCE($4, f.status)
+				 FROM scan s, project p
+				 WHERE s.id = f.scan_id AND p.id = s.project_id
+				   AND p.tenant_id = $1 AND f.id = $2
+				 RETURNING f.*`,
+      [tenantId, id, data, status ?? null],
+    );
+    return rows[0] ? toFinding(rows[0]) : null;
+  },
+
   async updateStatus(tenantId: TenantId, id: FindingId, status: FindingStatus): Promise<Finding | null> {
     const { rows } = await query<FindingRow>(
       `UPDATE finding f SET status = $3
