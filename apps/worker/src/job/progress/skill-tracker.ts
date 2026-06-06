@@ -20,14 +20,40 @@
 /** Skill names that map to an on-PATH CLI (mirror of the repo `skills/` dirs). */
 const KNOWN_SKILLS: ReadonlySet<string> = new Set([
 	// recon
-	"arjun", "dnsx", "ffuf", "gau", "httpx", "katana", "kxss", "naabu", "nmap",
-	"nuclei", "paramspider", "subfinder", "wafw00f", "waybackurls",
+	"arjun",
+	"dnsx",
+	"ffuf",
+	"gau",
+	"httpx",
+	"katana",
+	"kxss",
+	"naabu",
+	"nmap",
+	"nuclei",
+	"paramspider",
+	"subfinder",
+	"wafw00f",
+	"waybackurls",
 	// exploit
-	"authz-recipe", "commix", "dalfox", "generate-totp", "hydra",
-	"interactsh-client", "jwt_tool", "nosqli", "playwright", "sqlmap", "ssrfmap",
-	"sstimap", "xsstrike",
+	"authz-recipe",
+	"commix",
+	"dalfox",
+	"generate-totp",
+	"hydra",
+	"interactsh-client",
+	"jwt_tool",
+	"nosqli",
+	"playwright",
+	"sqlmap",
+	"ssrfmap",
+	"sstimap",
+	"xsstrike",
 	// static-analysis
-	"gitleaks", "osv-scanner", "semgrep", "trivy", "trufflehog",
+	"gitleaks",
+	"osv-scanner",
+	"semgrep",
+	"trivy",
+	"trufflehog",
 ]);
 
 /** Normalize a Bash leading token (strip path, drop a `.py`/`.sh` suffix). */
@@ -41,10 +67,17 @@ function normalizeToken(tok: string): string {
  * wins (e.g. a future `Skill` tool); otherwise parse a Bash command's first
  * meaningful token (skipping `sudo`/env-assignments) and match a known skill.
  */
-function skillForToolUse(toolName: string, params: Record<string, unknown>): string | null {
+function skillForToolUse(
+	toolName: string,
+	params: Record<string, unknown>,
+): string | null {
 	const direct = normalizeToken(toolName);
 	if (KNOWN_SKILLS.has(direct)) return direct;
-	if (toolName === "Skill" && typeof params.name === "string" && KNOWN_SKILLS.has(params.name)) {
+	if (
+		toolName === "Skill" &&
+		typeof params.name === "string" &&
+		KNOWN_SKILLS.has(params.name)
+	) {
 		return params.name;
 	}
 	if (toolName !== "Bash") return null;
@@ -67,7 +100,11 @@ class SkillTracker {
 	/** Record a tool_use against `agent` if it maps to a known skill. Attributing
 	 *  by explicit agent (not a global "current") keeps it correct when agents
 	 *  run concurrently. */
-	record(agent: string, toolName: string, params: Record<string, unknown>): void {
+	record(
+		agent: string,
+		toolName: string,
+		params: Record<string, unknown>,
+	): void {
 		if (!agent) return;
 		const skill = skillForToolUse(toolName, params);
 		if (!skill) return;
