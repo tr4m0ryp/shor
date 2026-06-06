@@ -46,3 +46,35 @@ export const PLAYWRIGHT_SESSION_MAPPING: Record<string, PlaywrightSession> =
 		// Phase 6: Attack-Surface Synthesis
 		"attack-surface": "agent3",
 	});
+
+/**
+ * Identity-scoped Playwright session label (task 008). A template-literal type
+ * disjoint from {@link PlaywrightSession} (`agent1`..`agent5`): an identity
+ * session is NEVER one of the phase sessions, so an authz agent acting as
+ * identity A vs B cannot collide with — or bleed cookies into — a phase browser.
+ */
+export type IdentitySessionLabel = `identity-${string}`;
+
+/**
+ * Slugify an identity label into a deterministic, credential-free, filesystem-
+ * safe token: lowercase, every run of non-alphanumerics collapses to a single
+ * hyphen, leading/trailing hyphens trimmed. Degenerate input (empty / all
+ * punctuation) falls back to a stable token so a label never yields "".
+ */
+export function identitySlug(label: string): string {
+	const slug = label
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	return slug.length > 0 ? slug : "identity";
+}
+
+/**
+ * Deterministic, credential-free Playwright session label for an identity —
+ * `identity-<slug>`. Namespaced away from the `agent1`..`agent5` phase sessions
+ * so each identity keeps its cookies in its own browser profile (no cross-
+ * identity bleed). Built from the label ONLY — never from any credential.
+ */
+export function identitySessionLabel(label: string): IdentitySessionLabel {
+	return `identity-${identitySlug(label)}`;
+}
