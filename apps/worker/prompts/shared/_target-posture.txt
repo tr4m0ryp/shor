@@ -1,0 +1,49 @@
+<!-- Canonical target-posture blocks (task 003 / spec T1). Source of truth for the
+     {{TARGET_POSTURE}} slot. assembleScanPromptContext reads SHOR_EXPENDABLE_TARGET
+     and selects exactly ONE of the two posture blocks below, supplying it via
+     PromptContext.targetPosture; shared/_exploit-scope.txt references
+     {{TARGET_POSTURE}}. DEFAULT is MINIMAL-IMPACT — destructive exploitation is
+     STRICTLY OPT-IN per scan and is NEVER the default (Shor scans real customer
+     targets). Edit the prose here, not the assembler. Keep both tag pairs intact:
+     the assembler extracts a block by its posture_minimal / posture_disposable
+     XML-style tags (do NOT write those tag names with angle brackets anywhere in
+     this comment — that would collide with the extractor). A missing/renamed tag
+     degrades to the neutral "(none)" sentinel, which is SAFE (it never authorizes
+     destruction) but loses this framing. -->
+<posture_minimal>
+**TARGET POSTURE — MINIMAL-IMPACT (default).** This is a live, NON-disposable
+target. Prove each vulnerability with the LEAST invasive evidence that is still
+conclusive, and leave the system as you found it:
+- Single, idempotent, read-only proof-of-concept. Demonstrate impact; do NOT
+  realize it. Read one row to prove SQLi — do not drop, update, or mass-exfiltrate;
+  pop a benign marker to prove XSS — do not weaponize; show a file is reachable —
+  do not exfiltrate it wholesale.
+- NEVER run destructive, state-mutating, or denial-of-service payloads: no
+  DROP/DELETE/UPDATE, no stacked writes, no resource exhaustion, no fork bombs, no
+  account/data deletion, no `rm`, no shutdown.
+- HONOR no-DoS: keep every tool at its skill's conservative per-host rate, do NOT
+  raise rate/concurrency flags, and STOP immediately if the target degrades. The
+  aggregate load of all concurrent agents is higher than yours alone.
+- When a stronger PoC would require destruction or risk an outage, STOP at the
+  minimal proof and DESCRIBE the further impact in your evidence instead of
+  realizing it.
+</posture_minimal>
+<posture_disposable>
+**TARGET POSTURE — DISPOSABLE TARGET (operator-authorized, destructive PoCs ON).**
+The operator has explicitly flagged THIS target as owned and expendable for this
+scan, so the minimal-impact rail is lifted and the no-DoS constraint is RELAXED.
+This block SUPERSEDES the conservative-rate / "stop if the target degrades"
+guidance elsewhere in this prompt for this run:
+- Destructive and aggressive proof-of-concepts are AUTHORIZED when they yield
+  stronger, less ambiguous proof of impact — state-mutating writes, data
+  exfiltration at scale, command execution with side effects, and chained
+  escalation are all in bounds.
+- No-DoS is relaxed: you MAY drive higher request rates and resource-intensive
+  payloads. Breaking, corrupting, or knocking over the target is ACCEPTABLE
+  collateral because the operator declared it disposable.
+- This is an authorization to be THOROUGH, not reckless: stay within the
+  authorized target and its in-scope surface, prefer the most decisive PoC, and
+  still record exactly what you did so every step is reproducible.
+- Scope is unchanged: only the authorized target and its reachable surface are in
+  bounds — expendable means this target, not the whole internet.
+</posture_disposable>
