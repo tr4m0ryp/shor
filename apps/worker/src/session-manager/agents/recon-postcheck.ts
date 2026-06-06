@@ -184,6 +184,10 @@ const GAP_REASONS: Record<string, string> = {
 		"the report references an API but no `api_access.json` recipe was recorded for downstream",
 	"api-access-base": "`api_access.json` is missing `apiBase` (host+port+path)",
 	"api-access-auth": "`api_access.json` is missing `authScheme`",
+	"api-access-token-source":
+		"token-bearing `authScheme` but no credential-free `tokenSource` — downstream " +
+		"cannot find the live token (it lives in the named session's storage-state) and " +
+		"will re-derive auth",
 	"api-access-secret":
 		"`api_access.json` appears to contain a SECRET (e.g. a JWT) — it MUST be credential-free",
 };
