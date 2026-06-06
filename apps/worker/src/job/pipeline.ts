@@ -26,6 +26,10 @@ import type { ScanJobParams } from "./env.js";
 import { bootstrapIdentities } from "../services/identity/index.js";
 import { runOraclePhase } from "../services/oracle/index.js";
 import { runScreenPanel } from "../services/screen-panel/index.js";
+import {
+	restoreCheckpoint,
+	saveCheckpoint,
+} from "../services/checkpoint/index.js";
 import { reportFindings } from "./findings/index.js";
 import { recordExploitLaneOutcome } from "./findings/lane-status.js";
 import { ProgressEmitter } from "./progress/index.js";
