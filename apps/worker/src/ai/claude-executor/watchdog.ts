@@ -47,7 +47,10 @@ const STAGNATION_PHRASES: readonly RegExp[] = [
 ];
 
 const MAX_STAGNATION_STREAK = 8;
-const MAX_TURNS_AFTER_SAVE = 25;
+// Turns with NO save-deliverable that count as a stale loop. Resets on every save
+// (see recordAssistantTurn), so this is the budget BETWEEN saves, not from the
+// first one. Headroom for a large deliverable chunked across several turns.
+const MAX_TURNS_AFTER_SAVE = 40;
 
 export interface WatchdogState {
 	stagnationStreak: number;
