@@ -926,6 +926,27 @@ The model — same rail as the primary login, applied per identity:
   `attacker` identity reaching the `victim`'s objects or endpoints (a 200 where
   403/404/empty is expected) is broken object-level access control; a low-role
   identity performing or reaching a higher-role action is privilege escalation.
+- **Prerequisite (check this FIRST) — the target must authenticate *distinct*
+  users.** Before adding `identities[]`, confirm a *different* credential yields a
+  *different* user with its own data. Many schemes collapse to ONE identity and
+  cannot do cross-account testing no matter how many credentials you supply:
+  - a single shared **API key** (every key-holder authenticates as the same
+    service user — e.g. a handler that maps any valid key to one `ApiUserName`);
+  - a single-user **dev/mock auth** (e.g. a `MockUserService` whose "current user"
+    is hardcoded to one account, often with *all* roles);
+  - a **service account** / machine token.
+  Read the target's auth handler + user service to decide. If a different
+  credential does NOT produce a different user, the target is single-identity —
+  **do not fabricate a second identity** (it won't authenticate; the bootstrap
+  just degrades to single-identity). Configure a single identity and accept the
+  fallback below: the authz lane still runs **white-box static analysis** (it finds
+  missing object-/role-level authorization checks by reading the code) plus
+  single-user probing — only the *live two-account confirmation* is skipped. To get
+  real cross-account testing on a single-auth target you control, you must first
+  make the target expose ≥2 distinct users (e.g. make the mock user selectable per
+  request and seed each with its own data) — that modifies the target, so do it
+  deliberately, and ideally give the second user a *narrower* role so vertical
+  escalation is meaningful too.
 - **Prerequisite — seeded data.** The target must already hold **data owned by
   each identity** (orders, documents, messages, etc.) for cross-account probes to
   land; the `victim` needs real objects for the `attacker` to try to reach. With
