@@ -6,20 +6,32 @@
 
 import { fs, path } from "zx";
 
+import type { ActivityLogger } from "../../types/activity-logger.js";
 import type { AgentDefinition, AgentValidator } from "../../types/index.js";
+import { runReconPostChecks } from "./recon-postcheck.js";
+
+const DELIVERABLE = "recon_deliverable.md";
 
 export const reconAgent: AgentDefinition = {
 	name: "recon",
 	displayName: "Recon agent",
 	prerequisites: ["pre-recon"],
 	promptTemplate: "recon",
-	deliverableFilename: "recon_deliverable.md",
+	deliverableFilename: DELIVERABLE,
 };
 
-/** Validates the recon deliverable. */
+/**
+ * Validate the recon deliverable: it MUST exist, and — when it does — run the
+ * deterministic tool-floor audit so a silently-skipped live-recon tool (e.g. a
+ * never-run `nuclei`) is surfaced rather than passing as "done". The audit is
+ * best-effort and never blocks; only a missing deliverable fails validation.
+ */
 export const reconValidator: AgentValidator = async (
 	sourceDir: string,
+	logger: ActivityLogger,
 ): Promise<boolean> => {
-	const reconFile = path.join(sourceDir, "recon_deliverable.md");
-	return await fs.pathExists(reconFile);
+	const reconFile = path.join(sourceDir, DELIVERABLE);
+	if (!(await fs.pathExists(reconFile))) return false;
+	await runReconPostChecks(sourceDir, reconFile, logger);
+	return true;
 };
