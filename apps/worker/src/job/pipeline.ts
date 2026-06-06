@@ -200,6 +200,18 @@ export async function runScanPipeline(
 		logger,
 	};
 
+	// Parallel-group width: full by default (all agents at once), or the
+	// operator-set SHOR_GROUP_CONCURRENCY. Applies to vuln / screen / exploit.
+	const groupWidth = resolveGroupWidth(
+		params.groupConcurrency,
+		VULN_AGENTS.length,
+	);
+	logger.info("Parallel-group width", {
+		scanId: params.scanId,
+		groupWidth,
+		configured: params.groupConcurrency ?? "full",
+	});
+
 	// 0) Multi-identity bootstrap (task 008) — provision per-identity session slots
 	// and write scan_identities.json BEFORE the prereq loop, so even threat-model
 	// sees the identity set. Best-effort: bootstrapIdentities never throws, but we
