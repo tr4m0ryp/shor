@@ -107,6 +107,7 @@ export async function runStructured<T>(args: RunStructuredArgs): Promise<Structu
       deliverablesSubdir,
       providerConfig,
       extraEnv,
+      maxTurns,
     );
   } catch (error) {
     // `runClaudePrompt` is designed to swallow its own errors, but guard anyway
