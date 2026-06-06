@@ -51,8 +51,22 @@ const VULN_AGENTS: readonly AgentName[] = ["injection-vuln", "xss-vuln", "auth-v
 const EXPLOIT_AGENTS: readonly AgentName[] = ["injection-exploit", "xss-exploit", "auth-exploit", "ssrf-exploit", "authz-exploit", "logic-exploit", "misconfig-web-exploit"];
 const SYNTHESIS_AGENTS: readonly AgentName[] = ["report", "attack-surface"];
 
-/** Max agents running at once within a parallel group. */
-const GROUP_CONCURRENCY = 2;
+/**
+ * Effective parallel-group width (vuln / screen / exploit). Unset config → FULL
+ * width — every agent in the group at once. DeepSeek flash allows ~2500 concurrent
+ * requests, so the LLM is not the bound; the old 2-wide cap was a RAM/rate guess
+ * that no longer applies. `SHOR_GROUP_CONCURRENCY` dials it down (e.g. to spare a
+ * fragile target). Clamped to the group size.
+ */
+export function resolveGroupWidth(
+	configured: number | undefined,
+	groupSize: number,
+): number {
+	if (configured !== undefined && configured > 0) {
+		return Math.min(configured, groupSize);
+	}
+	return groupSize;
+}
 
 /** Per-agent metrics summary returned to the entrypoint. */
 export interface AgentRunSummary {
