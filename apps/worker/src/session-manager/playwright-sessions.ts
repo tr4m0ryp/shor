@@ -18,19 +18,27 @@ export const PLAYWRIGHT_SESSION_MAPPING: Record<string, PlaywrightSession> =
 		// Phase 2: Reconnaissance
 		recon: "agent2",
 
-		// Phase 3: Vulnerability Analysis (5 parallel agents)
+		// Phase 3: Vulnerability Analysis (7 parallel agents — one DISTINCT browser
+		// session each so a full-width group never shares a profile. logic +
+		// misconfig-web were unmapped and fell back to agent1, colliding with
+		// injection under parallelism; agent6/agent7 give them their own.)
 		"vuln-injection": "agent1",
 		"vuln-xss": "agent2",
 		"vuln-auth": "agent3",
 		"vuln-ssrf": "agent4",
 		"vuln-authz": "agent5",
+		"vuln-logic": "agent6",
+		"vuln-misconfig-web": "agent7",
 
-		// Phase 4: Exploitation (5 parallel agents - same as vuln counterparts)
+		// Phase 4: Exploitation (7 parallel agents — same per-category session as the
+		// vuln counterpart so the established browser/auth state is reused).
 		"exploit-injection": "agent1",
 		"exploit-xss": "agent2",
 		"exploit-auth": "agent3",
 		"exploit-ssrf": "agent4",
 		"exploit-authz": "agent5",
+		"exploit-logic": "agent6",
+		"exploit-misconfig-web": "agent7",
 
 		// Phase 4b: Exploit retry pass (same session assignments; runs sequentially
 		// after the primary pass so there is no browser contention)
