@@ -29,19 +29,6 @@ export const preReconAgent: AgentDefinition = {
 const DELIVERABLE = "pre_recon_deliverable.md";
 
 /**
- * Derive the cloned-repo root from the deliverables directory. Deliverables
- * live under `<repoPath>/.storron/deliverables[/...]`, so the repo root is the
- * parent of the nearest `.storron` ancestor. Falls back to two levels up (the
- * default `.storron/deliverables` depth) when no `.storron` segment is found.
- */
-function repoRootFromDeliverables(sourceDir: string): string {
-	const parts = sourceDir.split(path.sep);
-	const idx = parts.lastIndexOf(".storron");
-	if (idx > 0) return parts.slice(0, idx).join(path.sep) || path.sep;
-	return path.resolve(sourceDir, "..", "..");
-}
-
-/**
  * Always emit `coverage_manifest.json` (T1 shared contract) into the
  * deliverables dir. Prefer the manifest the pre-recon agent confirmed/overrode
  * in its deliverable; otherwise seed it from a deterministic classification of
