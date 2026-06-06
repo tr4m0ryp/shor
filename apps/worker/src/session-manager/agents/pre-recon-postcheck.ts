@@ -28,12 +28,11 @@
  */
 
 import { fs, path } from "zx";
-
+import type { CoverageAudit } from "../../job/coverage/census.js";
 import {
 	auditCoverage,
 	collectBackendSourceFiles,
 } from "../../job/coverage/census.js";
-import type { CoverageAudit } from "../../job/coverage/census.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 
 /** Emitted artifacts (siblings of the deliverable). */
@@ -56,10 +55,18 @@ const REQUIRED_SECTIONS: ReadonlyArray<{
 	title: string;
 	keywords: string[];
 }> = [
-	{ num: 3, title: "Authentication & Authorization Deep Dive", keywords: ["auth"] },
+	{
+		num: 3,
+		title: "Authentication & Authorization Deep Dive",
+		keywords: ["auth"],
+	},
 	{ num: 5, title: "Attack Surface Analysis", keywords: ["attack surface"] },
 	{ num: 7, title: "Injection Sources", keywords: ["injection"] },
-	{ num: 8, title: "Critical File Paths", keywords: ["critical file", "file path"] },
+	{
+		num: 8,
+		title: "Critical File Paths",
+		keywords: ["critical file", "file path"],
+	},
 	{ num: 9, title: "XSS Sinks and Render Contexts", keywords: ["xss"] },
 	{ num: 10, title: "SSRF Sinks", keywords: ["ssrf"] },
 ];
@@ -106,7 +113,12 @@ export function auditSections(text: string): SectionAudit {
 	const sections: SectionInfo[] = REQUIRED_SECTIONS.map((req) => {
 		const hit = found.get(req.num);
 		if (!hit) {
-			return { num: req.num, expectedTitle: req.title, present: false, drifted: false };
+			return {
+				num: req.num,
+				expectedTitle: req.title,
+				present: false,
+				drifted: false,
+			};
 		}
 		const lower = hit.headingText.toLowerCase();
 		const drifted = !req.keywords.some((k) => lower.includes(k));
@@ -170,7 +182,9 @@ export function buildAuditAppendix(
 				`anywhere in this report — they are unaudited source and downstream ` +
 				`agents SHOULD treat them as a blind spot to re-examine:\n\n` +
 				sample.map((f) => `- \`${f}\``).join("\n") +
-				(more > 0 ? `\n- …and **${more}** more (see \`${COVERAGE_AUDIT_FILENAME}\`).` : ""),
+				(more > 0
+					? `\n- …and **${more}** more (see \`${COVERAGE_AUDIT_FILENAME}\`).`
+					: ""),
 		);
 	}
 
@@ -219,7 +233,11 @@ export async function runPreReconPostChecks(
 		await fs.writeFile(
 			path.join(sourceDir, INDEX_FILENAME),
 			`${JSON.stringify(
-				buildPreReconIndex(path.basename(deliverablePath), sectionAudit, coverage),
+				buildPreReconIndex(
+					path.basename(deliverablePath),
+					sectionAudit,
+					coverage,
+				),
 				null,
 				2,
 			)}\n`,
@@ -250,9 +268,12 @@ export async function runPreReconPostChecks(
 			);
 		}
 		if (sectionAudit.drifted.length > 0) {
-			logger.warn("pre-recon deliverable headings drifted from the parse contract", {
-				drifted: sectionAudit.drifted,
-			});
+			logger.warn(
+				"pre-recon deliverable headings drifted from the parse contract",
+				{
+					drifted: sectionAudit.drifted,
+				},
+			);
 		}
 	} catch (err) {
 		logger.warn("pre-recon post-checks failed (continuing)", {

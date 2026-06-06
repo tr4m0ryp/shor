@@ -5,14 +5,13 @@
 // as published by the Free Software Foundation.
 
 import { fs, path } from "zx";
-
+import type { CoverageManifest } from "../../job/coverage/index.js";
 import {
 	buildManifestFromRepo,
 	isTierCovered,
 	readManifest,
 	writeManifest,
 } from "../../job/coverage/index.js";
-import type { CoverageManifest } from "../../job/coverage/index.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import type { AgentDefinition, AgentValidator } from "../../types/index.js";
 import { runPreReconPostChecks } from "./pre-recon-postcheck.js";
@@ -138,7 +137,9 @@ export const preReconValidator: AgentValidator = async (
 			!isTierCovered(manifest, "backend");
 
 		const coverage = path.join(sourceDir, "coverage_check.md");
-		const notes = (await fs.pathExists(coverage)) ? await fs.readFile(coverage, "utf8") : "";
+		const notes = (await fs.pathExists(coverage))
+			? await fs.readFile(coverage, "utf8")
+			: "";
 
 		const scopeNote = clientOnly
 			? `The uploaded repository classifies as CLIENT-TIER ONLY (frontend present, ` +

@@ -45,7 +45,10 @@ describe("auditSections", () => {
 
 	it("flags a drifted heading (right number, wrong title)", () => {
 		const audit = auditSections(
-			FULL.replace("## 9. XSS Sinks and Render Contexts", "## 9. Output Encoding"),
+			FULL.replace(
+				"## 9. XSS Sinks and Render Contexts",
+				"## 9. Output Encoding",
+			),
 		);
 		expect(audit.drifted).toContain(9);
 		expect(audit.missing).not.toContain(9);
@@ -81,7 +84,12 @@ describe("buildAuditAppendix", () => {
 	});
 
 	it("surfaces section-contract warnings", () => {
-		const audit = auditSections(FULL.replace("## 7. Injection Sources (Command Injection and SQL Injection)", ""));
+		const audit = auditSections(
+			FULL.replace(
+				"## 7. Injection Sources (Command Injection and SQL Injection)",
+				"",
+			),
+		);
 		const appendix = buildAuditAppendix(fullCoverage, audit);
 		expect(appendix).toContain("Missing required sections");
 		expect(appendix).toContain("7");
