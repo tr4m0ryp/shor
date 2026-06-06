@@ -5,7 +5,7 @@
 // as published by the Free Software Foundation.
 
 import { PentestError } from "../../services/error-handling.js";
-import type { Config, Rule } from "../../types/config.js";
+import type { Config, Identity, Rule } from "../../types/config.js";
 import { ErrorCode } from "../../types/errors.js";
 import { checkForConflicts, checkForDuplicates } from "./duplicates.js";
 import { validateRuleTypeSpecific } from "./rule-types.js";
@@ -75,6 +75,15 @@ export const performSecurityValidation = (config: Config): void => {
 				}
 			});
 		}
+
+		// Secondary identities (task 008): the same dangerous-pattern gate the
+		// primary credentials pass — so a malicious label/role/credential can never
+		// ride in through the multi-identity path.
+		if (auth.identities) {
+			auth.identities.forEach((identity, index) =>
+				validateIdentitySecurity(identity, index),
+			);
+		}
 	}
 
 	if (config.rules) {
@@ -94,6 +103,41 @@ export const performSecurityValidation = (config: Config): void => {
 					"config",
 					false,
 					{ field: "description", pattern: pattern.source },
+					ErrorCode.CONFIG_VALIDATION_FAILED,
+				);
+			}
+		}
+	}
+};
+
+/**
+ * Run the dangerous-pattern gate over one secondary identity's non-secret
+ * metadata (label/role) and its credentials. Field paths mirror the AJV/primary
+ * messages so an operator sees exactly which identity tripped the gate.
+ */
+export const validateIdentitySecurity = (
+	identity: Identity,
+	index: number,
+): void => {
+	const checks: Array<[string, string | undefined]> = [
+		["label", identity.label],
+		["role", identity.role],
+		["credentials.username", identity.credentials?.username],
+		["credentials.password", identity.credentials?.password],
+		["success_condition.value", identity.success_condition?.value],
+	];
+	for (const [field, value] of checks) {
+		if (value === undefined) continue;
+		for (const pattern of DANGEROUS_PATTERNS) {
+			if (pattern.test(value)) {
+				throw new PentestError(
+					`authentication.identities[${index}].${field} contains potentially dangerous pattern: ${pattern.source}`,
+					"config",
+					false,
+					{
+						field: `identities[${index}].${field}`,
+						pattern: pattern.source,
+					},
 					ErrorCode.CONFIG_VALIDATION_FAILED,
 				);
 			}

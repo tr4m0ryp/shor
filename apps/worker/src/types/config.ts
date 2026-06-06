@@ -44,12 +44,35 @@ export interface Credentials {
 	totp_secret?: string;
 }
 
+/**
+ * A single authentication identity (task 008 — multi-identity provisioning).
+ *
+ * The top-level {@link Authentication.credentials} is always the PRIMARY identity;
+ * each entry in {@link Authentication.identities} is an ADDITIONAL identity that
+ * shares the primary's `login_type` / `login_url` / `login_flow` but logs in with
+ * its own `credentials` (and, when the post-login landing differs by role, its own
+ * `success_condition`). `label`/`role` are non-secret metadata — the ONLY fields
+ * ever surfaced to prompts/artifacts (ADR-050); `credentials` never leaves runtime.
+ */
+export interface Identity {
+	label: string;
+	role?: string;
+	credentials: Credentials;
+	success_condition?: SuccessCondition;
+}
+
 export interface Authentication {
 	login_type: LoginType;
 	login_url: string;
 	credentials: Credentials;
 	login_flow?: string[];
 	success_condition: SuccessCondition;
+	/**
+	 * Optional secondary identities for cross-account / privilege-escalation
+	 * authorization testing (IDOR/BOLA). Absent (or fewer than two total) means
+	 * single-identity coverage — the pipeline behaves exactly as before.
+	 */
+	identities?: Identity[];
 }
 
 export interface Config {
