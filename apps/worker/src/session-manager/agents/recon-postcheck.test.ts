@@ -13,27 +13,36 @@ import {
 } from "./recon-postcheck.js";
 
 const CLEAN_FLOOR = auditReconFloor("nmap httpx nuclei", []);
-const RECIPE = JSON.stringify({ apiBase: "http://h:8080/", authScheme: "oidc-bearer" });
-const CLEAN_API = auditApiAccess(JSON.parse(RECIPE), RECIPE, "uses /api on :8080");
+const RECIPE = JSON.stringify({
+	apiBase: "http://h:8080/",
+	authScheme: "oidc-bearer",
+});
+const CLEAN_API = auditApiAccess(
+	JSON.parse(RECIPE),
+	RECIPE,
+	"uses /api on :8080",
+);
 
 describe("auditReconFloor", () => {
 	it("floor fully met when every floor tool leaves evidence", () => {
-		expect(auditReconFloor("nmap httpx nuclei :8080", []).missingFloor).toEqual([]);
+		expect(auditReconFloor("nmap httpx nuclei :8080", []).missingFloor).toEqual(
+			[],
+		);
 	});
 
 	it("port-scan floor satisfied by EITHER naabu or nmap", () => {
-		expect(auditReconFloor("nmap; httpx; nuclei", []).missingFloor).not.toContain(
-			"port-scan",
-		);
-		expect(auditReconFloor("naabu; httpx; nuclei", []).missingFloor).not.toContain(
-			"port-scan",
-		);
+		expect(
+			auditReconFloor("nmap; httpx; nuclei", []).missingFloor,
+		).not.toContain("port-scan");
+		expect(
+			auditReconFloor("naabu; httpx; nuclei", []).missingFloor,
+		).not.toContain("port-scan");
 	});
 
 	it("flags a silently-skipped nuclei (the scan-00006 gap)", () => {
-		expect(auditReconFloor("naabu nmap httpx katana arjun", []).missingFloor).toEqual([
-			"nuclei",
-		]);
+		expect(
+			auditReconFloor("naabu nmap httpx katana arjun", []).missingFloor,
+		).toEqual(["nuclei"]);
 	});
 
 	it("counts scratchpad filenames as evidence", () => {
