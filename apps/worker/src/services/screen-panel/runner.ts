@@ -180,6 +180,7 @@ export async function runScreenPanel(
 			const candidates = readCandidateIds(queueFile, category, logger);
 			if (candidates.length === 0) {
 				writeVerdicts(deliverablesPath, category, [], logger);
+				await progress.completed_(screenAgent, Date.now() - startedAt);
 				continue;
 			}
 
