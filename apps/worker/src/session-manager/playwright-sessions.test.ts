@@ -40,4 +40,17 @@ describe("PLAYWRIGHT_SESSION_MAPPING — full-width browser isolation", () => {
 			);
 		}
 	});
+
+	it("EVERY registered agent is declared — no silent loadPrompt fallback", () => {
+		// loadPrompt now throws for an undeclared agent instead of falling back to a
+		// shared session. This pins the map exhaustive: a new agent without a session
+		// declaration fails HERE (CI), never silently at runtime.
+		const templates = [
+			...new Set(Object.values(AGENTS).map((a) => a.promptTemplate)),
+		];
+		const undeclared = templates.filter(
+			(t) => !(t in PLAYWRIGHT_SESSION_MAPPING),
+		);
+		expect(undeclared).toEqual([]);
+	});
 });
