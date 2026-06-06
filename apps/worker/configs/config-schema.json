@@ -19,31 +19,7 @@
           "format": "uri",
           "description": "URL for the login page or endpoint"
         },
-        "credentials": {
-          "type": "object",
-          "description": "Login credentials",
-          "properties": {
-            "username": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 255,
-              "description": "Username or email for authentication"
-            },
-            "password": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 255,
-              "description": "Password for authentication"
-            },
-            "totp_secret": {
-              "type": "string",
-              "pattern": "^[A-Za-z2-7]+=*$",
-              "description": "TOTP secret for two-factor authentication (Base32 encoded, case insensitive)"
-            }
-          },
-          "required": ["username", "password"],
-          "additionalProperties": false
-        },
+        "credentials": { "$ref": "#/$defs/credentials" },
         "login_flow": {
           "type": "array",
           "description": "Step-by-step instructions for the login process",
@@ -55,24 +31,12 @@
           "minItems": 1,
           "maxItems": 20
         },
-        "success_condition": {
-          "type": "object",
-          "description": "Condition that indicates successful authentication",
-          "properties": {
-            "type": {
-              "type": "string",
-              "enum": ["url_contains", "element_present", "url_equals_exactly", "text_contains"],
-              "description": "Type of success condition to check"
-            },
-            "value": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 500,
-              "description": "Value to match against the success condition"
-            }
-          },
-          "required": ["type", "value"],
-          "additionalProperties": false
+        "success_condition": { "$ref": "#/$defs/successCondition" },
+        "identities": {
+          "type": "array",
+          "description": "Additional identities for multi-identity authorization testing (task 008). Each shares the primary login_type/login_url/login_flow but authenticates with its own credentials. The primary identity is the top-level credentials.",
+          "items": { "$ref": "#/$defs/identity" },
+          "maxItems": 10
         }
       },
       "required": ["login_type", "login_url", "credentials", "success_condition"],
@@ -139,6 +103,72 @@
   ],
   "additionalProperties": false,
   "$defs": {
+    "credentials": {
+      "type": "object",
+      "description": "Login credentials",
+      "properties": {
+        "username": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "Username or email for authentication"
+        },
+        "password": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "Password for authentication"
+        },
+        "totp_secret": {
+          "type": "string",
+          "pattern": "^[A-Za-z2-7]+=*$",
+          "description": "TOTP secret for two-factor authentication (Base32 encoded, case insensitive)"
+        }
+      },
+      "required": ["username", "password"],
+      "additionalProperties": false
+    },
+    "successCondition": {
+      "type": "object",
+      "description": "Condition that indicates successful authentication",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["url_contains", "element_present", "url_equals_exactly", "text_contains"],
+          "description": "Type of success condition to check"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Value to match against the success condition"
+        }
+      },
+      "required": ["type", "value"],
+      "additionalProperties": false
+    },
+    "identity": {
+      "type": "object",
+      "description": "A single additional authentication identity (label/role metadata + its own credentials)",
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Non-secret, human-readable identity label (e.g. 'tenant-admin')"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Non-secret role / privilege level (e.g. 'owner', 'member')"
+        },
+        "credentials": { "$ref": "#/$defs/credentials" },
+        "success_condition": { "$ref": "#/$defs/successCondition" }
+      },
+      "required": ["label", "credentials"],
+      "additionalProperties": false
+    },
     "rule": {
       "type": "object",
       "description": "A single testing rule",

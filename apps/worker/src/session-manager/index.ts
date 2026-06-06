@@ -6,4 +6,9 @@
 
 export { AGENT_VALIDATORS, AGENTS } from "./agents/index.js";
 export { AGENT_PHASE_MAP, type PhaseName } from "./phase-map.js";
-export { PLAYWRIGHT_SESSION_MAPPING } from "./playwright-sessions.js";
+export {
+	identitySessionLabel,
+	identitySlug,
+	type IdentitySessionLabel,
+	PLAYWRIGHT_SESSION_MAPPING,
+} from "./playwright-sessions.js";
