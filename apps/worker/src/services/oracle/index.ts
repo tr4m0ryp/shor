@@ -5,45 +5,86 @@
 // as published by the Free Software Foundation.
 
 /**
- * Oracle phase (post-exploitation adjudication) — STABLE seam.
+ * Oracle phase (post-exploitation adjudication) — T9 executable oracle.
  *
- * Two entry points, both no-op by default so today's behavior is unchanged:
- *   - `runOraclePhase(ctx)` runs as a pipeline phase AFTER exploitation, with the
- *     full per-scan `AgentContext`. Task 013 fills it (e.g. an adjudicator agent
- *     that reconciles exploited / screened / blocked dispositions on disk).
- *   - `applyOracleDispositions(vulns, …)` runs inside `collectFindings`, between
- *     the screen verdicts and the emission gate, to overlay any oracle
- *     adjudication onto the normalized queue. Identity by default.
+ * The two entry points the pipeline calls:
+ *   - `runOraclePhase(ctx)` runs as a post-exploitation pipeline phase. It reads
+ *     each `{category}_poc.json` the exploit agents wrote, DETERMINISTICALLY
+ *     re-executes every replayable PoC (HTTP via the guarded `fetch`; browser /
+ *     OOB via pluggable seams), and writes the authoritative `{ id -> disposition }`
+ *     to `oracle_dispositions.json`. The verdict is EXECUTABLE — observed from a
+ *     re-run — not parsed from prose.
+ *   - `applyOracleDispositions(vulns, …)` runs inside `collectFindings`, after the
+ *     markdown evidence parse + screen verdicts: it overlays the oracle's verdict
+ *     onto the normalized queue, OVERRIDING the markdown-parsed disposition for any
+ *     finding the oracle could replay, and stamps `oracle_disposition` so the
+ *     finding record carries the executable outcome.
  *
- * The `AgentContext` type is imported type-only from the pipeline, so there is no
- * runtime dependency back into `job/pipeline` (the import is erased) and no
- * import cycle.
+ * `AgentContext` is imported type-only from the pipeline, so there is no runtime
+ * dependency back into `job/pipeline` (the import is erased) and no import cycle.
  */
 
+import type { NormalizedVuln, OracleDisposition } from "../../job/findings/types.js";
 import type { AgentContext } from "../../job/pipeline.js";
-import type { NormalizedVuln } from "../../job/findings/types.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
+import { lookupDisposition, readDispositions, runOracleReplay } from "./replay/index.js";
 
 /**
- * Run the post-exploitation oracle phase. DEFAULT: no-op (behavior unchanged).
- * Task 013 fills this with the adjudication pass.
+ * Run the post-exploitation oracle phase: replay every captured PoC and persist
+ * the authoritative disposition map. Best-effort — a failure here leaves the
+ * markdown-parsed dispositions in place (the oracle only ever tightens them).
  */
 export async function runOraclePhase(ctx: AgentContext): Promise<void> {
-	// No-op skeleton. `ctx` carries deliverablesPath, container, params, progress
-	// and logger — everything task 013 needs to drive the adjudication.
-	void ctx;
+	const { deliverablesPath, logger } = ctx;
+	try {
+		await runOracleReplay(deliverablesPath, logger);
+	} catch (err) {
+		logger.error("Oracle replay phase failed; markdown dispositions remain authoritative", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
 }
 
 /**
- * Overlay oracle adjudication onto the normalized queue. DEFAULT: identity —
- * returns `vulns` unchanged. Task 013 fills this.
+ * Overlay the executable-oracle verdicts onto the normalized queue, in place.
+ *
+ * For every finding the oracle could replay, its verdict is AUTHORITATIVE and
+ * overrides the markdown-parsed disposition — it can promote a prose-"blocked"
+ * finding to `exploited`, or demote a prose-"exploited" finding the replay could
+ * not reproduce to `blocked`. A `not_replayable` verdict changes nothing (the
+ * evidence.ts markdown parse remains the fallback). Every matched finding is
+ * stamped with `oracle_disposition` (via `raw`) so the mapper surfaces it on the
+ * record. Returns the same array for call-site chaining.
  */
 export function applyOracleDispositions(
 	vulns: NormalizedVuln[],
 	deliverablesPath: string,
 	logger: ActivityLogger,
 ): NormalizedVuln[] {
-	void deliverablesPath;
-	void logger;
+	const dispositions = readDispositions(deliverablesPath, logger);
+	if (dispositions.size === 0) return vulns;
+
+	let overridden = 0;
+	for (const vuln of vulns) {
+		const verdict = lookupDisposition(dispositions, vuln.id);
+		if (!verdict) continue;
+		// Stamp the executable outcome on the record (carried via `raw` → mapper).
+		stampOracleDisposition(vuln, verdict);
+		// Authoritative override for replayable verdicts; `not_replayable` is a no-op.
+		if (verdict === "exploited" || verdict === "blocked") {
+			if (vuln.disposition !== verdict) overridden += 1;
+			vuln.disposition = verdict;
+		}
+	}
+	if (overridden > 0) {
+		logger.info("Oracle verdicts overrode markdown-parsed dispositions", { overridden });
+	}
 	return vulns;
 }
+
+/** Carry the oracle verdict on `raw` so the §6.1 mapper can emit it. */
+function stampOracleDisposition(vuln: NormalizedVuln, verdict: OracleDisposition): void {
+	vuln.raw.oracle_disposition = verdict;
+}
+
+export { runOracleReplay } from "./replay/index.js";
