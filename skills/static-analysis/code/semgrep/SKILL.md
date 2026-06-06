@@ -15,18 +15,31 @@ exploitation aims at and that the finding's `vulnerable_code_location` needs.
   gaps, secrets-in-code, and language-specific bug classes.
 - To produce precise code locations that anchor each finding's fingerprint.
 
+## Target the BACKEND language, not just `auto` (IMPORTANT)
+`--config auto` over-weights config/YAML/Docker rules and routinely returns only
+**infrastructure** findings while missing the application backend entirely — a
+C#/.NET, Java, Go, or Python server can come back with zero app-level hits. Always
+ALSO run the language pack for the stack you found in the architecture phase:
+- `p/csharp` (.NET / ASP.NET), `p/java`, `p/golang`, `p/python`, `p/javascript`,
+  `p/typescript`, `p/php`, `p/ruby`.
+- Plus the category packs: `p/owasp-top-ten`, `p/sql-injection`, `p/xss`,
+  `p/command-injection`, `p/secrets`, and `p/nosql` (e.g. a MongoDB data layer).
+Stack the configs in one run (repeat `--config`). If a language pack returns
+nothing on a backend you KNOW has handlers, treat that as a tooling gap, not a
+clean bill — note it and lean on the Task-agent review.
+
 ## Key flags
-- `--config p/ci|p/owasp-top-ten|<rule-dir>|auto` ruleset (per-category packs preferred).
+- `--config p/owasp-top-ten|p/csharp|<rule-dir>|auto` — repeat to stack rulesets.
 - `--json -o out.json` structured output (SARIF: `--sarif`).
-- `--severity ERROR|WARNING`; `--include`/`--exclude` paths; `--metrics=off`.
+- `--severity ERROR|WARNING`; `--include '*.cs'` to focus the backend; `--metrics=off`.
 - `--max-target-bytes`, `--timeout <s>` for big repos.
 - `--baseline-commit <sha>` report only new findings vs a prior commit (diff scans).
 
 ## Safe invocation
 ```bash
-# Category ruleset over the repo, metrics off, JSON out
-semgrep --config p/owasp-top-ten --severity ERROR --metrics=off \
-  --json -o semgrep.json /path/to/repo
+# Language pack + OWASP + NoSQL stacked over the repo (e.g. an ASP.NET + Mongo app)
+semgrep --config p/csharp --config p/owasp-top-ten --config p/nosql \
+  --severity ERROR --metrics=off --json -o semgrep.json /path/to/repo
 ```
 
 ## Evidence to capture
