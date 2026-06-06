@@ -5,7 +5,7 @@
 // as published by the Free Software Foundation.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { optionalPositiveInt } from "./env.js";
+import { optionalBool, optionalPositiveInt } from "./env.js";
 import { resolveGroupWidth } from "./pipeline.js";
 
 describe("resolveGroupWidth", () => {
@@ -46,6 +46,33 @@ describe("optionalPositiveInt", () => {
 		for (const bad of ["0", "-2", "2.5", "abc", ""]) {
 			process.env[KEY] = bad;
 			expect(optionalPositiveInt(KEY)).toBeUndefined();
+		}
+	});
+});
+
+describe("optionalBool", () => {
+	const KEY = "SHOR_TEST_EXPENDABLE_TARGET";
+	afterEach(() => {
+		delete process.env[KEY];
+	});
+
+	it("undefined when unset or empty (distinguishes unset from off)", () => {
+		expect(optionalBool(KEY)).toBeUndefined();
+		process.env[KEY] = "   ";
+		expect(optionalBool(KEY)).toBeUndefined();
+	});
+
+	it("true for truthy spellings (1 / true / yes, case-insensitive)", () => {
+		for (const v of ["1", "true", "TRUE", "yes", "Yes", " true "]) {
+			process.env[KEY] = v;
+			expect(optionalBool(KEY)).toBe(true);
+		}
+	});
+
+	it("false for any other set value (off, not unset)", () => {
+		for (const v of ["0", "false", "no", "off", "destroy"]) {
+			process.env[KEY] = v;
+			expect(optionalBool(KEY)).toBe(false);
 		}
 	});
 });

@@ -34,6 +34,14 @@ export interface PromptContext {
 	identities?: string;
 	/** `{{FP_RULES}}` — org false-positive precedents (task 016). */
 	fpRules?: string;
+	/**
+	 * `{{TARGET_POSTURE}}` — EXPLOIT/screen impact posture (task 003).
+	 * assembleScanPromptContext selects the minimal-impact block by DEFAULT and
+	 * the disposable-target block only on operator opt-in (SHOR_EXPENDABLE_TARGET).
+	 * Destructive exploitation is never the default; an unset value renders the
+	 * neutral "(none)" sentinel, which is SAFE (it authorizes nothing destructive).
+	 */
+	targetPosture?: string;
 }
 
 /**
@@ -57,5 +65,6 @@ export function applyPromptContext(
 			context.voterIndex !== undefined ? String(context.voterIndex) : NONE,
 		)
 		.replace(/{{IDENTITIES}}/g, context.identities ?? NONE)
-		.replace(/{{FP_RULES}}/g, context.fpRules ?? NONE);
+		.replace(/{{FP_RULES}}/g, context.fpRules ?? NONE)
+		.replace(/{{TARGET_POSTURE}}/g, context.targetPosture ?? NONE);
 }

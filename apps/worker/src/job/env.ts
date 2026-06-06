@@ -36,6 +36,14 @@ export interface ScanJobParams {
 	 * (e.g. to spare a fragile target). Must be a positive integer.
 	 */
 	groupConcurrency?: number;
+	/**
+	 * Operator opt-in (`SHOR_EXPENDABLE_TARGET`): this target is owned/disposable,
+	 * so the EXPLOIT (and screen) posture relaxes — destructive PoCs authorized,
+	 * no-DoS relaxed, breakage acceptable. DEFAULT OFF/undefined → the
+	 * minimal-impact posture. Destructive exploitation is NEVER the default; Shor
+	 * scans real customer targets and only the operator may flag one expendable.
+	 */
+	expendableTarget?: boolean;
 }
 
 function required(name: string): string {
@@ -57,6 +65,17 @@ export function optionalPositiveInt(name: string): number | undefined {
 	if (raw === undefined) return undefined;
 	const n = Number(raw);
 	return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
+/**
+ * Parse a boolean env var. Unset/empty → `undefined`; truthy (`1`/`true`/`yes`,
+ * case-insensitive) → `true`; any other value → `false`. Mirrors the
+ * `optionalPositiveInt` shape so callers can distinguish "unset" from "off".
+ */
+export function optionalBool(name: string): boolean | undefined {
+	const raw = optional(name);
+	if (raw === undefined) return undefined;
+	return ["1", "true", "yes"].includes(raw.trim().toLowerCase());
 }
 
 /**
@@ -89,5 +108,8 @@ export function readScanJobParams(): ScanJobParams {
 	const groupConcurrency = optionalPositiveInt("SHOR_GROUP_CONCURRENCY");
 	if (groupConcurrency !== undefined)
 		params.groupConcurrency = groupConcurrency;
+	const expendableTarget = optionalBool("SHOR_EXPENDABLE_TARGET");
+	if (expendableTarget !== undefined)
+		params.expendableTarget = expendableTarget;
 	return params;
 }
