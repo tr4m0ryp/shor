@@ -121,7 +121,12 @@ export class SinkScanNotFoundError extends Error {
 async function upsertFinding(tenantId: TenantId, scanId: ScanId, record: FindingRecord): Promise<Finding> {
   const existing = await findingRepo.findByFingerprint(tenantId, scanId, record.fingerprint);
   if (existing) {
-    return existing;
+    // Refresh the row in place — the worker re-posts the same fingerprint as the
+    // run progresses, upgrading a finding from its initial `firm`/`queued` state to
+    // the final live `confirmed`/`exploited` disposition (and improved prose). The
+    // previous return-existing-unchanged froze every finding at its first post.
+    const updated = await findingRepo.updateData(tenantId, existing.id, record);
+    return updated ?? existing;
   }
   return findingRepo.create({
     scanId,
