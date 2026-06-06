@@ -27,6 +27,10 @@ credentials.*
 .claude/
 .agents/
 
+# Flow pipeline scaffolding — local-only (research/ stays tracked as the spec)
+tasks/
+notes/
+
 # GitHub Actions / CI config (local-only)
 .github/
 # Internal project notes for Claude — local-only, not pushed
