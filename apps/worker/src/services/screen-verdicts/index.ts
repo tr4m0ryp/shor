@@ -5,104 +5,52 @@
 // as published by the Free Software Foundation.
 
 /**
- * Screen-verdict application (T4 adversarial-screen → emission gate).
+ * Screen-verdict application — the screen as PRIORITIZER, not gate (spec T14).
  *
- * The adversarial screen agents write `{category}_screen_rejected.json` audit
- * files for the hypotheses they refuted before exploitation. This module reads
- * those files and stamps the matching queue entries `unverified_screen_rejected`
- * (synthesizing an entry when the raw queue no longer carries the id) so the
- * findings gate routes them to the manual-review appendix and OUT of the emitted
- * set — exactly like `unverified_out_of_scope`. A live PoC still wins: an
- * `exploited` finding is never demoted.
+ * STABLE seam consumed by `collectFindings` (and the measurement reconstructor)
+ * BEFORE the oracle/gate. For every category it routes the N-vote panel verdicts
+ * from `{category}_screen_verdicts.json` (written by `services/screen-panel`):
+ * only a confident majority-`refute` rejects (`unverified_screen_rejected`,
+ * terminal → manual-review appendix); `uncertain` becomes the non-terminal
+ * `screen_uncertain` and `support` stays `queued`, both flowing THROUGH to
+ * exploitation where the executable oracle is the real arbiter. A live PoC
+ * (`exploited`) is never demoted.
  *
- * This is the STABLE seam consumed by `collectFindings`. The default below
- * preserves today's behavior verbatim (the logic previously inlined in
- * `job/findings/index.ts`); task 012 replaces it with the screen-panel verdict
- * model without touching the call-site.
+ * Backward compatibility: a category with no panel verdicts falls back to the
+ * legacy `{category}_screen_rejected.json` audit file, preserving the pre-panel
+ * behavior verbatim so nothing regresses when the panel did not run. All reads
+ * are best-effort — missing/malformed files are skipped (logged), never thrown.
  */
 
-import fs from "node:fs";
-import path from "node:path";
 import { FINDING_CATEGORIES } from "../../job/findings/queue.js";
-import type { FindingCategory, NormalizedVuln } from "../../job/findings/types.js";
+import type { NormalizedVuln } from "../../job/findings/types.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
-
-const SCREEN_REJECTED_SUFFIX = "_screen_rejected.json";
-
-/**
- * Read every `{category}_screen_rejected.json` audit file (written by the
- * adversarial screen agents) into a `category → (id → reason)` map. Each file is a
- * JSON array of `{ id, screen_reason }`. Best-effort: a missing or malformed file
- * is skipped (a screen that refuted nothing simply writes no rejections).
- */
-function readScreenRejections(
-	deliverablesPath: string,
-	logger: ActivityLogger,
-): Map<FindingCategory, Map<string, string>> {
-	const out = new Map<FindingCategory, Map<string, string>>();
-	for (const category of FINDING_CATEGORIES) {
-		const file = path.join(
-			deliverablesPath,
-			`${category}${SCREEN_REJECTED_SUFFIX}`,
-		);
-		try {
-			if (!fs.existsSync(file)) continue;
-			const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf8"));
-			if (!Array.isArray(parsed)) continue;
-			const byId = new Map<string, string>();
-			for (const entry of parsed) {
-				if (!entry || typeof entry !== "object") continue;
-				const rec = entry as Record<string, unknown>;
-				const id = typeof rec.id === "string" ? rec.id.trim() : "";
-				if (!id) continue;
-				byId.set(
-					id,
-					typeof rec.screen_reason === "string" ? rec.screen_reason : "",
-				);
-			}
-			if (byId.size > 0) out.set(category, byId);
-		} catch (err) {
-			logger.warn("Failed to read/parse screen-rejected file; skipping", {
-				file,
-				error: err instanceof Error ? err.message : String(err),
-			});
-		}
-	}
-	return out;
-}
+import { readLegacyRejections, readScreenVerdicts } from "./reader.js";
+import { applyLegacyRejections, applyVerdictEntries } from "./router.js";
 
 /**
- * Apply the adversarial screen verdicts to the normalized queue, in place.
- *
- * Marks each refuted hypothesis `unverified_screen_rejected` (or synthesizes an
- * entry when the raw queue no longer carries it), except where a live PoC already
- * proved it (`exploited` is never demoted). Returns the same array (extended with
- * any synthesized entries) for call-site chaining.
+ * Apply screen routing to the normalized queue, in place. Returns the same array
+ * (extended with any synthesized terminal entries) for call-site chaining.
  */
 export function applyScreenVerdicts(
 	vulns: NormalizedVuln[],
 	deliverablesPath: string,
 	logger: ActivityLogger,
 ): NormalizedVuln[] {
-	const rejections = readScreenRejections(deliverablesPath, logger);
-	for (const [category, byId] of rejections) {
-		for (const [id, reason] of byId) {
-			const match = vulns.find((v) => v.category === category && v.id === id);
-			if (match) {
-				if (match.disposition !== "exploited") {
-					match.disposition = "unverified_screen_rejected";
-					if (reason.trim()) match.evidenceText = reason;
-				}
-			} else {
-				vulns.push({
-					category,
-					id,
-					raw: { ID: id },
-					disposition: "unverified_screen_rejected",
-					evidenceText: reason,
-				});
-			}
+	for (const category of FINDING_CATEGORIES) {
+		const verdicts = readScreenVerdicts(deliverablesPath, category, logger);
+		if (verdicts !== undefined) {
+			// The panel ran for this category → fail-open routing wins. (An absent
+			// OR malformed verdicts file reads as `undefined`, so a corrupt panel
+			// write safely falls back to the legacy file below instead of silently
+			// discarding its refutations.)
+			applyVerdictEntries(vulns, category, verdicts);
+			continue;
 		}
+		// BACKWARD-COMPAT: no usable panel verdicts → preserve the legacy behavior
+		// when the pre-panel `{category}_screen_rejected.json` audit file is present.
+		const legacy = readLegacyRejections(deliverablesPath, category, logger);
+		if (legacy !== undefined) applyLegacyRejections(vulns, category, legacy);
 	}
 	return vulns;
 }
