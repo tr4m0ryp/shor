@@ -66,4 +66,18 @@ testing. ONLY the injected credentials themselves are off-limits (point 1); the
 application's authentication and authorization remain fully in scope (points
 2-3). Probe them as hard as any other surface — an untested login is a coverage
 gap, not a courtesy.
+
+**5. REUSE the recon-established access — don't re-crack it.**
+Recon already located the backend and worked out how to authenticate. Before you
+re-derive any of that:
+- Read `.storron/deliverables/api_access.json` (when present) for the reachable
+  **API base** and the **auth recipe** — `authScheme` plus a credential-free
+  `tokenSource` telling you WHERE the live token lives.
+- The live session itself (cookies / bearer token) persists in the **named
+  Playwright session's storage-state** and is replayed for you — drive the API
+  through that session, or follow `tokenSource` to load the token for direct
+  calls. NEVER expect the raw token to appear in this prompt; it is held in the
+  runtime session seam by design (ADR-050), not surfaced here.
+Re-cracking auth from scratch when the recipe exists wastes the phase; if the
+recipe is missing or stale, fall back to establishing the session yourself.
 </auth_scaffolding>
