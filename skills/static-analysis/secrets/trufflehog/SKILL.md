@@ -14,8 +14,15 @@ provider's API to confirm the credential is still active. Read-only on the repo 
 - After/with gitleaks, to confirm which detected secrets are actually live.
 - Deep secret sweep across git history or a directory of artifacts.
 
+## Pick the mode by what's on disk (IMPORTANT)
+- **`trufflehog filesystem <path>`** scans files directly — works on uploads
+  with **no `.git`**. Make this your default.
+- **`trufflehog git file:///<repo>`** scans history — only when `.git` exists.
+  On a `.git`-less upload it finds nothing; use `filesystem` mode instead of
+  concluding "no secrets".
+
 ## Key flags
-- `trufflehog git file:///path/to/repo` (history) or `trufflehog filesystem <path>`.
+- `trufflehog filesystem <path>` (files) or `trufflehog git file:///path/to/repo` (history).
 - `--only-verified` report only credentials confirmed live (cuts false positives).
 - `--json` structured output (one JSON object per finding).
 - `--results=verified,unknown` control which verification states to emit.
@@ -23,8 +30,11 @@ provider's API to confirm the credential is still active. Read-only on the repo 
 
 ## Safe invocation
 ```bash
-# History scan, verified-only, JSON out
-trufflehog git file:///path/to/repo --only-verified --json > trufflehog.jsonl
+# Default: filesystem scan (works with or without .git), verified-only, JSON out
+trufflehog filesystem /path/to/repo --only-verified --json > trufflehog.jsonl
+# If .git exists, ALSO sweep history:
+[ -d /path/to/repo/.git ] && trufflehog git file:///path/to/repo \
+  --only-verified --json >> trufflehog.jsonl
 ```
 
 ## Evidence to capture
