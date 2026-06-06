@@ -21,7 +21,7 @@ const RECON = [
 	"httpx", "katana", "naabu", "nmap", "subfinder", "dnsx", "gau",
 	"waybackurls", "paramspider", "arjun", "wafw00f", "ffuf", "nuclei", "kxss",
 ];
-const STATIC = ["semgrep", "gitleaks", "osv-scanner", "trufflehog"];
+const STATIC = ["semgrep", "gitleaks", "osv-scanner", "trufflehog", "trivy"];
 
 export const RECOMMENDED: Readonly<Record<string, readonly string[]>> = {
 	"pre-recon-code": STATIC,
