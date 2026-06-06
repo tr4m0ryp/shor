@@ -145,6 +145,11 @@ export function auditApiAccess(
 	const recorded = obj !== null;
 	const apiBaseRecorded = !!obj && nonEmptyString(obj.apiBase);
 	const authRecorded = !!obj && nonEmptyString(obj.authScheme);
+	const tokenSourceRecorded = !!obj && nonEmptyString(obj.tokenSource);
+	const tokenBearing =
+		!!obj &&
+		typeof obj.authScheme === "string" &&
+		TOKEN_BEARING_RE.test(obj.authScheme.toLowerCase());
 	const secretSuspected = recorded && JWT_RE.test(rawText);
 
 	const gaps: string[] = [];
@@ -154,6 +159,11 @@ export function auditApiAccess(
 	} else {
 		if (!apiBaseRecorded) gaps.push("api-access-base");
 		if (!authRecorded) gaps.push("api-access-auth");
+		// A token-bearing scheme must say WHERE downstream gets the live token,
+		// or later phases re-derive auth (the Part-2 hand-off gap).
+		else if (tokenBearing && !tokenSourceRecorded) {
+			gaps.push("api-access-token-source");
+		}
 	}
 	if (secretSuspected) gaps.push("api-access-secret");
 
@@ -161,6 +171,7 @@ export function auditApiAccess(
 		recorded,
 		apiBaseRecorded,
 		authRecorded,
+		tokenSourceRecorded,
 		apiSignalsInReport,
 		secretSuspected,
 		gaps,
