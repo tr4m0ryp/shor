@@ -159,7 +159,9 @@ export function saveCheckpoint(
 		const snapshot = deliverablesSnapshot(root, scanId);
 		fs.mkdirSync(snapshot, { recursive: true });
 		if (fs.existsSync(deliverablesPath)) {
-			fs.cpSync(deliverablesPath, snapshot, { recursive: true, force: true });
+			// Content-only copy — NOT fs.cpSync, whose per-file chmod EPERMs on the
+			// gcsfuse checkpoint mount and aborts after one file (see helper note).
+			copyTreeContentOnly(deliverablesPath, snapshot);
 		}
 		const done = loadCompletedPhases(scanId);
 		done.add(phase);
