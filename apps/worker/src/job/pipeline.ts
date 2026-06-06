@@ -38,8 +38,10 @@ import { ProgressEmitter } from "./progress/index.js";
  * Pipeline stages (ADR-051). pre-recon and recon are prerequisites and run
  * sequentially (fail-fast — the vuln agents read their deliverables). The vuln and
  * exploit agents are each mutually independent within their group, so each group
- * runs CONCURRENTLY (2-wide — keeps us under the flash rate limit and ~2 headless
- * browsers within the job's RAM). Between discovery and exploitation runs the
+ * runs CONCURRENTLY at `resolveGroupWidth` — FULL width by default (DeepSeek flash
+ * allows ~2500 concurrent, so the LLM is not the bound), dialed down only via
+ * SHOR_GROUP_CONCURRENCY. Each category has its own Playwright session, so a
+ * full-width group never shares a browser profile. Between discovery and exploitation runs the
  * adversarial screen PANEL (T8 + T11): per category, each candidate hypothesis is
  * judged by N independent lens-voters (blind to recon context) whose structured
  * verdicts aggregate by majority, so the exploit agents receive a pre-filtered,
