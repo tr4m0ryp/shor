@@ -14,19 +14,31 @@ commits.
 - Whitebox secret sweep of the connected repo.
 - To check git history (not just HEAD) for leaked keys/tokens/passwords.
 
+## Pick the mode by what's on disk (IMPORTANT)
+- **`gitleaks dir <path>`** scans the **working tree** — it ALWAYS works,
+  including uploads that have **no `.git`**. Make this your default.
+- **`gitleaks git <repo>`** scans **commit history** — only meaningful when a
+  `.git` directory is present. It finds NOTHING on a `.git`-less upload, so do
+  NOT fall back to "skip secret scanning" when history is empty — run `dir` mode.
+- Most uploaded codebases arrive WITHOUT history → `dir` mode is the one that
+  actually scans the source. Run `git` mode ADDITIONALLY only if `.git` exists.
+
 ## Key flags
-- `git -C <repo> ...` then `gitleaks dir <path>` (working tree) or
-  `gitleaks git <repo>` (history). (Older syntax: `detect --source`.)
+- `gitleaks dir <path>` (working tree) / `gitleaks git <repo>` (history).
+  (Older syntax: `detect --source`.)
 - `--report-format json --report-path out.json` structured output (also `sarif`).
-- `--log-opts "--all"` scan all refs; `--no-git` treat as plain files.
+- `--log-opts "--all"` scan all refs (history mode); `--no-git` treat as plain files.
 - `-c gitleaks.toml` custom rules/allowlist; `--redact` redact secrets in output.
 - `--exit-code 0` to keep the pipeline going when leaks are found.
 
 ## Safe invocation
 ```bash
-# Scan full history of the checked-out repo, redacted JSON report
-gitleaks git /path/to/repo --report-format json \
-  --report-path gitleaks.json --redact
+# Always scan the working tree (works with or without .git), redacted JSON:
+gitleaks dir /path/to/repo --report-format json \
+  --report-path gitleaks.json --redact --exit-code 0
+# If a .git dir is present, ALSO sweep history for removed-but-committed secrets:
+[ -d /path/to/repo/.git ] && gitleaks git /path/to/repo --report-format json \
+  --report-path gitleaks-history.json --redact --exit-code 0
 ```
 > Verify subcommands with `gitleaks --help`; v8 uses `git`/`dir`, older uses `detect`.
 
