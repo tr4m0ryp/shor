@@ -153,7 +153,7 @@ describe("collectFindings failed-lane gating", () => {
 		await writeSsrfQueue(dir);
 		await writeLaneStatus(dir, { ssrf: "failed" });
 
-		const emitted = collectFindings(dir, logger);
+		const emitted = await collectFindings(dir, logger);
 
 		// Excluded from the emitted (returned) set.
 		expect(emitted.find((f) => f.id === SSRF_ID)).toBeUndefined();
@@ -173,7 +173,7 @@ describe("collectFindings failed-lane gating", () => {
 		await writeSsrfQueue(dir);
 		await writeLaneStatus(dir, { ssrf: "validated" });
 
-		const emitted = collectFindings(dir, logger);
+		const emitted = await collectFindings(dir, logger);
 
 		const f = emitted.find((rec) => rec.id === SSRF_ID);
 		expect(f).toBeDefined();
@@ -188,7 +188,7 @@ describe("collectFindings failed-lane gating", () => {
 		const dir = await mkDeliverables();
 		await writeSsrfQueue(dir);
 
-		const emitted = collectFindings(dir, logger);
+		const emitted = await collectFindings(dir, logger);
 
 		const f = emitted.find((rec) => rec.id === SSRF_ID);
 		expect(f).toBeDefined();
@@ -202,7 +202,7 @@ describe("collectFindings failed-lane gating", () => {
 		await writeExploitedEvidence(dir);
 		await writeLaneStatus(dir, { ssrf: "failed" });
 
-		const emitted = collectFindings(dir, logger);
+		const emitted = await collectFindings(dir, logger);
 
 		const f = emitted.find((rec) => rec.id === SSRF_ID);
 		expect(f).toBeDefined();

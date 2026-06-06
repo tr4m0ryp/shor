@@ -120,7 +120,7 @@ describe("collectFindings coverage gating", () => {
 		await writeAuthzQueue(dir);
 		await writeManifest(dir, manifest("absent"));
 
-		const emitted = collectFindings(dir, logger);
+		const emitted = await collectFindings(dir, logger);
 
 		// Excluded from the emitted (returned) set.
 		expect(emitted.find((f) => f.id === AUTHZ_ID)).toBeUndefined();
@@ -140,7 +140,7 @@ describe("collectFindings coverage gating", () => {
 		await writeAuthzQueue(dir);
 		await writeManifest(dir, manifest("present"));
 
-		const emitted = collectFindings(dir, logger);
+		const emitted = await collectFindings(dir, logger);
 
 		const f = emitted.find((rec) => rec.id === AUTHZ_ID);
 		expect(f).toBeDefined();
@@ -155,7 +155,7 @@ describe("collectFindings coverage gating", () => {
 		const dir = await mkDeliverables();
 		await writeAuthzQueue(dir);
 
-		const emitted = collectFindings(dir, logger);
+		const emitted = await collectFindings(dir, logger);
 
 		const f = emitted.find((rec) => rec.id === AUTHZ_ID);
 		expect(f).toBeDefined();
@@ -169,7 +169,7 @@ describe("collectFindings coverage gating", () => {
 		await writeExploitedEvidence(dir);
 		await writeManifest(dir, manifest("absent"));
 
-		const emitted = collectFindings(dir, logger);
+		const emitted = await collectFindings(dir, logger);
 
 		const f = emitted.find((rec) => rec.id === AUTHZ_ID);
 		expect(f).toBeDefined();
@@ -185,7 +185,7 @@ describe("readManualReviewAppendix (dashboard surfacing)", () => {
 		await writeAuthzQueue(dir);
 		await writeManifest(dir, manifest("absent"));
 
-		const emitted = collectFindings(dir, logger);
+		const emitted = await collectFindings(dir, logger);
 		expect(emitted).toHaveLength(0); // gated out of the emitted set
 
 		const manual = readManualReviewAppendix(dir, logger);
