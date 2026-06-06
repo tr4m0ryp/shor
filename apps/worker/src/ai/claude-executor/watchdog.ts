@@ -69,13 +69,16 @@ export function recordAssistantTurn(
 	assistantText: string,
 	toolCommands: readonly string[],
 ): void {
-	// 1. Detect a save-deliverable call so we can budget the post-save grace period.
-	if (state.savedDeliverableTurn === null) {
-		for (const cmd of toolCommands) {
-			if (/save-deliverable\b/i.test(cmd)) {
-				state.savedDeliverableTurn = turnCount;
-				break;
-			}
+	// 1. Detect a save-deliverable call and (RE)START the post-save grace period on
+	//    EVERY save. Each save-deliverable is forward progress: an agent writing a
+	//    large deliverable in chunks (one save per chunk) must NOT look like a stale
+	//    loop. Only a genuine run of turns with NO save in between should trip the
+	//    budget. (Previously this was set on the FIRST save only, so a long chunked
+	//    write was falsely killed 25 turns after the first chunk.)
+	for (const cmd of toolCommands) {
+		if (/save-deliverable\b/i.test(cmd)) {
+			state.savedDeliverableTurn = turnCount;
+			break;
 		}
 	}
 
