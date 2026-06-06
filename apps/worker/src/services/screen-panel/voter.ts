@@ -134,6 +134,7 @@ export async function runVoter(args: VoterRunArgs): Promise<ScreenVote> {
 		agentName: `${agentLabel}-v${voter}`,
 		logger,
 		deliverablesSubdir,
+		maxTurns: SCREEN_VOTER_MAX_TURNS,
 		...(providerConfig !== undefined ? { providerConfig } : {}),
 	});
 
