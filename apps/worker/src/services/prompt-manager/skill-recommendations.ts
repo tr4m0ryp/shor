@@ -18,15 +18,36 @@
  */
 
 const RECON = [
-	"httpx", "katana", "naabu", "nmap", "subfinder", "dnsx", "gau",
-	"waybackurls", "paramspider", "arjun", "wafw00f", "ffuf", "nuclei", "kxss",
+	"httpx",
+	"katana",
+	"naabu",
+	"nmap",
+	"subfinder",
+	"dnsx",
+	"gau",
+	"waybackurls",
+	"paramspider",
+	"arjun",
+	"wafw00f",
+	"ffuf",
+	"nuclei",
+	"kxss",
 ];
 const STATIC = ["semgrep", "gitleaks", "osv-scanner", "trufflehog", "trivy"];
 
 export const RECOMMENDED: Readonly<Record<string, readonly string[]>> = {
 	"pre-recon-code": STATIC,
 	recon: RECON,
-	"vuln-injection": ["sqlmap", "commix", "nosqli", "arjun", "paramspider", "ffuf", "semgrep", "interactsh-client"],
+	"vuln-injection": [
+		"sqlmap",
+		"commix",
+		"nosqli",
+		"arjun",
+		"paramspider",
+		"ffuf",
+		"semgrep",
+		"interactsh-client",
+	],
 	"exploit-injection": ["sqlmap", "commix", "nosqli", "interactsh-client"],
 	"vuln-xss": ["dalfox", "kxss", "xsstrike", "arjun", "paramspider", "semgrep"],
 	"exploit-xss": ["dalfox", "kxss", "xsstrike", "playwright"],
@@ -80,7 +101,7 @@ export function recommendedSkillsSection(promptName: string): string {
 		"**Justify every skip.** A tool left unrun needs a specific one-line reason",
 		"(out of scope, not applicable to this stack, superseded by another tool's",
 		"result). Running only one tool is a FAILED phase unless the rest are each",
-		"explicitly justified. \"Did not get to it\" is not a reason.",
+		'explicitly justified. "Did not get to it" is not a reason.',
 		"",
 		"This is NOT a mandate to spray: honor this agent's own scope, per-host",
 		"rate-limit, and minimum-impact rules above — pick the tool that fits each",
