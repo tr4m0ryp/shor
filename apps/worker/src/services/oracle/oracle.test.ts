@@ -102,7 +102,7 @@ describe("collectFindings end-to-end (oracle overrides markdown → record.oracl
 		await writeEvidence(dir, id, "Successfully Exploited Vulnerabilities"); // markdown says exploited
 		await writeDispositionsFile(dir, { [id]: "blocked" }); // oracle says blocked
 
-		const rec = collectFindings(dir, logger).find((f) => f.id === id);
+		const rec = (await collectFindings(dir, logger)).find((f) => f.id === id);
 
 		expect(rec).toBeDefined();
 		expect(rec?.disposition).toBe("blocked");
@@ -117,7 +117,7 @@ describe("collectFindings end-to-end (oracle overrides markdown → record.oracl
 		await writeEvidence(dir, id, "Potential Vulnerabilities (Validation Blocked)"); // markdown says blocked
 		await writeDispositionsFile(dir, { [id]: "exploited" }); // oracle says exploited
 
-		const rec = collectFindings(dir, logger).find((f) => f.id === id);
+		const rec = (await collectFindings(dir, logger)).find((f) => f.id === id);
 
 		expect(rec?.disposition).toBe("exploited");
 		expect(rec?.oracle_disposition).toBe("exploited");
