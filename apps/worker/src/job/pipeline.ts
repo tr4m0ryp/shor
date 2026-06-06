@@ -200,8 +200,13 @@ export async function runScanPipeline(
 	}
 
 	// 1) Prerequisites — sequential, fail-fast (vuln agents depend on these).
-	for (const agentName of PREREQ_AGENTS) {
-		await runAgent(agentName, ctx);
+	if (completedPhases.has("prereq")) {
+		logger.info("checkpoint: skipping completed phase", { phase: "prereq" });
+	} else {
+		for (const agentName of PREREQ_AGENTS) {
+			await runAgent(agentName, ctx);
+		}
+		saveCheckpoint(params.scanId, "prereq", deliverablesPath, logger);
 	}
 
 	// 2) Vulnerability analysis → adversarial screen panel → exploitation. The vuln
