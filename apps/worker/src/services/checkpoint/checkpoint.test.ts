@@ -39,7 +39,10 @@ afterEach(() => {
 
 describe("checkpoint save/restore", () => {
 	it("snapshots deliverables and records the phase", () => {
-		fs.writeFileSync(path.join(deliverables, "recon_deliverable.md"), "# recon");
+		fs.writeFileSync(
+			path.join(deliverables, "recon_deliverable.md"),
+			"# recon",
+		);
 		fs.writeFileSync(
 			path.join(deliverables, "injection_exploitation_queue.json"),
 			'{"vulnerabilities":[{"ID":"INJ-1"}]}',
@@ -54,8 +57,14 @@ describe("checkpoint save/restore", () => {
 		// scan_identities.json reached the snapshot. The content-only copy must
 		// round-trip every file AND nested dirs (e.g. schemas/).
 		fs.writeFileSync(path.join(deliverables, "scan_identities.json"), "{}");
-		fs.writeFileSync(path.join(deliverables, "pre_recon_deliverable.md"), "# pre");
-		fs.writeFileSync(path.join(deliverables, "threat_model.json"), '{"threats":[]}');
+		fs.writeFileSync(
+			path.join(deliverables, "pre_recon_deliverable.md"),
+			"# pre",
+		);
+		fs.writeFileSync(
+			path.join(deliverables, "threat_model.json"),
+			'{"threats":[]}',
+		);
 		fs.mkdirSync(path.join(deliverables, "schemas"), { recursive: true });
 		fs.writeFileSync(
 			path.join(deliverables, "schemas", "live_openapi.json"),
@@ -80,7 +89,10 @@ describe("checkpoint save/restore", () => {
 	});
 
 	it("restores deliverables into a fresh dir and returns completed phases", () => {
-		fs.writeFileSync(path.join(deliverables, "recon_deliverable.md"), "# recon");
+		fs.writeFileSync(
+			path.join(deliverables, "recon_deliverable.md"),
+			"# recon",
+		);
 		saveCheckpoint(SCAN, "prereq", deliverables, log);
 
 		// Simulate a fresh execution: a new, empty deliverables dir.
@@ -88,9 +100,9 @@ describe("checkpoint save/restore", () => {
 		const done = restoreCheckpoint(SCAN, fresh, log);
 
 		expect([...done]).toEqual(["prereq"]);
-		expect(fs.readFileSync(path.join(fresh, "recon_deliverable.md"), "utf8")).toBe(
-			"# recon",
-		);
+		expect(
+			fs.readFileSync(path.join(fresh, "recon_deliverable.md"), "utf8"),
+		).toBe("# recon");
 	});
 
 	it("returns empty (no resume) when no checkpoint exists for the scan", () => {
