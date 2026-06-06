@@ -87,6 +87,7 @@ export function readScanJobParams(): ScanJobParams {
 	const provider = optional("SHOR_PROVIDER");
 	if (provider) params.provider = provider;
 	const groupConcurrency = optionalPositiveInt("SHOR_GROUP_CONCURRENCY");
-	if (groupConcurrency !== undefined) params.groupConcurrency = groupConcurrency;
+	if (groupConcurrency !== undefined)
+		params.groupConcurrency = groupConcurrency;
 	return params;
 }

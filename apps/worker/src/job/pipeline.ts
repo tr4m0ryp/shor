@@ -16,20 +16,20 @@
 
 import { AuditSession } from "../audit/index.js";
 import { deliverablesDir } from "../paths.js";
-import { getOrCreateContainer } from "../services/container.js";
-import { AGENTS } from "../session-manager.js";
-import type { Container } from "../services/container.js";
-import type { AgentName } from "../types/agents.js";
-import type { ActivityLogger } from "../types/activity-logger.js";
-import type { SessionMetadata } from "../types/audit.js";
-import type { ScanJobParams } from "./env.js";
-import { bootstrapIdentities } from "../services/identity/index.js";
-import { runOraclePhase } from "../services/oracle/index.js";
-import { runScreenPanel } from "../services/screen-panel/index.js";
 import {
 	restoreCheckpoint,
 	saveCheckpoint,
 } from "../services/checkpoint/index.js";
+import type { Container } from "../services/container.js";
+import { getOrCreateContainer } from "../services/container.js";
+import { bootstrapIdentities } from "../services/identity/index.js";
+import { runOraclePhase } from "../services/oracle/index.js";
+import { runScreenPanel } from "../services/screen-panel/index.js";
+import { AGENTS } from "../session-manager.js";
+import type { ActivityLogger } from "../types/activity-logger.js";
+import type { AgentName } from "../types/agents.js";
+import type { SessionMetadata } from "../types/audit.js";
+import type { ScanJobParams } from "./env.js";
 import { reportFindings } from "./findings/index.js";
 import { recordExploitLaneOutcome } from "./findings/lane-status.js";
 import { ProgressEmitter } from "./progress/index.js";
@@ -48,9 +48,29 @@ import { ProgressEmitter } from "./progress/index.js";
  * higher-confidence queue. Within a group an agent failure is isolated (logged,
  * the others continue); report + attack-surface are best-effort synthesis.
  */
-const PREREQ_AGENTS: readonly AgentName[] = ["pre-recon", "recon", "threat-model"];
-const VULN_AGENTS: readonly AgentName[] = ["injection-vuln", "xss-vuln", "auth-vuln", "ssrf-vuln", "authz-vuln", "logic-vuln", "misconfig-web-vuln"];
-const EXPLOIT_AGENTS: readonly AgentName[] = ["injection-exploit", "xss-exploit", "auth-exploit", "ssrf-exploit", "authz-exploit", "logic-exploit", "misconfig-web-exploit"];
+const PREREQ_AGENTS: readonly AgentName[] = [
+	"pre-recon",
+	"recon",
+	"threat-model",
+];
+const VULN_AGENTS: readonly AgentName[] = [
+	"injection-vuln",
+	"xss-vuln",
+	"auth-vuln",
+	"ssrf-vuln",
+	"authz-vuln",
+	"logic-vuln",
+	"misconfig-web-vuln",
+];
+const EXPLOIT_AGENTS: readonly AgentName[] = [
+	"injection-exploit",
+	"xss-exploit",
+	"auth-exploit",
+	"ssrf-exploit",
+	"authz-exploit",
+	"logic-exploit",
+	"misconfig-web-exploit",
+];
 const SYNTHESIS_AGENTS: readonly AgentName[] = ["report", "attack-surface"];
 
 /**
@@ -98,9 +118,23 @@ export interface AgentContext {
 }
 
 /** Run one agent: own AuditSession, execute, emit progress, push partial findings. Throws on failure. */
-async function runAgent(agentName: AgentName, ctx: AgentContext): Promise<void> {
-	const { params, deliverablesPath, container, sessionMetadata, progress, completedAgents, logger } = ctx;
-	logger.info(`Starting agent ${agentName}`, { phase: AGENTS[agentName].displayName, scanId: params.scanId });
+async function runAgent(
+	agentName: AgentName,
+	ctx: AgentContext,
+): Promise<void> {
+	const {
+		params,
+		deliverablesPath,
+		container,
+		sessionMetadata,
+		progress,
+		completedAgents,
+		logger,
+	} = ctx;
+	logger.info(`Starting agent ${agentName}`, {
+		phase: AGENTS[agentName].displayName,
+		scanId: params.scanId,
+	});
 	await progress.started(agentName);
 
 	const auditSession = new AuditSession(sessionMetadata);
@@ -115,8 +149,12 @@ async function runAgent(agentName: AgentName, ctx: AgentContext): Promise<void> 
 				repoPath: params.repoPath,
 				deliverablesPath,
 				attemptNumber: 1,
-				...(params.configPath !== undefined && { configPath: params.configPath }),
-				...(params.configYaml !== undefined && { configYAML: params.configYaml }),
+				...(params.configPath !== undefined && {
+					configPath: params.configPath,
+				}),
+				...(params.configYaml !== undefined && {
+					configYAML: params.configYaml,
+				}),
 			},
 			auditSession,
 			logger,
@@ -144,15 +182,29 @@ async function runAgent(agentName: AgentName, ctx: AgentContext): Promise<void> 
  * emitted set by the findings gate. `recordExploitLaneOutcome` no-ops for any
  * non-exploit agent, so it is safe to call here for every agent in the group.
  */
-async function runGroup(agents: readonly AgentName[], concurrency: number, ctx: AgentContext): Promise<void> {
+async function runGroup(
+	agents: readonly AgentName[],
+	concurrency: number,
+	ctx: AgentContext,
+): Promise<void> {
 	const queue = [...agents];
 	const worker = async (): Promise<void> => {
 		for (let next = queue.shift(); next; next = queue.shift()) {
 			try {
 				await runAgent(next, ctx);
-				recordExploitLaneOutcome(ctx.deliverablesPath, next, "validated", ctx.logger);
+				recordExploitLaneOutcome(
+					ctx.deliverablesPath,
+					next,
+					"validated",
+					ctx.logger,
+				);
 			} catch (err) {
-				recordExploitLaneOutcome(ctx.deliverablesPath, next, "failed", ctx.logger);
+				recordExploitLaneOutcome(
+					ctx.deliverablesPath,
+					next,
+					"failed",
+					ctx.logger,
+				);
 				ctx.logger.error(`Agent ${next} failed; group continues`, {
 					scanId: ctx.params.scanId,
 					error: err instanceof Error ? err.message : String(err),
@@ -160,7 +212,9 @@ async function runGroup(agents: readonly AgentName[], concurrency: number, ctx: 
 			}
 		}
 	};
-	await Promise.all(Array.from({ length: Math.min(concurrency, agents.length) }, worker));
+	await Promise.all(
+		Array.from({ length: Math.min(concurrency, agents.length) }, worker),
+	);
 }
 
 /**
@@ -180,7 +234,10 @@ export async function runScanPipeline(
 	};
 
 	const container = getOrCreateContainer(params.scanId, sessionMetadata);
-	const deliverablesPath = deliverablesDir(params.repoPath, container.config.deliverablesSubdir);
+	const deliverablesPath = deliverablesDir(
+		params.repoPath,
+		container.config.deliverablesSubdir,
+	);
 
 	// Resume: if a checkpoint exists for this scanId, restore its deliverables and
 	// learn which phases already finished, so the guarded phases below skip them.
