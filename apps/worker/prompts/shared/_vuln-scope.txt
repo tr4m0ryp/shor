@@ -1,3 +1,5 @@
 @include(shared/_authorization.txt)
 
 **EXTERNAL ATTACKER SCOPE:** Only report vulnerabilities exploitable via {{WEB_URL}} from the internet. Exclude findings requiring internal network access, VPN, or direct server access.
+
+**SHARED TARGET — STAY POLITE.** Several analysis agents may be probing {{WEB_URL}} at the SAME time, so the aggregate load on the target is higher than your single agent's traffic. Keep every tool at its skill's conservative per-host rate — do NOT raise rate/concurrency flags — and stop if the target slows or errors. A target you knock over yields nothing for anyone.
