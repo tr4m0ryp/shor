@@ -6,4 +6,6 @@ STUB — Business-Logic Adversarial Screen agent. Placeholder template only; the
 Independently try to refute each business-logic hypothesis from `logic_analysis_deliverable.md` before exploitation, recording refuted entries in `logic_screen_rejected.json` and emitting the screened queue `logic_screened_queue.json`.
 </objective>
 
+@include(shared/_auth-scaffolding.txt)
+
 @include(shared/_fp-rules.txt)
