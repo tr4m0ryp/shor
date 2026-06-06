@@ -179,8 +179,15 @@ export interface FindingsSinkPayload {
 	status: "completed" | "failed" | "running";
 }
 
-/** The five vulnerability categories the pipeline produces queues for. */
-export type FindingCategory = "injection" | "xss" | "auth" | "ssrf" | "authz";
+/** The vulnerability categories the pipeline produces queues for. */
+export type FindingCategory =
+	| "injection"
+	| "xss"
+	| "auth"
+	| "ssrf"
+	| "authz"
+	| "logic"
+	| "misconfig-web";
 
 /**
  * A normalized vulnerability drawn from a per-category exploitation queue,
