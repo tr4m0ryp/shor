@@ -17,7 +17,7 @@
  * new skill first appears.
  */
 
-/** The 31 skill names (mirror of the repo `skills/<category>/<name>` dirs). */
+/** Skill names that map to an on-PATH CLI (mirror of the repo `skills/` dirs). */
 const KNOWN_SKILLS: ReadonlySet<string> = new Set([
 	// recon
 	"arjun", "dnsx", "ffuf", "gau", "httpx", "katana", "kxss", "naabu", "nmap",
@@ -27,7 +27,7 @@ const KNOWN_SKILLS: ReadonlySet<string> = new Set([
 	"interactsh-client", "jwt_tool", "nosqli", "playwright", "sqlmap", "ssrfmap",
 	"sstimap", "xsstrike",
 	// static-analysis
-	"gitleaks", "osv-scanner", "semgrep", "trufflehog",
+	"gitleaks", "osv-scanner", "semgrep", "trivy", "trufflehog",
 ]);
 
 /** Normalize a Bash leading token (strip path, drop a `.py`/`.sh` suffix). */
