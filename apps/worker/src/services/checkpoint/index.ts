@@ -61,6 +61,31 @@ function deliverablesSnapshot(root: string, scanId: string): string {
 }
 
 /**
+ * Recursively copy `src` → `dst`, CONTENT ONLY (no mode/timestamp preservation).
+ *
+ * `fs.cpSync` preserves file mode — per file it copies content then `chmod`s the
+ * destination. On a **gcsfuse** mount (the `/checkpoints` GCS volume) the content
+ * write succeeds but the chmod returns `EPERM` (objects have no POSIX mode), so
+ * cpSync aborts after the first file and the snapshot is left with a single file
+ * and no `phases.json` — silently disabling resume AND losing every deliverable.
+ * This copy issues only `mkdir` + content `writeFile` (operations gcsfuse allows),
+ * overwriting existing files (matches the old `force: true`). Symlinks/specials
+ * are skipped — deliverables are plain files and dirs.
+ */
+function copyTreeContentOnly(src: string, dst: string): void {
+	const stat = fs.statSync(src);
+	if (stat.isDirectory()) {
+		fs.mkdirSync(dst, { recursive: true });
+		for (const entry of fs.readdirSync(src)) {
+			copyTreeContentOnly(path.join(src, entry), path.join(dst, entry));
+		}
+	} else if (stat.isFile()) {
+		fs.mkdirSync(path.dirname(dst), { recursive: true });
+		fs.writeFileSync(dst, fs.readFileSync(src));
+	}
+}
+
+/**
  * The set of phases already completed for this scan (empty when checkpointing is
  * off or no manifest exists). Reading never throws — a malformed manifest is
  * treated as "nothing done".
