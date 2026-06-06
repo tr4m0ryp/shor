@@ -58,9 +58,10 @@ const MAX_WALK_ENTRIES = 20_000;
 
 /**
  * Recursively collect repo-relative POSIX paths under `repoPath`, skipping
- * build/vendor noise. Best-effort: unreadable directories are skipped.
+ * build/vendor noise. Best-effort: unreadable directories are skipped. Exported
+ * so the coverage census (`census.ts`) can reuse the same walk + skip rules.
  */
-async function collectRepoPaths(repoPath: string): Promise<string[]> {
+export async function collectRepoPaths(repoPath: string): Promise<string[]> {
 	const out: string[] = [];
 	const stack: string[] = [repoPath];
 
