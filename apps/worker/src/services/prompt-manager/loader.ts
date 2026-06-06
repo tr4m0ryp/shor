@@ -87,7 +87,11 @@ export async function loadPrompt(
 		//    a gap is a config bug to fix, not something to paper over at runtime.
 		const enhancedVariables: PromptVariables = { ...variables };
 
-		if (!(promptName in PLAYWRIGHT_SESSION_MAPPING)) {
+		const session =
+			PLAYWRIGHT_SESSION_MAPPING[
+				promptName as keyof typeof PLAYWRIGHT_SESSION_MAPPING
+			];
+		if (session === undefined) {
 			throw new PentestError(
 				`No Playwright session declared for agent prompt "${promptName}". ` +
 					`Every agent MUST be declared in PLAYWRIGHT_SESSION_MAPPING — refusing ` +
@@ -97,10 +101,6 @@ export async function loadPrompt(
 				{ promptName },
 			);
 		}
-		const session =
-			PLAYWRIGHT_SESSION_MAPPING[
-				promptName as keyof typeof PLAYWRIGHT_SESSION_MAPPING
-			];
 		enhancedVariables.PLAYWRIGHT_SESSION = session;
 		logger.info(`Assigned ${promptName} -> ${session}`);
 
