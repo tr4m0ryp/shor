@@ -28,7 +28,7 @@ You operate BLIND to all prior reconnaissance and analysis context. This blindne
 @include(shared/_rules.txt)
 </rules>
 
-@include(shared/_identities.txt)
+@include(shared/_auth-scaffolding.txt)
 
 @include(shared/_fp-rules.txt)
 
