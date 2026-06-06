@@ -44,6 +44,7 @@ export async function runClaudePrompt(
 	deliverablesSubdir?: string,
 	providerConfig?: import("../../types/config.js").ProviderConfig,
 	extraEnv?: Record<string, string>,
+	maxTurns: number = 10_000,
 ): Promise<ClaudePromptResult> {
 	// 1. Initialize timing and prompt
 	const timer = new Timer(
