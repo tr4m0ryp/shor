@@ -246,6 +246,7 @@ export function buildReconCoverage(
 			recorded: apiAccess.recorded,
 			apiBaseRecorded: apiAccess.apiBaseRecorded,
 			authRecorded: apiAccess.authRecorded,
+			tokenSourceRecorded: apiAccess.tokenSourceRecorded,
 			secretSuspected: apiAccess.secretSuspected,
 			gaps: apiAccess.gaps,
 		},
