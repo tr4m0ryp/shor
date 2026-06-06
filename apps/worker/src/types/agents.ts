@@ -58,7 +58,9 @@ export type PlaywrightSession =
 	| "agent2"
 	| "agent3"
 	| "agent4"
-	| "agent5";
+	| "agent5"
+	| "agent6"
+	| "agent7";
 
 import type { ActivityLogger } from "./activity-logger.js";
 
