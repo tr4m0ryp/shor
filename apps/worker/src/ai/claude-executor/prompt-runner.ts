@@ -83,7 +83,7 @@ export async function runClaudePrompt(
 	const claudeCli = process.env.SHOR_CLAUDE_CLI;
 	const options = {
 		model,
-		maxTurns: 10_000,
+		maxTurns,
 		cwd: sourceDir,
 		permissionMode: "bypassPermissions" as const,
 		allowDangerouslySkipPermissions: true,
