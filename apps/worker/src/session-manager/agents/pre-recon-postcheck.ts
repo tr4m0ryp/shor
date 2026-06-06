@@ -92,11 +92,12 @@ const HEADING_RE = /^#{1,4}[ \t]+(\d+)\.[ \t]*(.*)$/gm;
 export function auditSections(text: string): SectionAudit {
 	const found = new Map<number, { headingText: string; charOffset: number }>();
 	for (const m of text.matchAll(HEADING_RE)) {
+		if (m[1] === undefined) continue;
 		const num = Number(m[1]);
 		// First heading wins (a stray later "7." in prose can't override).
 		if (!found.has(num)) {
 			found.set(num, {
-				headingText: m[2].trim(),
+				headingText: (m[2] ?? "").trim(),
 				charOffset: m.index ?? 0,
 			});
 		}
