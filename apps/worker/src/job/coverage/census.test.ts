@@ -60,7 +60,9 @@ describe("extractCitedPaths", () => {
 	});
 
 	it("strips a leading ./", () => {
-		expect(extractCitedPaths("./src/routes/a.ts:1")).toContain("src/routes/a.ts");
+		expect(extractCitedPaths("./src/routes/a.ts:1")).toContain(
+			"src/routes/a.ts",
+		);
 	});
 });
 

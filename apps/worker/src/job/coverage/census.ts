@@ -149,7 +149,12 @@ export function auditCoverage(
 		else uncovered.push(rel);
 	}
 	const total = sourceFiles.length;
-	return { total, covered, uncovered, ratio: total === 0 ? 1 : covered / total };
+	return {
+		total,
+		covered,
+		uncovered,
+		ratio: total === 0 ? 1 : covered / total,
+	};
 }
 
 /**
