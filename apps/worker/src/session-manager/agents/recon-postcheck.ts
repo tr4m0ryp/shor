@@ -185,7 +185,9 @@ export function buildReconAuditAppendix(
 	if (floor.missingFloor.length > 0) {
 		const whyById = new Map(FLOOR.map((f) => [f.id, f.why]));
 		const lines = floor.missingFloor
-			.map((id) => `- \`${id}\` — ${whyById.get(id) ?? ""} (no evidence it ran)`)
+			.map(
+				(id) => `- \`${id}\` — ${whyById.get(id) ?? ""} (no evidence it ran)`,
+			)
 			.join("\n");
 		const rec =
 			floor.recommendedMissing.length > 0
