@@ -14,6 +14,7 @@ import {
 } from "../../job/coverage/index.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import type { AgentDefinition, AgentValidator } from "../../types/index.js";
+import { repoRootFromDeliverables } from "./deliverable-paths.js";
 import { runPreReconPostChecks } from "./pre-recon-postcheck.js";
 
 export const preReconAgent: AgentDefinition = {
