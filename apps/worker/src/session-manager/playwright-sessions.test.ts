@@ -5,6 +5,7 @@
 // as published by the Free Software Foundation.
 
 import { describe, expect, it } from "vitest";
+import { AGENTS } from "../session-manager.js";
 import { PLAYWRIGHT_SESSION_MAPPING } from "./playwright-sessions.js";
 
 const CATEGORIES = [
