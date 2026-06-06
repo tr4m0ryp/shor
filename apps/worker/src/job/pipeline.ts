@@ -245,19 +245,19 @@ export async function runScanPipeline(
 	if (completedPhases.has("vuln")) {
 		logger.info("checkpoint: skipping completed phase", { phase: "vuln" });
 	} else {
-		await runGroup(VULN_AGENTS, GROUP_CONCURRENCY, ctx);
+		await runGroup(VULN_AGENTS, groupWidth, ctx);
 		saveCheckpoint(params.scanId, "vuln", deliverablesPath, logger);
 	}
 	if (completedPhases.has("screen")) {
 		logger.info("checkpoint: skipping completed phase", { phase: "screen" });
 	} else {
-		await runScreenPanel(ctx, GROUP_CONCURRENCY);
+		await runScreenPanel(ctx, groupWidth);
 		saveCheckpoint(params.scanId, "screen", deliverablesPath, logger);
 	}
 	if (completedPhases.has("exploit")) {
 		logger.info("checkpoint: skipping completed phase", { phase: "exploit" });
 	} else {
-		await runGroup(EXPLOIT_AGENTS, GROUP_CONCURRENCY, ctx);
+		await runGroup(EXPLOIT_AGENTS, groupWidth, ctx);
 		saveCheckpoint(params.scanId, "exploit", deliverablesPath, logger);
 	}
 
