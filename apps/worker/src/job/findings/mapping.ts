@@ -45,6 +45,8 @@ const CLASS_LABEL: Record<FindingCategory, string> = {
 	auth: "Authentication",
 	ssrf: "SSRF",
 	authz: "Authorization",
+	logic: "Business Logic",
+	"misconfig-web": "Security Misconfiguration",
 };
 
 /**
@@ -135,6 +137,8 @@ function inferSeverity(
 		ssrf: ["medium", "high"],
 		xss: ["medium", "high"],
 		authz: ["medium", "high"],
+		logic: ["medium", "high"],
+		"misconfig-web": ["medium", "high"],
 	};
 	const [base, escalated] = table[category];
 	return disposition === "exploited" ? escalated : base;

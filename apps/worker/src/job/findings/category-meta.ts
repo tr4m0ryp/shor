@@ -76,6 +76,24 @@ export const CATEGORY_META: Record<FindingCategory, CategoryMeta> = {
 		witnessKeys: ["minimal_witness"],
 		severityKeys: ["severity_score"],
 	},
+	logic: {
+		defaultCwe: "CWE-840",
+		owasp: "A04:2021-Insecure Design",
+		locationKeys: ["vulnerable_code_location"],
+		defenseKeys: ["broken_invariant", "reason"],
+		endpointKeys: ["endpoint", "source_endpoint"],
+		witnessKeys: ["minimal_witness"],
+		severityKeys: ["severity_score"],
+	},
+	"misconfig-web": {
+		defaultCwe: "CWE-16",
+		owasp: "A05:2021-Security Misconfiguration",
+		locationKeys: ["vulnerable_code_location", "config_location"],
+		defenseKeys: ["misconfiguration_detail", "reason"],
+		endpointKeys: ["endpoint", "source_endpoint"],
+		witnessKeys: ["minimal_witness"],
+		severityKeys: ["severity_score"],
+	},
 };
 
 /** First non-empty string value among `keys` on `raw`, else "". */

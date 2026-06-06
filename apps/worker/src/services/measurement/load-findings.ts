@@ -47,7 +47,15 @@ export interface LoadedFindings {
 }
 
 function emptyByCategory(): Record<FindingCategory, number> {
-	return { injection: 0, xss: 0, auth: 0, ssrf: 0, authz: 0 };
+	return {
+		injection: 0,
+		xss: 0,
+		auth: 0,
+		ssrf: 0,
+		authz: 0,
+		logic: 0,
+		"misconfig-web": 0,
+	};
 }
 
 /**
