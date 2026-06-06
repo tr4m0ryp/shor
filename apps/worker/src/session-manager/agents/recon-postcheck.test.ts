@@ -75,15 +75,24 @@ describe("auditApiAccess", () => {
 	});
 
 	it("flags a token-bearing scheme with no tokenSource (Part-2 hand-off gap)", () => {
-		const raw = JSON.stringify({ apiBase: "http://h:8080", authScheme: "bearer" });
+		const raw = JSON.stringify({
+			apiBase: "http://h:8080",
+			authScheme: "bearer",
+		});
 		const a = auditApiAccess(JSON.parse(raw), raw, "/api");
 		expect(a.gaps).toContain("api-access-token-source");
 	});
 
 	it("does NOT require tokenSource for non-token schemes", () => {
-		const cookie = JSON.stringify({ apiBase: "http://h:8080", authScheme: "session-cookie" });
+		const cookie = JSON.stringify({
+			apiBase: "http://h:8080",
+			authScheme: "session-cookie",
+		});
 		expect(auditApiAccess(JSON.parse(cookie), cookie, "/api").gaps).toEqual([]);
-		const none = JSON.stringify({ apiBase: "http://h:8080", authScheme: "none" });
+		const none = JSON.stringify({
+			apiBase: "http://h:8080",
+			authScheme: "none",
+		});
 		expect(auditApiAccess(JSON.parse(none), none, "/api").gaps).toEqual([]);
 	});
 
