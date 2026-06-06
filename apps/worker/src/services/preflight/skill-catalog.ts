@@ -75,6 +75,7 @@ export const SKILL_BINARIES: Readonly<Record<string, string | null>> = {
 	gitleaks: "gitleaks",
 	"osv-scanner": "osv-scanner",
 	semgrep: "semgrep",
+	trivy: "trivy",
 	trufflehog: "trufflehog",
 };
 
