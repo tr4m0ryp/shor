@@ -11,10 +11,10 @@
  * policy, the agentName↔promptName reconciliation, and the pure evaluator.
  */
 
-export { evaluateCoverage, policyFor } from "./evaluate.js";
 export type { SkillReader } from "./evaluate.js";
-export { makeQueueFindingsReader } from "./findings.js";
+export { evaluateCoverage, policyFor } from "./evaluate.js";
 export type { FindingsReader } from "./findings.js";
+export { makeQueueFindingsReader } from "./findings.js";
 export {
 	COVERAGE_POLICY,
 	DISCOVERY_LENSES,
@@ -22,4 +22,8 @@ export {
 	MAX_DISCOVERY_ROUNDS,
 } from "./policy.js";
 export { agentForPrompt, promptForAgent } from "./reconcile.js";
-export type { CoveragePolicy, CoverageResult } from "./types.js";
+export type {
+	CoveragePolicy,
+	CoverageResult,
+	CoverageShortfall,
+} from "./types.js";
