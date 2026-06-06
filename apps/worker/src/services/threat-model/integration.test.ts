@@ -15,8 +15,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PROMPTS_DIR } from "../../paths.js";
-import { loadPrompt } from "../prompt-manager.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
+import { loadPrompt } from "../prompt-manager.js";
 import { assembleScanPromptContext, THREAT_MODEL_FILE } from "./assemble.js";
 
 const LEFTOVER = /\{\{[^}]+\}\}/;
@@ -34,6 +34,7 @@ const CONTEXT_PLACEHOLDERS = [
 	"{{VOTER_INDEX}}",
 	"{{IDENTITIES}}",
 	"{{FP_RULES}}",
+	"{{TARGET_POSTURE}}",
 	"{{WEB_URL}}",
 	"{{REPO_PATH}}",
 	"{{LOGIN_INSTRUCTIONS}}",
@@ -130,5 +131,60 @@ describe("threat-model prompt integration", () => {
 		expectAllPlaceholdersResolved(rendered);
 		expect(rendered).toContain("cross-tenant IDOR");
 		expect(rendered).toContain("tenant billing records");
+	});
+});
+
+describe("exploit-scope target posture (task 003)", () => {
+	it("default (unset) renders the minimal-impact posture — no regression", async () => {
+		const context = await assembleScanPromptContext(dir, null, {});
+		const rendered = await loadPrompt(
+			"exploit-injection",
+			VARS,
+			null,
+			noopLogger,
+			PROMPTS_DIR,
+			context,
+		);
+		expectAllPlaceholdersResolved(rendered);
+		expect(rendered).toContain("MINIMAL-IMPACT");
+		expect(rendered).toContain("HONOR no-DoS");
+		// The disposable authorization MUST NOT appear by default.
+		expect(rendered).not.toContain("DISPOSABLE TARGET");
+	});
+
+	it("SHOR_EXPENDABLE_TARGET injects the disposable-target posture into exploit", async () => {
+		const context = await assembleScanPromptContext(dir, null, {
+			SHOR_EXPENDABLE_TARGET: "1",
+		});
+		const rendered = await loadPrompt(
+			"exploit-injection",
+			VARS,
+			null,
+			noopLogger,
+			PROMPTS_DIR,
+			context,
+		);
+		expectAllPlaceholdersResolved(rendered);
+		expect(rendered).toContain("DISPOSABLE TARGET");
+		expect(rendered).toContain("No-DoS is relaxed");
+		expect(rendered).not.toContain("MINIMAL-IMPACT");
+	});
+
+	it("vuln scope stays non-mutating regardless of the posture flag", async () => {
+		const context = await assembleScanPromptContext(dir, null, {
+			SHOR_EXPENDABLE_TARGET: "true",
+		});
+		const rendered = await loadPrompt(
+			"vuln-injection",
+			VARS,
+			null,
+			noopLogger,
+			PROMPTS_DIR,
+			context,
+		);
+		// vuln prompts never reference {{TARGET_POSTURE}}, so the disposable block
+		// must not leak into the non-mutating discovery phase.
+		expect(rendered).not.toContain("DISPOSABLE TARGET");
+		expectAllPlaceholdersResolved(rendered);
 	});
 });

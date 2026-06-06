@@ -27,13 +27,46 @@ afterEach(async () => {
 });
 
 describe("assembleScanPromptContext", () => {
-	it("returns no fields (every var -> sentinel) when no artifacts/env present", async () => {
+	it("leaves artifact-backed fields unset when no artifacts/env present", async () => {
 		const ctx = await assembleScanPromptContext(dir, null, {});
-		expect(ctx).toEqual({});
 		expect(ctx.threatModel).toBeUndefined();
 		expect(ctx.historicalSeed).toBeUndefined();
 		expect(ctx.identities).toBeUndefined();
 		expect(ctx.fpRules).toBeUndefined();
+	});
+
+	it("defaults targetPosture to the minimal-impact block (never destructive)", async () => {
+		// OFF is the default: destructive exploitation must be strictly opt-in.
+		const ctx = await assembleScanPromptContext(dir, null, {});
+		expect(ctx.targetPosture).toBeDefined();
+		expect(ctx.targetPosture).toContain("MINIMAL-IMPACT");
+		expect(ctx.targetPosture).not.toMatch(/destructive .* are AUTHORIZED/i);
+	});
+
+	it("flips targetPosture OFF -> ON only on a truthy SHOR_EXPENDABLE_TARGET", async () => {
+		const off = await assembleScanPromptContext(dir, null, {});
+		const on = await assembleScanPromptContext(dir, null, {
+			SHOR_EXPENDABLE_TARGET: "true",
+		});
+		expect(on.targetPosture).toBeDefined();
+		expect(on.targetPosture).not.toEqual(off.targetPosture);
+		expect(on.targetPosture).toContain("DISPOSABLE TARGET");
+		expect(on.targetPosture).toMatch(/destructive/i);
+
+		// Every truthy spelling selects the disposable block...
+		for (const v of ["1", "yes", "TRUE", "Yes"]) {
+			const ctx = await assembleScanPromptContext(dir, null, {
+				SHOR_EXPENDABLE_TARGET: v,
+			});
+			expect(ctx.targetPosture).toEqual(on.targetPosture);
+		}
+		// ...and any non-truthy / unset value stays on the minimal-impact default.
+		for (const v of ["0", "false", "no", "", "destroy"]) {
+			const ctx = await assembleScanPromptContext(dir, null, {
+				SHOR_EXPENDABLE_TARGET: v,
+			});
+			expect(ctx.targetPosture).toEqual(off.targetPosture);
+		}
 	});
 
 	it("populates threatModel from threat_model.json", async () => {
@@ -122,7 +155,9 @@ describe("assembleScanPromptContext", () => {
 
 describe("renderIdentities", () => {
 	it("is allowlist-driven — emits label/role, never other fields", () => {
-		const out = renderIdentities([{ label: "a", role: "admin", secret: "s3cr3t" }]);
+		const out = renderIdentities([
+			{ label: "a", role: "admin", secret: "s3cr3t" },
+		]);
 		expect(out).toContain("a");
 		expect(out).toContain("admin");
 		expect(out).not.toContain("s3cr3t");
