@@ -71,7 +71,9 @@ export function auditVulnFloor(
 }
 
 /** Structured audit artifact. Pure. */
-export function buildVulnCoverage(audit: VulnFloorAudit): Record<string, unknown> {
+export function buildVulnCoverage(
+	audit: VulnFloorAudit,
+): Record<string, unknown> {
 	return {
 		generatedBy: "vuln deterministic post-validator",
 		category: audit.category,
