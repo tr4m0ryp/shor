@@ -38,7 +38,11 @@ const APPENDIX_MARKER = "## Appendix: Recon Tool-Floor Audit";
 const FLOOR: ReadonlyArray<{ id: string; names: string[]; why: string }> = [
 	{ id: "port-scan", names: ["naabu", "nmap"], why: "port discovery" },
 	{ id: "httpx", names: ["httpx"], why: "live HTTP probe / fingerprint" },
-	{ id: "nuclei", names: ["nuclei"], why: "templated misconfig/exposure sweep" },
+	{
+		id: "nuclei",
+		names: ["nuclei"],
+		why: "templated misconfig/exposure sweep",
+	},
 ];
 
 /** Recommended but not floor — reported for visibility, never warned on. */
@@ -71,7 +75,8 @@ export function auditReconFloor(
 	deliverableText: string,
 	scratchpadFiles: readonly string[],
 ): ReconFloorAudit {
-	const haystack = `${deliverableText}\n${scratchpadFiles.join("\n")}`.toLowerCase();
+	const haystack =
+		`${deliverableText}\n${scratchpadFiles.join("\n")}`.toLowerCase();
 	const has = (name: string): boolean => haystack.includes(name);
 
 	const floor = FLOOR.map((f) => ({
@@ -113,7 +118,9 @@ export function buildReconAuditAppendix(audit: ReconFloorAudit): string {
 }
 
 /** Structured audit artifact. Pure. */
-export function buildReconCoverage(audit: ReconFloorAudit): Record<string, unknown> {
+export function buildReconCoverage(
+	audit: ReconFloorAudit,
+): Record<string, unknown> {
 	return {
 		generatedBy: "recon deterministic post-validator",
 		floor: audit.floor,
