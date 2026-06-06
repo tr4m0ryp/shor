@@ -128,35 +128,51 @@ export const preReconValidator: AgentValidator = async (
 	const manifest = await emitCoverageManifest(sourceDir, logger);
 
 	const deliverable = path.join(sourceDir, DELIVERABLE);
-	if (await fs.pathExists(deliverable)) return true;
 
-	const clientOnly =
-		isTierCovered(manifest, "frontend") &&
-		!isTierCovered(manifest, "backend");
+	// Degrade path: synthesize a placeholder when the agent produced no
+	// deliverable (black-box / no source / client-tier only) so the scan never
+	// aborts at agent 1/14.
+	if (!(await fs.pathExists(deliverable))) {
+		const clientOnly =
+			isTierCovered(manifest, "frontend") &&
+			!isTierCovered(manifest, "backend");
 
-	const coverage = path.join(sourceDir, "coverage_check.md");
-	const notes = (await fs.pathExists(coverage)) ? await fs.readFile(coverage, "utf8") : "";
+		const coverage = path.join(sourceDir, "coverage_check.md");
+		const notes = (await fs.pathExists(coverage)) ? await fs.readFile(coverage, "utf8") : "";
 
-	const scopeNote = clientOnly
-		? `The uploaded repository classifies as CLIENT-TIER ONLY (frontend present, ` +
-			`no server framework/route handlers/ORM in source). Any backend reachable ` +
-			`from the live target is an UNSEEN trust boundary — its source was not ` +
-			`provided. Proceeding with live-target reconnaissance; downstream agents ` +
-			`probe the running application for that unseen surface.`
-		: `No source-code deliverable was produced. This is a black-box scan (no ` +
-			`repository was provided) or the repository contained no analyzable source. ` +
-			`Proceeding with live-target reconnaissance; downstream agents operate ` +
-			`against the running application.`;
+		const scopeNote = clientOnly
+			? `The uploaded repository classifies as CLIENT-TIER ONLY (frontend present, ` +
+				`no server framework/route handlers/ORM in source). Any backend reachable ` +
+				`from the live target is an UNSEEN trust boundary — its source was not ` +
+				`provided. Proceeding with live-target reconnaissance; downstream agents ` +
+				`probe the running application for that unseen surface.`
+			: `No source-code deliverable was produced. This is a black-box scan (no ` +
+				`repository was provided) or the repository contained no analyzable source. ` +
+				`Proceeding with live-target reconnaissance; downstream agents operate ` +
+				`against the running application.`;
 
-	const synthesized =
-		`# Pre-recon Code Analysis\n\n` +
-		`${scopeNote}\n\n` +
-		(notes ? `## Coverage notes\n\n${notes}\n` : "");
-	await fs.writeFile(deliverable, synthesized);
-	logger.warn(
-		clientOnly
-			? "pre-recon deliverable missing; repo is client-tier only — synthesized a placeholder noting the unseen backend trust boundary so the scan continues"
-			: "pre-recon deliverable missing (black-box / no source); synthesized a placeholder so the scan continues",
+		const synthesized =
+			`# Pre-recon Code Analysis\n\n` +
+			`${scopeNote}\n\n` +
+			(notes ? `## Coverage notes\n\n${notes}\n` : "");
+		await fs.writeFile(deliverable, synthesized);
+		logger.warn(
+			clientOnly
+				? "pre-recon deliverable missing; repo is client-tier only — synthesized a placeholder noting the unseen backend trust boundary so the scan continues"
+				: "pre-recon deliverable missing (black-box / no source); synthesized a placeholder so the scan continues",
+		);
+	}
+
+	// Deterministic post-checks: verify how much backend source the agent
+	// actually cited (coverage census) and enforce the downstream section-parse
+	// contract, emitting a structured index. Runs on BOTH the agent-authored and
+	// the synthesized path. Best-effort — never blocks the scan.
+	await runPreReconPostChecks(
+		sourceDir,
+		deliverable,
+		repoRootFromDeliverables(sourceDir),
+		logger,
 	);
+
 	return true;
 };
