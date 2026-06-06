@@ -24,25 +24,25 @@ import type { ActivityLogger } from "../types/activity-logger.js";
 import type { SessionMetadata } from "../types/audit.js";
 import type { ScanJobParams } from "./env.js";
 import { runOraclePhase } from "../services/oracle/index.js";
+import { runScreenPanel } from "../services/screen-panel/index.js";
 import { reportFindings } from "./findings/index.js";
 import { recordExploitLaneOutcome } from "./findings/lane-status.js";
 import { ProgressEmitter } from "./progress/index.js";
 
 /**
  * Pipeline stages (ADR-051). pre-recon and recon are prerequisites and run
- * sequentially (fail-fast — the vuln agents read their deliverables). The vuln,
- * screen, and exploit agents are each mutually independent within their group, so
- * each group runs CONCURRENTLY (2-wide — keeps us under the flash rate limit and
- * ~2 headless browsers within the job's RAM). The adversarial screen agents run
- * between discovery and exploitation: each independently tries to refute its
- * category's hypotheses (blind to recon context) so the exploit agents receive a
- * pre-filtered, higher-confidence queue. Within a group an agent failure is
- * isolated (logged, the others continue); report + attack-surface are best-effort
- * synthesis.
+ * sequentially (fail-fast — the vuln agents read their deliverables). The vuln and
+ * exploit agents are each mutually independent within their group, so each group
+ * runs CONCURRENTLY (2-wide — keeps us under the flash rate limit and ~2 headless
+ * browsers within the job's RAM). Between discovery and exploitation runs the
+ * adversarial screen PANEL (T8 + T11): per category, each candidate hypothesis is
+ * judged by N independent lens-voters (blind to recon context) whose structured
+ * verdicts aggregate by majority, so the exploit agents receive a pre-filtered,
+ * higher-confidence queue. Within a group an agent failure is isolated (logged,
+ * the others continue); report + attack-surface are best-effort synthesis.
  */
 const PREREQ_AGENTS: readonly AgentName[] = ["pre-recon", "recon", "threat-model"];
 const VULN_AGENTS: readonly AgentName[] = ["injection-vuln", "xss-vuln", "auth-vuln", "ssrf-vuln", "authz-vuln", "logic-vuln", "misconfig-web-vuln"];
-const SCREEN_AGENTS: readonly AgentName[] = ["injection-screen", "xss-screen", "auth-screen", "ssrf-screen", "authz-screen", "logic-screen", "misconfig-web-screen"];
 const EXPLOIT_AGENTS: readonly AgentName[] = ["injection-exploit", "xss-exploit", "auth-exploit", "ssrf-exploit", "authz-exploit", "logic-exploit", "misconfig-web-exploit"];
 const SYNTHESIS_AGENTS: readonly AgentName[] = ["report", "attack-surface"];
 
@@ -177,12 +177,15 @@ export async function runScanPipeline(
 		await runAgent(agentName, ctx);
 	}
 
-	// 2) Vulnerability analysis → adversarial screen → exploitation — each 2-wide
-	// and fault-isolated. The screen agents independently try to refute each
-	// hypothesis before the exploit agents see it, so the exploit pass works from a
-	// pre-filtered, higher-confidence queue (T6).
+	// 2) Vulnerability analysis → adversarial screen panel → exploitation. The vuln
+	// and exploit groups are each 2-wide and fault-isolated. The screen step is no
+	// longer one agent per category but an N-vote diverse-lens panel (T8 + T11):
+	// per candidate, N independent lens-voters emit structured verdicts that
+	// aggregate by majority into `{category}_screen_verdicts.json`. The exploit pass
+	// then works from a pre-filtered, higher-confidence queue (T6). Voters run with
+	// the same GROUP_CONCURRENCY bound.
 	await runGroup(VULN_AGENTS, GROUP_CONCURRENCY, ctx);
-	await runGroup(SCREEN_AGENTS, GROUP_CONCURRENCY, ctx);
+	await runScreenPanel(ctx, GROUP_CONCURRENCY);
 	await runGroup(EXPLOIT_AGENTS, GROUP_CONCURRENCY, ctx);
 
 	// 2b) Oracle phase — post-exploitation adjudication over the exploited/screened
