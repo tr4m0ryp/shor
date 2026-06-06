@@ -7,8 +7,16 @@
 import type { PlaywrightSession } from "../types/index.js";
 
 /**
- * Playwright session mapping — assigns each agent to a specific session for browser isolation.
- * Keys are `promptTemplate` values from the AGENTS registry.
+ * Playwright session mapping — assigns each agent prompt to a browser session for
+ * isolation. Keys are `promptTemplate` values from the AGENTS registry.
+ *
+ * This map MUST be EXHAUSTIVE over every registered agent. `loadPrompt` now FAILS
+ * FAST (throws) for any prompt not declared here instead of silently falling back
+ * to a shared session — that poor fallback once let threat-model, the screen
+ * voters, and logic/misconfig-web collide on `agent1`. Browserless agents
+ * (threat-model, screen voters) are still declared explicitly; their session is
+ * simply unused. A unit test asserts every registered agent appears here, so a
+ * new agent without a declaration fails CI rather than degrading at runtime.
  */
 export const PLAYWRIGHT_SESSION_MAPPING: Record<string, PlaywrightSession> =
 	Object.freeze({
@@ -17,6 +25,9 @@ export const PLAYWRIGHT_SESSION_MAPPING: Record<string, PlaywrightSession> =
 
 		// Phase 2: Reconnaissance
 		recon: "agent2",
+
+		// Phase 2b: Threat model (synthesis; browserless — session declared, unused).
+		"threat-model": "agent1",
 
 		// Phase 3: Vulnerability Analysis (7 parallel agents — one DISTINCT browser
 		// session each so a full-width group never shares a profile. logic +
