@@ -27,5 +27,9 @@ export function repoRootFromDeliverables(sourceDir: string): string {
 
 /** The per-run scratchpad dir (`<repo>/.storron/scratchpad`) siblings the deliverables. */
 export function scratchpadDir(sourceDir: string): string {
-	return path.join(repoRootFromDeliverables(sourceDir), ".storron", "scratchpad");
+	return path.join(
+		repoRootFromDeliverables(sourceDir),
+		".storron",
+		"scratchpad",
+	);
 }
