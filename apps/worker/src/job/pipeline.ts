@@ -216,14 +216,34 @@ export async function runScanPipeline(
 	// aggregate by majority into `{category}_screen_verdicts.json`. The exploit pass
 	// then works from a pre-filtered, higher-confidence queue (T6). Voters run with
 	// the same GROUP_CONCURRENCY bound.
-	await runGroup(VULN_AGENTS, GROUP_CONCURRENCY, ctx);
-	await runScreenPanel(ctx, GROUP_CONCURRENCY);
-	await runGroup(EXPLOIT_AGENTS, GROUP_CONCURRENCY, ctx);
+	if (completedPhases.has("vuln")) {
+		logger.info("checkpoint: skipping completed phase", { phase: "vuln" });
+	} else {
+		await runGroup(VULN_AGENTS, GROUP_CONCURRENCY, ctx);
+		saveCheckpoint(params.scanId, "vuln", deliverablesPath, logger);
+	}
+	if (completedPhases.has("screen")) {
+		logger.info("checkpoint: skipping completed phase", { phase: "screen" });
+	} else {
+		await runScreenPanel(ctx, GROUP_CONCURRENCY);
+		saveCheckpoint(params.scanId, "screen", deliverablesPath, logger);
+	}
+	if (completedPhases.has("exploit")) {
+		logger.info("checkpoint: skipping completed phase", { phase: "exploit" });
+	} else {
+		await runGroup(EXPLOIT_AGENTS, GROUP_CONCURRENCY, ctx);
+		saveCheckpoint(params.scanId, "exploit", deliverablesPath, logger);
+	}
 
 	// 2b) Oracle phase — post-exploitation adjudication over the exploited/screened
 	// dispositions. No-op today (task 013 fills `runOraclePhase`); runs before
 	// synthesis so the report/attack-surface see the adjudicated set.
-	await runOraclePhase(ctx);
+	if (completedPhases.has("oracle")) {
+		logger.info("checkpoint: skipping completed phase", { phase: "oracle" });
+	} else {
+		await runOraclePhase(ctx);
+		saveCheckpoint(params.scanId, "oracle", deliverablesPath, logger);
+	}
 
 	// 3) Synthesis — best-effort; a failure here must not discard the findings.
 	for (const agentName of SYNTHESIS_AGENTS) {
