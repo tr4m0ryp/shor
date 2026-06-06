@@ -58,7 +58,10 @@ export async function interpolateVariables(
 				/{{PLAYWRIGHT_SESSION}}/g,
 				variables.PLAYWRIGHT_SESSION || "agent1",
 			)
-			.replace(/{{AUTH_CONTEXT}}/g, buildAuthContext(config))
+			.replace(
+				/{{AUTH_CONTEXT}}/g,
+				buildAuthContext(config, context.identities),
+			)
 			.replace(
 				/{{DESCRIPTION}}/g,
 				config?.description ? `Description: ${config.description}` : "",

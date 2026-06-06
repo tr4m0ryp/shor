@@ -23,6 +23,8 @@ export enum DeliverableType {
 	AUTH_ANALYSIS = "AUTH_ANALYSIS",
 	AUTHZ_ANALYSIS = "AUTHZ_ANALYSIS",
 	SSRF_ANALYSIS = "SSRF_ANALYSIS",
+	LOGIC_ANALYSIS = "LOGIC_ANALYSIS",
+	MISCONFIG_WEB_ANALYSIS = "MISCONFIG_WEB_ANALYSIS",
 
 	// Exploitation agents
 	INJECTION_EVIDENCE = "INJECTION_EVIDENCE",
@@ -30,6 +32,8 @@ export enum DeliverableType {
 	AUTH_EVIDENCE = "AUTH_EVIDENCE",
 	AUTHZ_EVIDENCE = "AUTHZ_EVIDENCE",
 	SSRF_EVIDENCE = "SSRF_EVIDENCE",
+	LOGIC_EVIDENCE = "LOGIC_EVIDENCE",
+	MISCONFIG_WEB_EVIDENCE = "MISCONFIG_WEB_EVIDENCE",
 }
 
 /**
@@ -43,9 +47,13 @@ export const DELIVERABLE_FILENAMES: Record<DeliverableType, string> = {
 	[DeliverableType.AUTH_ANALYSIS]: "auth_analysis_deliverable.md",
 	[DeliverableType.AUTHZ_ANALYSIS]: "authz_analysis_deliverable.md",
 	[DeliverableType.SSRF_ANALYSIS]: "ssrf_analysis_deliverable.md",
+	[DeliverableType.LOGIC_ANALYSIS]: "logic_analysis_deliverable.md",
+	[DeliverableType.MISCONFIG_WEB_ANALYSIS]: "misconfig-web_analysis_deliverable.md",
 	[DeliverableType.INJECTION_EVIDENCE]: "injection_exploitation_evidence.md",
 	[DeliverableType.XSS_EVIDENCE]: "xss_exploitation_evidence.md",
 	[DeliverableType.AUTH_EVIDENCE]: "auth_exploitation_evidence.md",
 	[DeliverableType.AUTHZ_EVIDENCE]: "authz_exploitation_evidence.md",
 	[DeliverableType.SSRF_EVIDENCE]: "ssrf_exploitation_evidence.md",
+	[DeliverableType.LOGIC_EVIDENCE]: "logic_exploitation_evidence.md",
+	[DeliverableType.MISCONFIG_WEB_EVIDENCE]: "misconfig-web_exploitation_evidence.md",
 };

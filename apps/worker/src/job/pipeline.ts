@@ -23,6 +23,7 @@ import type { AgentName } from "../types/agents.js";
 import type { ActivityLogger } from "../types/activity-logger.js";
 import type { SessionMetadata } from "../types/audit.js";
 import type { ScanJobParams } from "./env.js";
+import { bootstrapIdentities } from "../services/identity/index.js";
 import { runOraclePhase } from "../services/oracle/index.js";
 import { runScreenPanel } from "../services/screen-panel/index.js";
 import { reportFindings } from "./findings/index.js";
@@ -171,6 +172,19 @@ export async function runScanPipeline(
 		completedAgents,
 		logger,
 	};
+
+	// 0) Multi-identity bootstrap (task 008) — provision per-identity session slots
+	// and write scan_identities.json BEFORE the prereq loop, so even threat-model
+	// sees the identity set. Best-effort: bootstrapIdentities never throws, but we
+	// wrap defensively so a surprise fault here can never abort the scan.
+	try {
+		await bootstrapIdentities(ctx);
+	} catch (err) {
+		logger.error("Identity bootstrap threw unexpectedly; continuing", {
+			scanId: params.scanId,
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
 
 	// 1) Prerequisites — sequential, fail-fast (vuln agents depend on these).
 	for (const agentName of PREREQ_AGENTS) {
