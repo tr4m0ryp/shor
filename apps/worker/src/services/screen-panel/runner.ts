@@ -165,8 +165,14 @@ export async function runScreenPanel(
 	});
 
 	for (const category of SCREEN_CATEGORIES) {
+		// Emit progress per screen agent so the dashboard shows the adversarial-screen
+		// phase running and the timeline advances (the panel runs outside the normal
+		// runAgent path that emits these). Declared before the try so catch can report.
+		const screenAgent = `${category}-screen` as AgentName;
+		const startedAt = Date.now();
+		await progress.started(screenAgent);
 		try {
-			const def = AGENTS[`${category}-screen` as AgentName];
+			const def = AGENTS[screenAgent];
 			const queueFile = path.join(
 				deliverablesPath,
 				`${category}_exploitation_queue.json`,
