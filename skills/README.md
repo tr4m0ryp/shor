@@ -38,6 +38,8 @@ Claude Agent SDK auto-discovers them.
 | [gitleaks](gitleaks/SKILL.md) | secrets in repo + git history |
 | [trufflehog](trufflehog/SKILL.md) | secrets with live provider verification |
 | [osv-scanner](osv-scanner/SKILL.md) | dependency CVEs via OSV (SCA) |
+| [trivy](trivy/SKILL.md) | SCA (npm + NuGet) + IaC/Docker/K8s misconfig + secrets |
+| [git-security-history](git-security-history/SKILL.md) | mine repo history for prior security fixes (procedure) |
 
 ## Exploit — live PoC (exploitation)
 
