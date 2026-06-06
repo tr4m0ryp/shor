@@ -48,6 +48,8 @@ export interface RunStructuredArgs {
   providerConfig?: ProviderConfig;
   /** Extra environment variables forwarded to the SDK subprocess. */
   extraEnv?: Record<string, string>;
+  /** Per-run turn cap; defaults to the runner's 10_000. Screen voters pass a low cap so a screen can't run away. */
+  maxTurns?: number;
 }
 
 /**
