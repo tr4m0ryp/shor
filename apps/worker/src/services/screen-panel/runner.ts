@@ -137,7 +137,7 @@ export async function runScreenPanel(
 	ctx: AgentContext,
 	concurrency: number = DEFAULT_CONCURRENCY,
 ): Promise<void> {
-	const { params, deliverablesPath, container, logger } = ctx;
+	const { params, deliverablesPath, container, logger, progress } = ctx;
 	const panelSize = resolvePanelSize(process.env);
 	const deliverablesSubdir = path.relative(params.repoPath, deliverablesPath);
 	const providerConfig = container.config.providerConfig;
