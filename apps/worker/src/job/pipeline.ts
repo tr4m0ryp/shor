@@ -166,6 +166,15 @@ export async function runScanPipeline(
 	const container = getOrCreateContainer(params.scanId, sessionMetadata);
 	const deliverablesPath = deliverablesDir(params.repoPath, container.config.deliverablesSubdir);
 
+	// Resume: if a checkpoint exists for this scanId, restore its deliverables and
+	// learn which phases already finished, so the guarded phases below skip them.
+	// No-op (empty set) when checkpointing is unwired or there is no prior run.
+	const completedPhases = restoreCheckpoint(
+		params.scanId,
+		deliverablesPath,
+		logger,
+	);
+
 	const completedAgents: AgentRunSummary[] = [];
 	const ctx: AgentContext = {
 		params,
