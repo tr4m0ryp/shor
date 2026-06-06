@@ -13,7 +13,10 @@
  */
 
 import { evaluateCoverage } from "../../services/coverage/evaluate.js";
-import type { CoverageResult } from "../../services/coverage/types.js";
+import type {
+	CoverageResult,
+	CoverageShortfall,
+} from "../../services/coverage/types.js";
 import type { AgentName } from "../../types/agents.js";
 
 /** The slice of CoverageResult surfaced in the progress snapshot. */
@@ -21,6 +24,14 @@ export interface CoverageSummary {
 	ran: string[];
 	missing: string[];
 	floor: number;
+	/**
+	 * Present ONLY for an agent that proceeded BELOW its breadth floor (T4): the
+	 * structured "still below floor … proceeding" signal, surfaced so the
+	 * dashboard can flag a below-floor run instead of it living only in logs.
+	 * Absent when the floor was met (backward compatible — older dashboards
+	 * simply ignore the field).
+	 */
+	shortfall?: CoverageShortfall;
 }
 
 /**
@@ -41,6 +52,9 @@ export function buildCoverageMap(
 			ran: result.ran,
 			missing: result.missing,
 			floor: result.floor,
+			// Carry the below-floor shortfall through to the artifact only when set
+			// (mirrors the optional `coverage` field's backward-compatible shape).
+			...(result.shortfall !== undefined && { shortfall: result.shortfall }),
 		};
 	}
 	return out;

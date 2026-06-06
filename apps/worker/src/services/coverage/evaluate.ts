@@ -21,9 +21,9 @@
 
 import { skillTracker } from "../../job/progress/skill-tracker.js";
 import type { AgentName } from "../../types/agents.js";
+import { RECOMMENDED } from "../prompt-manager/skill-recommendations.js";
 import { COVERAGE_POLICY } from "./policy.js";
 import { promptForAgent } from "./reconcile.js";
-import { RECOMMENDED } from "../prompt-manager/skill-recommendations.js";
 import type { CoveragePolicy, CoverageResult } from "./types.js";
 
 /** Reads the distinct skills an agent has exercised, keyed by agentName. */
@@ -57,6 +57,9 @@ export function policyFor(agent: AgentName): CoveragePolicy | undefined {
  * - `missing`     = candidates it did NOT exercise (soft gap)
  * - `hardMissing` = `required` tools it did NOT exercise (hard gap)
  * - `ok`          = `ran.length >= minCount` AND `hardMissing` is empty
+ * - `shortfall`   = a structured below-floor record, set ONLY when `ok` is false
+ *   (the accept-and-proceed signal the coverage artifact surfaces); absent
+ *   otherwise.
  *
  * No policy → `{ ok: true, ran: [], missing: [], hardMissing: [], floor: 0 }`.
  */
@@ -75,5 +78,23 @@ export function evaluateCoverage(
 	const hardMissing = policy.required.filter((tool) => !used.has(tool));
 	const ok = ran.length >= policy.minCount && hardMissing.length === 0;
 
-	return { ok, ran, missing, hardMissing, floor: policy.minCount };
+	const base: CoverageResult = {
+		ok,
+		ran,
+		missing,
+		hardMissing,
+		floor: policy.minCount,
+	};
+	// Accept-and-proceed: below floor we do NOT block; we only attach a
+	// structured shortfall so the run is visible in the coverage artifact.
+	if (ok) return base;
+	return {
+		...base,
+		shortfall: {
+			belowFloor: true,
+			ranTools: ran.length,
+			requiredFloor: policy.minCount,
+			missing,
+		},
+	};
 }
