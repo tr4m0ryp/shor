@@ -82,6 +82,8 @@ export interface ApiAccessAudit {
 	recorded: boolean;
 	apiBaseRecorded: boolean;
 	authRecorded: boolean;
+	/** A token-bearing scheme carries a credential-free `tokenSource` pointer. */
+	tokenSourceRecorded: boolean;
 	/** The deliverable references an API/backend (so a recipe is expected). */
 	apiSignalsInReport: boolean;
 	/** A secret (e.g. JWT) appears in the recipe — a hygiene violation. */
@@ -89,6 +91,9 @@ export interface ApiAccessAudit {
 	/** Actionable gap ids (raised only when an API is in play). */
 	gaps: string[];
 }
+
+/** Auth schemes that hand downstream a token it must fetch from the session seam. */
+const TOKEN_BEARING_RE = /bearer|oidc|api-?key|token/;
 
 /**
  * Audit the live-recon floor against textual evidence. Pure: `deliverableText`
