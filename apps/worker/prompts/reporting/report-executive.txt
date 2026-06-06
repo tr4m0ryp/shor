@@ -32,6 +32,8 @@ Authentication Context:
 {{AUTH_CONTEXT}}
 </context>
 
+@include(shared/_auth-scaffolding.txt)
+
 <input_files>
 Read, in this order:
 - `.storron/deliverables/pre_recon_deliverable.md` — initial scans (nmap, subfinder, whatweb) and source-code reconnaissance
