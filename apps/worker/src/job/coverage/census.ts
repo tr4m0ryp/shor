@@ -103,7 +103,9 @@ const CITED_TOKEN_RE = /([A-Za-z0-9_.\-/\\]+\.[A-Za-z0-9]{1,6})(?::\d+){0,2}/g;
 export function extractCitedPaths(text: string): string[] {
 	const out = new Set<string>();
 	for (const m of text.matchAll(CITED_TOKEN_RE)) {
-		const token = normalize(m[1]).replace(/^\.\//, "");
+		const raw = m[1];
+		if (!raw) continue;
+		const token = normalize(raw).replace(/^\.\//, "");
 		if (token.includes("/") || token.includes(".")) out.add(token);
 	}
 	return [...out];
