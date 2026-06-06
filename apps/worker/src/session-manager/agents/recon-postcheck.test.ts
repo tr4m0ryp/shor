@@ -16,6 +16,7 @@ const CLEAN_FLOOR = auditReconFloor("nmap httpx nuclei", []);
 const RECIPE = JSON.stringify({
 	apiBase: "http://h:8080/",
 	authScheme: "oidc-bearer",
+	tokenSource: "named session storage-state, localStorage access_token",
 });
 const CLEAN_API = auditApiAccess(
 	JSON.parse(RECIPE),
