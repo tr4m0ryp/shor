@@ -9,8 +9,8 @@ frontmatter is always in context; the body loads on demand when an agent
 escalates to that tool (ADR-035). Preinstalled into the worker image so the
 Claude Agent SDK auto-discovers them.
 
-31 skills total: 30 offensive tools (the §5.3 toolkit matrix) + the
-`authz-recipe` procedure (the one category with no headless CLI).
+33 skills total: 31 tool wrappers (the §5.3 toolkit matrix + `trivy`) plus two
+procedures with no single CLI — `authz-recipe` and `git-security-history`.
 
 ## Recon — discovery (pre-recon / recon)
 
