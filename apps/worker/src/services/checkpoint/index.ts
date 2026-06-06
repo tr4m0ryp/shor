@@ -126,9 +126,9 @@ export function restoreCheckpoint(
 		const done = loadCompletedPhases(scanId);
 		if (done.size === 0 || !fs.existsSync(snapshot)) return new Set();
 		fs.mkdirSync(deliverablesPath, { recursive: true });
-		// Copy snapshot → local deliverables (restore). force:true overwrites; we
-		// trust the snapshot over any partial local state.
-		fs.cpSync(snapshot, deliverablesPath, { recursive: true, force: true });
+		// Restore snapshot → local deliverables, content-only (overwrites). Same
+		// gcsfuse-safe copy as save: the snapshot side is the GCS mount.
+		copyTreeContentOnly(snapshot, deliverablesPath);
 		logger.info("checkpoint: restored deliverables; resuming", {
 			scanId,
 			completedPhases: [...done],
