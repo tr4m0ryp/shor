@@ -30,6 +30,7 @@ import type { AgentName } from "../../types/agents.js";
 import type { DistributedConfig } from "../../types/config.js";
 import { isErr } from "../../types/result.js";
 import { loadPrompt } from "../prompt-manager.js";
+import { assembleScanPromptContext } from "../threat-model/index.js";
 import { buildVerdictEntry } from "./aggregate.js";
 import { lensesForCategory, resolvePanelSize } from "./lenses.js";
 import type { ScreenVerdictEntry, ScreenVote } from "./types.js";
