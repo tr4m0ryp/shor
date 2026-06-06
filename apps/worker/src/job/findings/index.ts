@@ -76,12 +76,16 @@ function applyImprovedText(
 			const imp = byId.get(String(r.id));
 			if (!imp) return r;
 			const overlay: Partial<FindingRecord> & { title?: string } = {};
-			if (typeof imp.title === "string" && imp.title.trim()) overlay.title = imp.title;
-			if (typeof imp.evidence === "string" && imp.evidence.trim()) overlay.evidence = imp.evidence;
+			if (typeof imp.title === "string" && imp.title.trim())
+				overlay.title = imp.title;
+			if (typeof imp.evidence === "string" && imp.evidence.trim())
+				overlay.evidence = imp.evidence;
 			if (typeof imp.missing_defense === "string" && imp.missing_defense.trim())
 				overlay.missing_defense = imp.missing_defense;
-			if (typeof imp.remediation === "string" && imp.remediation.trim()) overlay.remediation = imp.remediation;
-			if (typeof imp.safe_poc === "string" && imp.safe_poc.trim()) overlay.safe_poc = imp.safe_poc;
+			if (typeof imp.remediation === "string" && imp.remediation.trim())
+				overlay.remediation = imp.remediation;
+			if (typeof imp.safe_poc === "string" && imp.safe_poc.trim())
+				overlay.safe_poc = imp.safe_poc;
 			if (Array.isArray(imp.repro_steps) && imp.repro_steps.length)
 				overlay.repro_steps = imp.repro_steps.map((s) => String(s));
 			return { ...r, ...overlay };
@@ -152,8 +156,12 @@ export async function collectFindings(
 		const map = evidenceByCategory.get(category);
 		if (!map || map.size === 0) continue;
 		const catVulns = vulns.filter((v) => v.category === category);
-		const matched = catVulns.filter((v) => v.disposition === "exploited" || v.disposition === "blocked").length;
-		const exploited = catVulns.filter((v) => v.disposition === "exploited").length;
+		const matched = catVulns.filter(
+			(v) => v.disposition === "exploited" || v.disposition === "blocked",
+		).length;
+		const exploited = catVulns.filter(
+			(v) => v.disposition === "exploited",
+		).length;
 		if (catVulns.length > 0 && matched === 0) {
 			logger.warn(
 				"Evidence present but matched ZERO queue findings — disposition drift; all stay queued/firm",
@@ -183,7 +191,10 @@ export async function collectFindings(
 	// Final emitted-set passes (ordered): cluster near-duplicates by root cause
 	// (T12, async + opt-in), then grade. `gradeFindings` is an identity no-op today
 	// (task 015); the dedup pass is identity unless the judge is enabled.
-	const clustered = await clusterFindings(improved, { deliverablesPath, logger });
+	const clustered = await clusterFindings(improved, {
+		deliverablesPath,
+		logger,
+	});
 	return gradeFindings(clustered, { deliverablesPath, logger });
 }
 
