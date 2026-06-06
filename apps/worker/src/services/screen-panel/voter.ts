@@ -28,6 +28,16 @@ import { sessionForVoter } from "./lenses.js";
 import type { ScreenVote } from "./types.js";
 
 /**
+ * A screen is meant to be a FAST pass/reject (a few focused probes), not a full
+ * exploit. Without a cap, voters inherit the runner's 10_000-turn default and can
+ * run away (90+ turns), stalling the whole adversarial-screen phase. Cap each
+ * voter; hitting the cap fails open to "uncertain" (no recall lost). Env-overridable
+ * (SHOR_SCREEN_VOTER_MAX_TURNS) so it can be tuned without a redeploy.
+ */
+const SCREEN_VOTER_MAX_TURNS =
+	Number(process.env.SHOR_SCREEN_VOTER_MAX_TURNS) || 15;
+
+/**
  * The authoritative voter framing appended AFTER the rendered screen prompt (so
  * it overrides the template's file-writing deliverable + completion trigger).
  * `{{LENS}}` / `{{VOTER_INDEX}}` are resolved via `applyPromptContext`; the
