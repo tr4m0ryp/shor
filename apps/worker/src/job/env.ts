@@ -51,6 +51,14 @@ function optional(name: string): string | undefined {
 	return value && value.trim() !== "" ? value : undefined;
 }
 
+/** Parse a positive-integer env var, or `undefined` when unset/invalid. */
+export function optionalPositiveInt(name: string): number | undefined {
+	const raw = optional(name);
+	if (raw === undefined) return undefined;
+	const n = Number(raw);
+	return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
 /**
  * Read + validate the scan params from the environment. Throws on missing
  * required vars so a misconfigured Job fails fast (non-zero exit).
