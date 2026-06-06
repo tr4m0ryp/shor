@@ -43,20 +43,20 @@ const BACKEND_DEP_MARKERS = [
 ];
 
 /** Lowercased basenames that strongly imply a server entrypoint/runtime. */
-const BACKEND_BASENAMES = new Set([
+export const BACKEND_BASENAMES = new Set([
 	"server.js", "server.ts", "app.py", "wsgi.py", "asgi.py", "manage.py",
 	"main.go", "gemfile", "pom.xml", "build.gradle", "go.mod",
 	"requirements.txt", "pipfile", "composer.json",
 ]);
 
 /** Path fragments that imply server-side route/handler/model code. */
-const BACKEND_PATH_FRAGMENTS = [
+export const BACKEND_PATH_FRAGMENTS = [
 	"/routes/", "/controllers/", "/handlers/", "/api/", "/server/",
 	"/models/", "/middleware/", "/services/", "/migrations/",
 ];
 
 /** Server-side language extensions. */
-const BACKEND_EXTENSIONS = new Set([
+export const BACKEND_EXTENSIONS = new Set([
 	".py", ".go", ".rb", ".php", ".java", ".kt", ".cs",
 ]);
 
