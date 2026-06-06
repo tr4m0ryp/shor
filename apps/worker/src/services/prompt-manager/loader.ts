@@ -23,7 +23,10 @@ import type { PromptVariables } from "./types.js";
  * recon/ vulnerability/ exploitation/ reporting/ attack-surface/). Returns the
  * absolute path, or undefined if not found anywhere.
  */
-async function resolvePromptFile(baseDir: string, filename: string): Promise<string | undefined> {
+async function resolvePromptFile(
+	baseDir: string,
+	filename: string,
+): Promise<string | undefined> {
 	const direct = path.join(baseDir, filename);
 	if (await fs.pathExists(direct)) return direct;
 	const stack: string[] = [baseDir];
