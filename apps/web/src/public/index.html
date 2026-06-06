@@ -557,6 +557,24 @@ body.guest .sidebar nav { display: none; }
   font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
   background: #332B12; color: #F5C147; border: 1px solid rgba(245,193,71,.3);
 }
+/* Reachability of the vulnerable code from an external entrypoint (set by the
+ * reachability pass). REACHABLE flags a vuln on live traffic; HARNESS_ONLY /
+ * UNCLEAR de-emphasise. Absent reachability renders no badge (back-compat). */
+.reach-badge {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px;
+  font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
+  background: var(--card-hover); color: var(--text-secondary); border: 1px solid var(--border);
+}
+.reach-reachable { background: #39191C; color: #F87171; border-color: rgba(248,113,113,.3); }
+.reach-harness_only { background: #16243F; color: #7AA7FF; border-color: rgba(122,167,255,.3); }
+.reach-unclear { background: var(--card-hover); color: var(--text-secondary); border-color: var(--border); }
+/* Cluster-size pill: a representative row carries "+N similar" when near-duplicate
+ * findings were de-duplicated under one root-cause cluster_id. */
+.cluster-badge {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px;
+  font-size: 10px; font-weight: 600; letter-spacing: .04em;
+  background: rgba(242,100,25,.12); color: var(--accent); border: 1px solid rgba(242,100,25,.35);
+}
 
 /* === Severity badges === */
 .severity-badge {
@@ -1933,6 +1951,22 @@ async function loadScanFindings(scanId) {
 
 // Short per-class code for the human-readable finding id (e.g. XSS-01).
 var VULN_CODE = { injection: 'INJ', xss: 'XSS', auth: 'AUTH', ssrf: 'SSRF', authz: 'AUTHZ' };
+// Human-readable reachability + oracle-replay metadata, keyed by the worker's
+// enum values (apps/worker .../findings/types.ts). Drive the new precision
+// signals in renderFindingRow; an absent/unknown value surfaces nothing.
+var REACH_META = {
+  REACHABLE: { label: 'Reachable', desc: 'Reachable — the vulnerable code is reached from an external / untrusted entrypoint.' },
+  HARNESS_ONLY: { label: 'Harness only', desc: 'Harness only — reachable only via a test / harness, not live traffic.' },
+  UNCLEAR: { label: 'Unclear', desc: 'Reachability unclear — could not be determined from the analyzed source.' },
+};
+var ORACLE_META = {
+  exploited: 'Exploited — the exploitation oracle replayed the PoC and it succeeded.',
+  blocked: 'Blocked — the oracle replay was blocked by a defense (WAF / auth / rate-limit).',
+  not_replayable: 'Not replayable — the PoC could not be deterministically replayed.',
+};
+// Cluster-representative ranking: severity desc, then confidence desc (see cmpFindingPriority).
+var SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
+var CONF_RANK = { confirmed: 2, firm: 1, tentative: 0 };
 function vulnCode(category) {
   var c = String(category || '').toLowerCase().trim();
   if (VULN_CODE[c]) return VULN_CODE[c];
@@ -1987,6 +2021,40 @@ function isManualReview(f) {
   return d === 'unverified_out_of_scope' || d === 'unverified_screen_rejected';
 }
 
+// Order two findings so the higher-priority one sorts first: severity desc, then
+// confidence desc, then a live-exploited disposition. Picks a cluster's representative.
+function cmpFindingPriority(a, b) {
+  const sa = SEV_RANK[String(a.severity || 'info').toLowerCase()] || 0;
+  const sb = SEV_RANK[String(b.severity || 'info').toLowerCase()] || 0;
+  if (sa !== sb) return sb - sa;
+  const ca = CONF_RANK[String(a.confidence || '').toLowerCase()] || 0;
+  const cb = CONF_RANK[String(b.confidence || '').toLowerCase()] || 0;
+  if (ca !== cb) return cb - ca;
+  const ea = String(a.disposition || '') === 'exploited' ? 1 : 0;
+  const eb = String(b.disposition || '') === 'exploited' ? 1 : 0;
+  return eb - ea;
+}
+
+// De-duplicate near-duplicate findings: group by cluster_id (root-cause group),
+// returning one group per cluster with its highest-priority representative + all
+// members. Findings with no cluster_id are singleton groups. Arrival order is
+// preserved — a cluster takes the position of its first member.
+function groupByCluster(findings) {
+  const groups = [];
+  const byId = {};
+  (findings || []).forEach(function (f) {
+    const cid = f && f.cluster_id ? String(f.cluster_id) : '';
+    if (cid && byId[cid]) { byId[cid].members.push(f); return; }
+    const g = { members: [f], clusterId: cid };
+    if (cid) byId[cid] = g;
+    groups.push(g);
+  });
+  groups.forEach(function (g) {
+    g.rep = g.members.length > 1 ? g.members.slice().sort(cmpFindingPriority)[0] : g.members[0];
+  });
+  return groups;
+}
+
 function renderFindings() {
   const panel = document.getElementById('panelFindings');
   const all = state.findingsCache;
@@ -2014,9 +2082,11 @@ function renderFindings() {
     severities.map((s) => '<button class="findings-filter' + (state.severityFilter === s ? ' active' : '') +
       '" onclick="setSeverityFilter(\'' + s + '\')">' + s + '</button>').join('') + '</div>';
 
-  const rows = base
-    .filter((f) => state.severityFilter === 'all' || String(f.severity || '').toLowerCase() === state.severityFilter)
-    .map((f, i) => renderFindingRow(f, i))
+  // De-duplicate: group near-duplicates by cluster_id, then filter by the
+  // representative's severity so one row stands in for the whole cluster.
+  const rows = groupByCluster(base)
+    .filter((g) => state.severityFilter === 'all' || String(g.rep.severity || '').toLowerCase() === state.severityFilter)
+    .map((g, i) => renderFindingRow(g.rep, i, g.members))
     .join('');
 
   const emptyMsg = review === 'manual'
@@ -2025,7 +2095,7 @@ function renderFindings() {
   panel.innerHTML = viewRow + sevRow + (rows || '<div class="panel-empty">' + emptyMsg + '</div>');
 }
 
-function renderFindingRow(f, i) {
+function renderFindingRow(f, i, members) {
   const sev = String(f.severity || 'info').toLowerCase();
   const conf = String(f.confidence || '');
   const cat = String(f.title || f.category || 'finding');
@@ -2059,6 +2129,19 @@ function renderFindingRow(f, i) {
         ? 'Manual review — the adversarial screen refuted this hypothesis before exploitation. Verify manually.'
         : 'Manual review — the enforcing tier was not in the analyzed source (or its validation lane failed) and it was not live-confirmed. Verify manually.') + '">Manual review</span>'
     : '';
+  // Reachability badge — REACHABLE flags a vuln on live traffic; HARNESS_ONLY /
+  // UNCLEAR de-prioritise. Absent reachability surfaces no badge (back-compat).
+  const reach = String(f.reachability || '').toUpperCase();
+  const reachMeta = REACH_META[reach];
+  const reachBadge = reachMeta
+    ? '<span class="reach-badge reach-' + reach.toLowerCase() + '" title="' + escapeHtml(reachMeta.desc) + '">' + escapeHtml(reachMeta.label) + '</span>'
+    : '';
+  // Cluster pill — N near-duplicates were grouped under this finding's root cause.
+  const dupes = (members && members.length > 1) ? members.length - 1 : 0;
+  const clusterBadge = dupes > 0
+    ? '<span class="cluster-badge" title="' + dupes + ' near-duplicate finding' + (dupes === 1 ? '' : 's') +
+      ' grouped under this root-cause cluster">+' + dupes + ' similar</span>'
+    : '';
 
   const detailRows = [];
   const push = (label, value, highlight) => {
@@ -2070,6 +2153,13 @@ function renderFindingRow(f, i) {
   push('CWE', cwe);
   push('OWASP', String(f.owasp_category || ''));
   push('Location', locStr);
+  // New precision signals (worker-emitted, optional): reachability of the
+  // vulnerable code, the exploitation-oracle replay outcome, and the threat id
+  // the finding maps to. Each push() is a no-op when its field is absent.
+  if (reachMeta) push('Reachability', reachMeta.desc);
+  const oracleDesc = ORACLE_META[String(f.oracle_disposition || '').toLowerCase()];
+  if (oracleDesc) push('Oracle replay', oracleDesc);
+  push('Threat', String(f.threat_id || ''));
   // Show validation_note for non-confirmed findings — explains the specific failure reason.
   if (conf.toLowerCase() !== 'confirmed' && validationNote) {
     push('Validation note', validationNote);
@@ -2081,6 +2171,15 @@ function renderFindingRow(f, i) {
   if (Array.isArray(f.repro_steps) && f.repro_steps.length) {
     push('Repro steps', f.repro_steps.map((s, n) => (n + 1) + '. ' + s).join('\n'));
   }
+  // Near-duplicates folded into this cluster — list them so the de-duplication is auditable.
+  if (members && members.length > 1) {
+    const others = members.filter((m) => m !== f);
+    push('Grouped duplicates', others.map((m) => {
+      const ml = m.vulnerable_code_location || {};
+      const mloc = ml.file ? ' (' + ml.file + ':' + (ml.line != null ? ml.line : '?') + ')' : '';
+      return '- ' + (m.displayId || m.id || 'finding') + mloc;
+    }).join('\n'));
+  }
   push('Fingerprint', String(f.fingerprint || ''));
 
   return (
@@ -2088,7 +2187,7 @@ function renderFindingRow(f, i) {
       '<span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span>' +
       '<span class="finding-id">' + (f.displayId ? '<span class="vuln-num">' + escapeHtml(f.displayId) + '</span>' : '') + '</span>' +
       '<span class="finding-summary finding-title">' + escapeHtml(cat) + '</span>' +
-      '<span class="finding-badges">' + validatedBadge + reviewBadge + confBadge + '</span>' +
+      '<span class="finding-badges">' + clusterBadge + validatedBadge + reviewBadge + reachBadge + confBadge + '</span>' +
       '<span class="finding-chevron">&rsaquo;</span>' +
     '</div>' +
     '<div class="finding-detail" id="findingDetail' + i + '" hidden>' + detailRows.join('') + '</div>'
