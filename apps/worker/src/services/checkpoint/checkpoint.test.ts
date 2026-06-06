@@ -49,6 +49,36 @@ describe("checkpoint save/restore", () => {
 		expect([...loadCompletedPhases(SCAN)].sort()).toEqual(["prereq", "vuln"]);
 	});
 
+	it("snapshots ALL deliverables incl. nested subdirs (not just the first file)", () => {
+		// Regression: fs.cpSync chmod-EPERM'd on gcsfuse after ONE file, so only
+		// scan_identities.json reached the snapshot. The content-only copy must
+		// round-trip every file AND nested dirs (e.g. schemas/).
+		fs.writeFileSync(path.join(deliverables, "scan_identities.json"), "{}");
+		fs.writeFileSync(path.join(deliverables, "pre_recon_deliverable.md"), "# pre");
+		fs.writeFileSync(path.join(deliverables, "threat_model.json"), '{"threats":[]}');
+		fs.mkdirSync(path.join(deliverables, "schemas"), { recursive: true });
+		fs.writeFileSync(
+			path.join(deliverables, "schemas", "live_openapi.json"),
+			'{"openapi":"3.0"}',
+		);
+
+		saveCheckpoint(SCAN, "prereq", deliverables, log);
+
+		const fresh = path.join(tmp, "repo3", ".storron", "deliverables");
+		restoreCheckpoint(SCAN, fresh, log);
+		for (const rel of [
+			"scan_identities.json",
+			"pre_recon_deliverable.md",
+			"threat_model.json",
+			"schemas/live_openapi.json",
+		]) {
+			expect(fs.existsSync(path.join(fresh, rel)), rel).toBe(true);
+		}
+		expect(
+			fs.readFileSync(path.join(fresh, "schemas/live_openapi.json"), "utf8"),
+		).toBe('{"openapi":"3.0"}');
+	});
+
 	it("restores deliverables into a fresh dir and returns completed phases", () => {
 		fs.writeFileSync(path.join(deliverables, "recon_deliverable.md"), "# recon");
 		saveCheckpoint(SCAN, "prereq", deliverables, log);
