@@ -127,6 +127,7 @@ export class AgentExecutionService {
 		const outcome = await runWithCoverage({
 			agentName,
 			basePrompt: prompt,
+			deliverablesPath,
 			deliverablesSubdir,
 			logger,
 			auditSession,
