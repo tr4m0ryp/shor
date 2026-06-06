@@ -497,6 +497,11 @@ Ask: "Does the target require authentication? (yes / no)"
 Yes → build `authConfig` (see **Phase 4d**), then return here.
 No → `authConfig = null`.
 
+The accounts you supply are **in-scope test credentials** — a means of access the
+scanner logs in with, never themselves a finding; the app's own auth and authz
+stay the test surface (full framing in **4d**). To test broken access control /
+IDOR, configure a **second identity** there.
+
 **→ Go to Phase 5** (create project + scan).
 
 ---
@@ -804,6 +809,19 @@ if __name__ == "__main__":
 
 ### 4d — Auth setup
 
+**These credentials are scaffolding, not a finding.** The accounts you configure
+here are **in-scope test accounts** the scanner uses as a **means of access** —
+session plumbing to reach authenticated surface. They are supplied through the
+secrets/config seam (this `authConfig`), never pasted into prompts or logs, and
+are **never themselves a finding**: a weak or hard-coded test password, or the
+bare fact that the scanner holds a valid session, does not get reported. The
+application's **own** authentication and authorization stay the test surface —
+including the scanner **forging or tampering with the very tokens it was handed**
+(stripping a JWT signature, swapping a user id, replaying a session) to probe the
+app's own validation of them. This is **not** "auth is out of scope": only the
+injected credentials are off-limits — real login, MFA, session, and authorization
+flaws are exactly what the scan hunts for.
+
 Determine auth type from the grep output in 3b:
 
 | Pattern found in code | `login_type` | Credential to use |
@@ -844,6 +862,80 @@ TOKEN=$(curl -sf -X POST "http://$EXTERNAL_IP:8090/token" | jq -r .access_token)
 curl -sf "http://$EXTERNAL_IP:8080/api/me" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
+
+#### Multi-identity ("second user") — broken access control / IDOR
+
+To test **broken access control** — horizontal cross-account access (IDOR) and
+vertical privilege escalation — configure **two or more identities**. Add an
+`identities[]` array to `authentication` alongside the primary `credentials`
+block. The primary `credentials` stays as the default/primary identity; each
+entry in `identities[]` is a full login of its own, with the same
+`credentials` shape (`username`, `password`, optional `totp_secret`) and an
+optional per-identity `success_condition`. Give each a `label` and, optionally, a
+`role`.
+
+```json
+{
+  "authentication": {
+    "login_type": "form",
+    "login_url": "https://target.example/login",
+    "credentials": {
+      "username": "primary",
+      "password": "<PRIMARY_PASSWORD>"
+    },
+    "success_condition": {
+      "type": "url_contains",
+      "value": "/dashboard"
+    },
+    "identities": [
+      {
+        "label": "attacker",
+        "role": "member",
+        "credentials": {
+          "username": "low-priv",
+          "password": "<ATTACKER_PASSWORD>"
+        },
+        "success_condition": {
+          "type": "url_contains",
+          "value": "/dashboard"
+        }
+      },
+      {
+        "label": "victim",
+        "role": "member",
+        "credentials": {
+          "username": "victim",
+          "password": "<VICTIM_PASSWORD>",
+          "totp_secret": "<BASE32_SECRET>"
+        },
+        "success_condition": {
+          "type": "url_contains",
+          "value": "/dashboard"
+        }
+      }
+    ]
+  }
+}
+```
+
+The model — same rail as the primary login, applied per identity:
+
+- **Each identity is scaffolding.** Its credentials are a means of access, never a
+  finding — exactly like the primary login above.
+- **The access-control *differences* between identities are the findings.** The
+  `attacker` identity reaching the `victim`'s objects or endpoints (a 200 where
+  403/404/empty is expected) is broken object-level access control; a low-role
+  identity performing or reaching a higher-role action is privilege escalation.
+- **Prerequisite — seeded data.** The target must already hold **data owned by
+  each identity** (orders, documents, messages, etc.) for cross-account probes to
+  land; the `victim` needs real objects for the `attacker` to try to reach. With
+  nothing seeded, the probes have nothing to hit.
+- **Fewer than 2 identities → single-identity fallback.** The authorization lane
+  then covers only the vertical and unauthenticated-vs-authenticated boundaries;
+  horizontal cross-account testing is skipped for lack of a second identity.
+- **ADR-050.** `label` and `role` are metadata used to plan and report the authz
+  tests; the credentials flow through this config/secrets seam and never enter
+  prompts or logs.
 
 ### 4e — Upload and start
 
@@ -962,16 +1054,31 @@ All calls: `Authorization: Bearer <shor-engine-trigger-token>`.
   "authentication": {
     "login_type": "form | sso | api | basic",
     "login_url": "<valid URI>",
-    "credentials": { "username": "<str>", "password": "<str>" },
+    "credentials": {
+      "username": "<str>",
+      "password": "<str>",
+      "totp_secret": "<base32 — only if MFA is required>"
+    },
     "success_condition": {
       "type": "url_contains | text_contains | element_present | url_equals_exactly",
       "value": "<str>"
     },
     "login_flow": ["optional: step-by-step natural language instructions"],
-    "totp_secret": "<base32 — only if MFA is required>"
+    "identities": [
+      {
+        "label": "<str>",
+        "role": "<optional str>",
+        "credentials": { "username": "<str>", "password": "<str>", "totp_secret": "<optional base32>" },
+        "success_condition": { "type": "<same enum as above>", "value": "<str>" }
+      }
+    ]
   }
 }
 ```
+
+`login_flow` and `identities` are optional. Supply `identities[]` to test broken
+access control / IDOR — see the multi-identity setup in **4d**; each entry is a
+full login with the same `credentials` shape as the primary identity.
 
 ## Reference — Common failures
 
