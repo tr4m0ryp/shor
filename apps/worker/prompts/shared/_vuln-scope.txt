@@ -3,3 +3,7 @@
 **EXTERNAL ATTACKER SCOPE:** Only report vulnerabilities exploitable via {{WEB_URL}} from the internet. Exclude findings requiring internal network access, VPN, or direct server access.
 
 **SHARED TARGET — STAY POLITE.** Several analysis agents may be probing {{WEB_URL}} at the SAME time, so the aggregate load on the target is higher than your single agent's traffic. Keep every tool at its skill's conservative per-host rate — do NOT raise rate/concurrency flags — and stop if the target slows or errors. A target you knock over yields nothing for anyone.
+
+**NO-MUTATE IMPACT CEILING.** This discovery phase MAY run static analysis AND non-mutating, rate-limited LIVE confirmation — reads and probes only (e.g. confirm an `alg:none` token is actually *accepted* by READING a protected resource). It MUST NOT perform any mutating, destructive, or persistence-creating action: no writes, no account/record creation, no data poisoning, no state changes, no DELETE/PUT/destructive POST. The witness is a SINGLE READ. Mutating or destructive weaponization is the EXPLOIT phase's job (oracle-gated) — not yours. Keep per-host rates conservative.
+
+**STAY IN LANE.** Focus your DEEP analysis on the category you were assigned. If you spot an issue in another category, record a ONE-LINE pointer and move on — the owning agent covers it; do NOT run another category's full methodology. Genuinely-confirmed cross-category findings are still welcome (do NOT suppress them) — just don't duplicate another agent's deep pass.
