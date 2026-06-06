@@ -21,6 +21,13 @@
  * may execute live is the open static/dynamic-boundary decision (a separate
  * task); this guard is decision-independent.
  *
+ * Mutation-evidence backstop: the scan audit also caught agents performing
+ * MUTATING actions during the read-only phase (creating MongoDB users, poisoning
+ * data). `auditMutationEvidence` is a deterministic detection-after-the-fact for
+ * the no-mutate prompt rail — it scans the deliverable for conservative,
+ * high-signal markers a write actually landed (precision over recall: a bare
+ * POST/PUT/DELETE or a plain GET read must NOT trip it).
+ *
  * Best-effort: never throws, never blocks a scan.
  */
 
@@ -70,9 +77,65 @@ export function auditVulnFloor(
 	};
 }
 
+/**
+ * Conservative, high-signal LITERAL markers that a write actually landed during
+ * the read-only phase. Each is matched as a lowercased substring → one signal.
+ * Kept narrow on purpose: precision over recall.
+ */
+const MUTATION_MARKERS: readonly string[] = [
+	"201 created",
+	"created user",
+	"created record",
+	"account created",
+	"inserted",
+	"persisted",
+	"poisoned",
+	"deleted the",
+	"updated the",
+];
+
+/**
+ * An HTTP write verb co-located (same sentence, within a short window, either
+ * order) with a create/mutate OUTCOME word. Catches "forged a token and POSTed
+ * to create a new account" / "DELETEd the record" while a bare POST or a plain
+ * GET read does NOT trip it — the outcome word is required.
+ */
+const WRITE_VERB = "(?:post(?:ed|s|ing)?|put|patch(?:ed)?|delete(?:d)?)";
+const MUTATE_OUTCOME =
+	"(?:created|inserted|persisted|new (?:user|record|account|row|document))";
+const WRITE_WITH_OUTCOME_RE = new RegExp(
+	`\\b${WRITE_VERB}\\b[^.]{0,80}\\b${MUTATE_OUTCOME}\\b|` +
+		`\\b${MUTATE_OUTCOME}\\b[^.]{0,80}\\b${WRITE_VERB}\\b`,
+);
+
+export interface MutationEvidence {
+	suspected: boolean;
+	signals: string[];
+}
+
+/**
+ * Scan a deliverable for evidence the agent performed a MUTATING action during
+ * the read-only phase. Pure: `deliverableText` is the analysis deliverable body.
+ * Each matched marker is recorded in `signals`; `suspected` is true iff any hit.
+ */
+export function auditMutationEvidence(
+	deliverableText: string,
+): MutationEvidence {
+	const hay = deliverableText.toLowerCase();
+	const signals: string[] = [];
+	for (const marker of MUTATION_MARKERS) {
+		if (hay.includes(marker)) signals.push(marker);
+	}
+	if (WRITE_WITH_OUTCOME_RE.test(hay)) {
+		signals.push("write-verb paired with create/mutate outcome");
+	}
+	return { suspected: signals.length > 0, signals };
+}
+
 /** Structured audit artifact. Pure. */
 export function buildVulnCoverage(
 	audit: VulnFloorAudit,
+	mutation: MutationEvidence = { suspected: false, signals: [] },
 ): Record<string, unknown> {
 	return {
 		generatedBy: "vuln deterministic post-validator",
@@ -81,6 +144,8 @@ export function buildVulnCoverage(
 		floorMet: audit.floorMet,
 		recommendedRun: audit.recommendedRun,
 		recommendedMissing: audit.recommendedMissing,
+		mutationSuspected: mutation.suspected,
+		mutationSignals: mutation.signals,
 	};
 }
 
@@ -102,10 +167,11 @@ export async function runVulnPostChecks(
 			? await fs.readFile(deliverable, "utf8")
 			: "";
 		const audit = auditVulnFloor(text, category);
+		const mutation = auditMutationEvidence(text);
 
 		await fs.writeFile(
 			path.join(sourceDir, `${category}_vuln_coverage.json`),
-			`${JSON.stringify(buildVulnCoverage(audit), null, 2)}\n`,
+			`${JSON.stringify(buildVulnCoverage(audit, mutation), null, 2)}\n`,
 		);
 
 		if (!audit.floorMet) {
@@ -117,6 +183,12 @@ export async function runVulnPostChecks(
 			logger.warn(`vuln ${category}: expected static tools with no evidence`, {
 				missing: audit.recommendedMissing,
 			});
+		}
+		if (mutation.suspected) {
+			logger.warn(
+				`vuln ${category} shows evidence of a MUTATING action in the read-only phase`,
+				{ signals: mutation.signals },
+			);
 		}
 	} catch (err) {
 		logger.warn(`vuln ${category}: post-checks failed (continuing)`, {
