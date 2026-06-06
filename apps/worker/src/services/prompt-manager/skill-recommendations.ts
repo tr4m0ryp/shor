@@ -36,6 +36,12 @@ export const RECOMMENDED: Readonly<Record<string, readonly string[]>> = {
 	"exploit-ssrf": ["ssrfmap", "interactsh-client", "playwright"],
 	"vuln-authz": ["authz-recipe", "jwt_tool", "semgrep"],
 	"exploit-authz": ["authz-recipe", "jwt_tool", "generate-totp", "playwright"],
+	"vuln-logic": ["semgrep", "arjun", "httpx"],
+	"screen-logic": ["ffuf", "httpx", "playwright"],
+	"exploit-logic": ["ffuf", "jwt_tool", "httpx", "playwright"],
+	"vuln-misconfig-web": ["semgrep", "nuclei", "httpx"],
+	"screen-misconfig-web": ["nuclei", "httpx", "jwt_tool"],
+	"exploit-misconfig-web": ["nuclei", "httpx", "jwt_tool", "playwright"],
 };
 
 /**

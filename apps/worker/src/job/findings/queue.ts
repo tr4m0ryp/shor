@@ -25,6 +25,8 @@ export const QUEUE_FILES: Record<FindingCategory, string> = {
 	auth: "auth_exploitation_queue.json",
 	ssrf: "ssrf_exploitation_queue.json",
 	authz: "authz_exploitation_queue.json",
+	logic: "logic_exploitation_queue.json",
+	"misconfig-web": "misconfig-web_exploitation_queue.json",
 };
 
 export const FINDING_CATEGORIES: readonly FindingCategory[] = [
@@ -33,6 +35,8 @@ export const FINDING_CATEGORIES: readonly FindingCategory[] = [
 	"auth",
 	"ssrf",
 	"authz",
+	"logic",
+	"misconfig-web",
 ] as const;
 
 function readJsonSafe(filePath: string, logger: ActivityLogger): unknown {

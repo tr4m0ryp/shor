@@ -68,6 +68,8 @@ function byCategory(
 		auth: over.auth ?? 0,
 		ssrf: over.ssrf ?? 0,
 		authz: over.authz ?? 0,
+		logic: over.logic ?? 0,
+		"misconfig-web": over["misconfig-web"] ?? 0,
 	};
 }
 

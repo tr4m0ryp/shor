@@ -42,6 +42,8 @@ const EVIDENCE_FILES: Record<FindingCategory, string> = {
 	auth: "auth_exploitation_evidence.md",
 	ssrf: "ssrf_exploitation_evidence.md",
 	authz: "authz_exploitation_evidence.md",
+	logic: "logic_exploitation_evidence.md",
+	"misconfig-web": "misconfig-web_exploitation_evidence.md",
 };
 
 export interface EvidenceEntry {
