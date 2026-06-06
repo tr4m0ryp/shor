@@ -152,17 +152,25 @@ Before you launch any source-analysis Task agent, you MUST actively probe the li
 **Execution rule:** Run these tools DIRECTLY via the **Bash tool** in this conversation. Do NOT delegate live recon to sub-agents (Task agents are for SOURCE-CODE analysis only; they cannot reach the network target on your behalf). Each tool below is a preinstalled per-tool skill — first **invoke the skill by name to load its usage guide** (flags + one safe rate-limited invocation), then run it against {{WEB_URL}} (and its host) via Bash, capturing the output into `.storron/scratchpad/`.
 
 Run in this dependency order (skip a step only if it is genuinely inapplicable, and say so):
-1. **`naabu`** — fast port discovery on the target host. Feeds nmap.
+1. **`naabu`** — port discovery on the target host (feeds nmap). Run it in **CONNECT mode (`-s c`)**: this worker is nonroot, so the default SYN scan silently under-reports. Scan the **full range (`-p -`)**, or at minimum top-1000 PLUS the common app/dev ports **8080, 8090, 8000, 3000, 5000, 8443, 9000, 9090** — backends and OIDC providers routinely live there. **A 2-port result (e.g. just 80 + 22) on a real web app means the scan was too narrow — re-run it wider BEFORE moving on; do not start hunting the backend by hand to compensate for an under-scoped port scan.**
 2. **`nmap`** — deep service/version detection + safe NSE on the open ports naabu found.
-3. **`httpx`** — HTTP probe + fingerprint of the discovered web ports (titles, tech, status, TLS).
+3. **`httpx`** — HTTP probe + fingerprint of the discovered web ports (titles, tech, status, TLS). Probe EVERY open port, not just 80/443.
 4. **`katana`** — active crawl of {{WEB_URL}} to enumerate live endpoints and forms.
 5. **`gau` / `waybackurls`** — historical URLs from Wayback/Common Crawl/OTX for the target host.
 6. **`wafw00f`** — fingerprint any WAF/CDN in front (this shapes later payload choices for the exploit agents).
 7. **`dnsx` / `subfinder`** — DNS resolution and passive subdomain enumeration (when the target is a registrable domain, not a bare IP/localhost).
 8. **`arjun` / `paramspider`** — hidden-parameter discovery on the endpoints katana/gau surfaced.
-9. **`nuclei`** — templated misconfiguration/exposure checks to flag obvious issues for the analysis phase.
+9. **`nuclei` (MANDATORY — do NOT silently skip)** — templated misconfiguration/exposure/CVE checks across **every live web port you found, including the backend API** (e.g. the `:8080` API, not only `:80`). Feed it the httpx live-host list. If you genuinely cannot run it, state the specific reason in the deliverable's tool checklist — an unexplained skip is a recon failure.
+10. **`ffuf`** — content/route fuzzing on the live web services for unlinked routes (admin panels, debug endpoints, alternate API bases). Less critical when a complete API spec is recovered (see below), but run it when the surface is otherwise sparse.
 
-**CRITICAL — probe the proxied API even if the direct backend port is closed.** {{WEB_URL}} is the externally reachable origin; a single-page app reverse-proxies its backend on the SAME origin under a path prefix. You MUST explicitly probe `{{WEB_URL}}/api/`, `{{WEB_URL}}/api/v1/`, `{{WEB_URL}}/api/health`, and `{{WEB_URL}}/graphql` (with `httpx`/`curl` via Bash). A closed direct backend port (:8000/:3000/:80) does NOT mean the backend is unreachable — the proxied `/api` path is the real, testable attack surface. Record the reachable API base path explicitly so the exploitation agents target it.
+**CRITICAL — FIND THE BACKEND, wherever it is.** {{WEB_URL}} is the externally reachable origin; the backend may be reached EITHER (a) reverse-proxied on the SAME origin under a path prefix, OR (b) on a SEPARATE port on the same host. Cover both:
+- Probe `{{WEB_URL}}/api/`, `/api/v1/`, `/api/health`, `/graphql` (via `httpx`/`curl`) for a same-origin proxy.
+- Probe the OTHER open ports from your (wide) naabu scan directly — the backend API and any OIDC/IdP commonly sit on `:8080`/`:8090`/`:8000` etc.
+- **Read the SPA's built/bundled JS** (via a Task agent on the source, or `curl` the served bundle) to recover the **API base URL the frontend actually calls** — this is the authoritative answer when neither a `/api` proxy nor an obvious port is conclusive.
+
+A closed direct port on `:80` does NOT mean the backend is unreachable. Record the reachable **API base (host + port + path)** explicitly so the exploitation agents target it instead of giving up.
+
+**CAPTURE ANY LIVE API SPEC.** If you find a live OpenAPI/Swagger doc (`/swagger`, `/swagger/index.html`, `/swagger.json`, `/openapi.json`, `/v3/api-docs`), DOWNLOAD the spec JSON into `.storron/deliverables/schemas/` (e.g. `live_openapi.json`) with `curl`. A machine-readable contract of the live API is the single highest-value recon artifact — it gives every downstream agent the full endpoint/parameter/schema inventory directly. Reference it in Section 4.
 
 **Honor the no-DoS per-host rate limits** baked into each skill and re-validate scope immediately before each network action. Write every live finding (open ports, services/versions, live HTTP endpoints, WAF, subdomains, params, reachable `/api` base) into the recon deliverable (Sections 2, 4, 5, 6) — these are now FIRST-HAND live results, not assumptions inherited from a prior phase.
 
