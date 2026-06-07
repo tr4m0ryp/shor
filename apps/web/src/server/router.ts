@@ -135,7 +135,7 @@ export async function apiRouter(
   }
 
   // Dashboard data plane (Phase 5): projects, scans, findings/attack-surface,
-  // diff, trigger, users. Returns null when the path is not a dashboard route.
+  // trigger, users. Returns null when the path is not a dashboard route.
   const dashboard = await routeDashboard(method, segments, body, cookieHeader);
   if (dashboard) return dashboard;
 
