@@ -107,9 +107,16 @@ export async function assembleScanPromptContext(
 	deliverablesPath: string,
 	_config?: DistributedConfig | null,
 	env?: NodeJS.ProcessEnv,
+	webUrl?: string,
 ): Promise<PromptContext> {
 	const environment = env ?? process.env;
 	const context: PromptContext = {};
+
+	// Recon-driven target surface: the real service origins recon observed, so
+	// agents probe the actual ports (API on :8080, etc.) instead of the SPA at
+	// {{WEB_URL}}. Absent until recon's deliverable exists → "(none)" sentinel.
+	const surface = await renderTargetSurface(deliverablesPath, webUrl);
+	if (surface !== undefined) context.targetSurface = surface;
 
 	const threatModelRaw = await readJsonFile(
 		deliverablesPath,
