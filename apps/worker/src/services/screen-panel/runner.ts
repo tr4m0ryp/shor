@@ -145,7 +145,6 @@ function writeVerdicts(
 interface CategoryRunDeps {
 	ctx: AgentContext;
 	config: DistributedConfig | null;
-	panelSize: number;
 	pool: SessionPool;
 }
 
