@@ -332,9 +332,11 @@ export async function runScanPipeline(
 		saveCheckpoint(params.scanId, "exploit", deliverablesPath, logger);
 	}
 
-	// 2b) Oracle phase — post-exploitation adjudication over the exploited/screened
-	// dispositions. No-op today (task 013 fills `runOraclePhase`); runs before
-	// synthesis so the report/attack-surface see the adjudicated set.
+	// 2b) Oracle phase — post-exploitation adjudication: deterministically replays
+	// each captured PoC and overrides the markdown-parsed disposition with the
+	// observed outcome (HTTP replay is live; browser/OOB are seams). Emits progress
+	// under the "oracle" service marker. Runs before synthesis so report/
+	// attack-surface see the adjudicated set.
 	if (completedPhases.has("oracle")) {
 		logger.info("checkpoint: skipping completed phase", { phase: "oracle" });
 	} else {

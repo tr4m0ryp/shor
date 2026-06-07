@@ -1,8 +1,8 @@
 /**
- * Finding repository (LAUNCH-SPEC §4.3 + §6.1, ADR-030/031/032/033).
+ * Finding repository (LAUNCH-SPEC §4.3 + §6.1, ADR-030/031/033).
  *
  * Findings are stored as JSONB (`data`) in storron's shape, keyed by the stable
- * `fingerprint` for scan-to-scan diffs. Hangs off `scan`; queries join through
+ * `fingerprint` for idempotent re-ingest. Hangs off `scan`; queries join through
  * `scan` → `project` and filter by `tenant_id` for tenant scoping.
  */
 
@@ -40,7 +40,7 @@ export const findingRepo = {
     return rows.map(toFinding);
   },
 
-  /** Look up a finding by its stable fingerprint within one scan (diff path). */
+  /** Look up a finding by its stable fingerprint within one scan (sink dedup path). */
   async findByFingerprint(tenantId: TenantId, scanId: ScanId, fingerprint: string): Promise<Finding | null> {
     const { rows } = await query<FindingRow>(`${SELECT_SCOPED} AND f.scan_id = $2 AND f.fingerprint = $3`, [
       tenantId,
@@ -50,18 +50,6 @@ export const findingRepo = {
     return rows[0] ? toFinding(rows[0]) : null;
   },
 
-  /** All fingerprints present in a scan (used to compute new/fixed/regressed). */
-  async fingerprintsForScan(tenantId: TenantId, scanId: ScanId): Promise<string[]> {
-    const { rows } = await query<{ fingerprint: string }>(
-      `SELECT f.fingerprint FROM finding f
-			 JOIN scan s ON s.id = f.scan_id
-			 JOIN project p ON p.id = s.project_id
-			 WHERE p.tenant_id = $1 AND f.scan_id = $2`,
-      [tenantId, scanId],
-    );
-    return rows.map((r) => r.fingerprint);
-  },
-
   /**
    * Refresh an existing finding's `data` JSONB in place (idempotent re-ingest of
    * the same fingerprint within a scan). The worker posts findings incrementally
@@ -69,7 +57,7 @@ export const findingRepo = {
    * `firm`), and later posts carry the live-exploitation disposition
    * (`exploited` → `confirmed`) and improved prose. Without this update the first
    * write froze every finding at `firm`. Optionally refreshes the `status` column
-   * (kept as-is when `status` is null/omitted so a computed diff status survives).
+   * (kept as-is when `status` is null/omitted).
    */
   async updateData(
     tenantId: TenantId,
@@ -84,18 +72,6 @@ export const findingRepo = {
 				   AND p.tenant_id = $1 AND f.id = $2
 				 RETURNING f.*`,
       [tenantId, id, data, status ?? null],
-    );
-    return rows[0] ? toFinding(rows[0]) : null;
-  },
-
-  async updateStatus(tenantId: TenantId, id: FindingId, status: FindingStatus): Promise<Finding | null> {
-    const { rows } = await query<FindingRow>(
-      `UPDATE finding f SET status = $3
-			 FROM scan s, project p
-			 WHERE s.id = f.scan_id AND p.id = s.project_id
-			   AND p.tenant_id = $1 AND f.id = $2
-			 RETURNING f.*`,
-      [tenantId, id, status],
     );
     return rows[0] ? toFinding(rows[0]) : null;
   },

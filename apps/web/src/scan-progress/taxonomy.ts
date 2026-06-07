@@ -94,47 +94,55 @@ export const PIPELINE_PLAN: readonly PhaseSpec[] = [
     id: 'vulnerability-analysis',
     label: 'Vulnerability Analysis',
     agents: [
-      { name: 'injection-vuln', label: 'Injection', subtasks: VULN_SUBTASKS },
-      { name: 'xss-vuln', label: 'XSS', subtasks: VULN_SUBTASKS },
-      { name: 'auth-vuln', label: 'Auth', subtasks: VULN_SUBTASKS },
-      { name: 'ssrf-vuln', label: 'SSRF', subtasks: VULN_SUBTASKS },
-      { name: 'authz-vuln', label: 'Authz', subtasks: VULN_SUBTASKS },
-      { name: 'logic-vuln', label: 'Logic', subtasks: VULN_SUBTASKS },
-      { name: 'misconfig-web-vuln', label: 'Web Misconfig', subtasks: VULN_SUBTASKS },
+      { name: 'injection-vuln', label: '(VA) Injection', subtasks: VULN_SUBTASKS },
+      { name: 'xss-vuln', label: '(VA) XSS', subtasks: VULN_SUBTASKS },
+      { name: 'auth-vuln', label: '(VA) Auth', subtasks: VULN_SUBTASKS },
+      { name: 'ssrf-vuln', label: '(VA) SSRF', subtasks: VULN_SUBTASKS },
+      { name: 'authz-vuln', label: '(VA) Authz', subtasks: VULN_SUBTASKS },
+      { name: 'logic-vuln', label: '(VA) Logic', subtasks: VULN_SUBTASKS },
+      { name: 'misconfig-web-vuln', label: '(VA) Web Misconfig', subtasks: VULN_SUBTASKS },
     ],
   },
   {
     id: 'adversarial-screen',
     label: 'Adversarial Screen',
     agents: [
-      { name: 'injection-screen', label: 'Injection', subtasks: SCREEN_SUBTASKS },
-      { name: 'xss-screen', label: 'XSS', subtasks: SCREEN_SUBTASKS },
-      { name: 'auth-screen', label: 'Auth', subtasks: SCREEN_SUBTASKS },
-      { name: 'ssrf-screen', label: 'SSRF', subtasks: SCREEN_SUBTASKS },
-      { name: 'authz-screen', label: 'Authz', subtasks: SCREEN_SUBTASKS },
-      { name: 'logic-screen', label: 'Logic', subtasks: SCREEN_SUBTASKS },
-      { name: 'misconfig-web-screen', label: 'Web Misconfig', subtasks: SCREEN_SUBTASKS },
+      { name: 'injection-screen', label: '(AS) Injection', subtasks: SCREEN_SUBTASKS },
+      { name: 'xss-screen', label: '(AS) XSS', subtasks: SCREEN_SUBTASKS },
+      { name: 'auth-screen', label: '(AS) Auth', subtasks: SCREEN_SUBTASKS },
+      { name: 'ssrf-screen', label: '(AS) SSRF', subtasks: SCREEN_SUBTASKS },
+      { name: 'authz-screen', label: '(AS) Authz', subtasks: SCREEN_SUBTASKS },
+      { name: 'logic-screen', label: '(AS) Logic', subtasks: SCREEN_SUBTASKS },
+      { name: 'misconfig-web-screen', label: '(AS) Web Misconfig', subtasks: SCREEN_SUBTASKS },
     ],
   },
   {
     id: 'exploitation',
     label: 'Validation',
     agents: [
-      { name: 'injection-exploit', label: 'Injection', subtasks: EXPLOIT_SUBTASKS },
-      { name: 'xss-exploit', label: 'XSS', subtasks: EXPLOIT_SUBTASKS },
-      { name: 'auth-exploit', label: 'Auth', subtasks: EXPLOIT_SUBTASKS },
-      { name: 'ssrf-exploit', label: 'SSRF', subtasks: EXPLOIT_SUBTASKS },
-      { name: 'authz-exploit', label: 'Authz', subtasks: EXPLOIT_SUBTASKS },
-      { name: 'logic-exploit', label: 'Logic', subtasks: EXPLOIT_SUBTASKS },
-      { name: 'misconfig-web-exploit', label: 'Web Misconfig', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'injection-exploit', label: '(V) Injection', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'xss-exploit', label: '(V) XSS', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'auth-exploit', label: '(V) Auth', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'ssrf-exploit', label: '(V) SSRF', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'authz-exploit', label: '(V) Authz', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'logic-exploit', label: '(V) Logic', subtasks: EXPLOIT_SUBTASKS },
+      { name: 'misconfig-web-exploit', label: '(V) Web Misconfig', subtasks: EXPLOIT_SUBTASKS },
     ],
   },
   {
     id: 'oracle',
     label: 'Adjudication',
-    // Post-exploitation oracle phase — runs as a worker service (no tracked
-    // agent), so this card carries no agents (task 013/017 fill the view).
-    agents: [],
+    // Post-exploitation oracle: a deterministic replay SERVICE, not an LLM agent
+    // (absent from the worker's ALL_AGENTS). The worker emits its progress under
+    // the service key 'oracle' (ProgressEmitter.ServicePhaseAgent), so this single
+    // tracked unit makes the card render running/done instead of "0/0 QUEUED".
+    agents: [
+      {
+        name: 'oracle',
+        label: 'Replay & adjudicate',
+        subtasks: ['Replay captured PoCs', 'Match expected signals', 'Write dispositions'],
+      },
+    ],
   },
   {
     id: 'reporting',

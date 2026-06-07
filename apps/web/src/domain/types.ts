@@ -170,12 +170,14 @@ export interface Scan {
 export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type FindingConfidence = 'confirmed' | 'firm' | 'tentative';
 
-/** Diff lifecycle computed via pgMemento on `fingerprint` (ADR-031/032). */
+/**
+ * Persisted finding status column. The scan-to-scan diff feature that computed
+ * the non-`new` states has been removed, so only `new` is written now; the other
+ * values are retained for backward-compat with rows from prior scans.
+ */
 export type FindingStatus = 'new' | 'open' | 'fixed' | 'regressed';
 
 export const FINDING_SEVERITIES: readonly FindingSeverity[] = ['critical', 'high', 'medium', 'low', 'info'] as const;
-
-export const FINDING_STATUSES: readonly FindingStatus[] = ['new', 'open', 'fixed', 'regressed'] as const;
 
 /** file:line location for code findings (LAUNCH-SPEC §6.1). */
 export interface VulnerableCodeLocation {
