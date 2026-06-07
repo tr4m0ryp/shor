@@ -1685,7 +1685,7 @@ function showScanTab(tab) {
 var scanPollTimer = null;
 
 function isScanClosed(status) {
-  return status === 'completed' || status === 'failed' || status === 'cancelled';
+  return status === 'completed' || status === 'failed' || status === 'cancelled' || status === 'archived';
 }
 
 function stopScanPolling() {

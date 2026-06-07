@@ -93,7 +93,12 @@ function agentStatus(name: string, progress: ScanProgress, scanClosed: boolean):
   // Concurrency: any agent in the running set is in progress (currentAgent is
   // just one representative for the banner).
   const running = progress.runningAgents ?? (progress.currentAgent ? [progress.currentAgent] : []);
-  if (running.includes(name)) return { status: 'in_progress', durationMs: null, startedAt: started, finishedAt: null };
+  // A closed/archived scan can't have a live agent: a worker that died mid-run
+  // leaves a stale "running" entry in the last snapshot, so never show in_progress
+  // once the scan is terminal — fall through to skipped.
+  if (!scanClosed && running.includes(name)) {
+    return { status: 'in_progress', durationMs: null, startedAt: started, finishedAt: null };
+  }
   // A closed scan that never reached this agent skipped it; otherwise it is queued.
   return { status: scanClosed ? 'skipped' : 'pending', durationMs: null, startedAt: null, finishedAt: null };
 }
@@ -104,7 +109,11 @@ function agentStatus(name: string, progress: ScanProgress, scanClosed: boolean):
  * already closed) so the feed still renders the plan.
  */
 export function deriveProgressView(scan: Scan): ProgressView {
-  const scanClosed = scan.status === 'completed' || scan.status === 'failed' || scan.status === 'cancelled';
+  const scanClosed =
+    scan.status === 'completed' ||
+    scan.status === 'failed' ||
+    scan.status === 'cancelled' ||
+    scan.status === 'archived';
   const progress: ScanProgress = scan.progress ?? {
     status: scan.status,
     currentPhase: null,
