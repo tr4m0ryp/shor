@@ -1,16 +1,14 @@
 /**
- * Dashboard scan-detail API (LAUNCH-SPEC §5/§6, ADR-015/032).
+ * Dashboard scan-detail API (LAUNCH-SPEC §5/§6, ADR-015).
  *
- * Per-scan reads behind the run-detail view: the scan's findings (§6.1 records),
- * its attack-surface document (kill chains + scenarios with the remediation
- * "fix" prompt, ADR-010), and the scan-to-scan diff (new/open/fixed/regressed,
- * ADR-032). All authenticated + tenant-scoped via `gate()`.
+ * Per-scan reads behind the run-detail view: the scan's findings (§6.1 records)
+ * and its attack-surface document (kill chains + scenarios with the remediation
+ * "fix" prompt, ADR-010). All authenticated + tenant-scoped via `gate()`.
  */
 
 import { getConfig } from '../../config.js';
 import { attackSurfaceRepo, findingRepo, scanRepo } from '../../db/repositories/index.js';
 import type { ScanId } from '../../domain/types.js';
-import { computeStatusTransitions } from '../../findings/index.js';
 import type { ApiResponse } from '../router.js';
 import { gate, notFound, ok, serverError } from './auth-util.js';
 
