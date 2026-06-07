@@ -1643,7 +1643,6 @@ async function openScan(scanId) {
     loadScanProgress(scanId);
     loadScanFindings(scanId);
     loadScanAttackSurface(scanId);
-    loadScanDiff(scanId);
     // Poll the live feed while the run is active; the poller self-stops on a
     // terminal status (and showPage stops it when navigating away).
     if (!isScanClosed(data.scan.status)) startScanPolling(scanId);
