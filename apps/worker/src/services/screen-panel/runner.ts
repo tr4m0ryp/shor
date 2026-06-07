@@ -156,8 +156,12 @@ async function runCategoryPanel(
 	category: string,
 	deps: CategoryRunDeps,
 ): Promise<void> {
-	const { ctx, config, panelSize, pool } = deps;
+	const { ctx, config, pool } = deps;
 	const { params, deliverablesPath, container, logger, progress } = ctx;
+	// Per-category panel size: ensures a category with an extra lens (authz's
+	// auth-context) runs a voter for it instead of leaving it dormant at the
+	// default size of 3.
+	const panelSize = panelSizeForCategory(category);
 
 	// Emit progress per screen agent so the dashboard shows the adversarial-screen
 	// phase running and the timeline advances (the panel runs outside the normal
