@@ -290,15 +290,16 @@ export async function runScreenPanel(
 
 	logger.info("screen-panel: starting N-vote diverse-lens screen", {
 		scanId: params.scanId,
-		voters: panelSize,
+		voters: resolvePanelSize(process.env),
 		sessions: poolSize,
 	});
 
 	// Categories fan out; runCategoryPanel never throws, so one failure can't abort
 	// the rest. The pool keeps total concurrent voters within poolSize regardless.
+	// Each category resolves its own panel size (authz gets its 4th lens).
 	await Promise.all(
 		SCREEN_CATEGORIES.map((category) =>
-			runCategoryPanel(category, { ctx, config, panelSize, pool }),
+			runCategoryPanel(category, { ctx, config, pool }),
 		),
 	);
 }
