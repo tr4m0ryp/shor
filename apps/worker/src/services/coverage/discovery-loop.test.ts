@@ -111,7 +111,7 @@ const silentLogger: ActivityLogger = {
 
 describe("runWithCoverage: findings-convergence drives above the floor", () => {
 	it("continues while new findings arrive, then stops on the first dry round", async () => {
-		// injection-vuln floor is 2 → met from round 0. Findings: 2, then +1, then
+		// injection-vuln floor is 4 → met from round 0. Findings: 2, then +1, then
 		// +0 (dry) → discovery stops the round AFTER the empty one.
 		const runner = fakeRunner([okResult()]);
 		const outcome = await runWithCoverage({
