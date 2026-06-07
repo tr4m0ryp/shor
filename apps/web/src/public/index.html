@@ -1695,7 +1695,7 @@ function startScanPolling(scanId) {
 }
 
 // One poll tick: refresh status badge + progress feed; when the run closes,
-// stop polling and pull the now-final findings/diff in.
+// stop polling and pull the now-final findings in.
 async function pollScan(scanId) {
   if (!state.currentScan || state.currentScan.id !== scanId) { stopScanPolling(); return; }
   try {
