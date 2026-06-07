@@ -115,7 +115,7 @@ export interface CodebaseVersion {
 
 // ───────────────────────────────── scan ───────────────────────────────────
 
-export type ScanStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type ScanStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'archived';
 
 export const SCAN_STATUSES: readonly ScanStatus[] = ['pending', 'running', 'completed', 'failed', 'cancelled'] as const;
 
