@@ -23,8 +23,8 @@ import {
 import type { ModelTier } from "../../ai/models.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import type { ProviderConfig } from "../../types/config.js";
+import type { PlaywrightSession } from "../../types/agents.js";
 import { applyPromptContext } from "../prompt-manager/prompt-context.js";
-import { sessionForVoter } from "./lenses.js";
 import type { ScreenVote } from "./types.js";
 
 /**
