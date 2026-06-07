@@ -19,8 +19,6 @@
  */
 
 import { attackSurfaceRepo, findingRepo, projectRepo, scanRepo } from '../db/repositories/index.js';
-import type { DiffResult } from '../findings/index.js';
-import { diffFingerprints } from '../findings/index.js';
 import { deriveProgressView } from '../scan-progress/index.js';
 import { fetchSinasReport } from './dashboard/scans.js';
 import type { ApiResponse } from './router.js';
