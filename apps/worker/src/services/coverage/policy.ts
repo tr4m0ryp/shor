@@ -62,26 +62,43 @@ export const DISCOVERY_LENSES: readonly string[] = [
 /** Policy body minus `candidates` (which is derived from `RECOMMENDED`). */
 type PolicyThresholds = Pick<CoveragePolicy, "required" | "minCount">;
 
-const VULN_MIN_COUNT = 2;
 const EXPLOIT_MIN_COUNT = 1;
+
+/**
+ * The vuln breadth floor for a category: half its recommended tool set, rounded
+ * up, floored at 1. Keyed by PROMPT name (`vuln-injection`) to match
+ * `RECOMMENDED`; stays in lockstep with the candidate pool `evaluate.ts` derives
+ * from the same map, so the floor can never exceed the tools that count.
+ */
+function vulnFloor(promptKey: string): number {
+	const n = RECOMMENDED[promptKey]?.length ?? 0;
+	return Math.max(1, Math.ceil(n / 2));
+}
 
 /** No agent hard-requires a specific tool by default (see header). */
 const NO_REQUIRED: readonly string[] = [];
 
 /**
  * Per-agentName thresholds. Agents absent from this map (report,
- * attack-surface) have no coverage expectation.
+ * attack-surface) have no coverage expectation. All seven vuln categories —
+ * `logic` and `misconfig-web` included — carry a floor + breadth continuation;
+ * leaving the latter two out previously let them pass having run no tools at all.
  */
 export const COVERAGE_POLICY: Readonly<
 	Partial<Record<AgentName, PolicyThresholds>>
 > = Object.freeze({
 	"pre-recon": { required: NO_REQUIRED, minCount: 2 },
 	recon: { required: NO_REQUIRED, minCount: 6 },
-	"injection-vuln": { required: NO_REQUIRED, minCount: VULN_MIN_COUNT },
-	"xss-vuln": { required: NO_REQUIRED, minCount: VULN_MIN_COUNT },
-	"auth-vuln": { required: NO_REQUIRED, minCount: VULN_MIN_COUNT },
-	"ssrf-vuln": { required: NO_REQUIRED, minCount: VULN_MIN_COUNT },
-	"authz-vuln": { required: NO_REQUIRED, minCount: VULN_MIN_COUNT },
+	"injection-vuln": { required: NO_REQUIRED, minCount: vulnFloor("vuln-injection") },
+	"xss-vuln": { required: NO_REQUIRED, minCount: vulnFloor("vuln-xss") },
+	"auth-vuln": { required: NO_REQUIRED, minCount: vulnFloor("vuln-auth") },
+	"ssrf-vuln": { required: NO_REQUIRED, minCount: vulnFloor("vuln-ssrf") },
+	"authz-vuln": { required: NO_REQUIRED, minCount: vulnFloor("vuln-authz") },
+	"logic-vuln": { required: NO_REQUIRED, minCount: vulnFloor("vuln-logic") },
+	"misconfig-web-vuln": {
+		required: NO_REQUIRED,
+		minCount: vulnFloor("vuln-misconfig-web"),
+	},
 	"injection-exploit": { required: NO_REQUIRED, minCount: EXPLOIT_MIN_COUNT },
 	"xss-exploit": { required: NO_REQUIRED, minCount: EXPLOIT_MIN_COUNT },
 	"auth-exploit": { required: NO_REQUIRED, minCount: EXPLOIT_MIN_COUNT },
