@@ -222,6 +222,25 @@ describe("lensesForCategory", () => {
 	});
 });
 
+describe("panelSizeForCategory", () => {
+	it("gives authz a 4th voter so its auth-context lens actually runs", () => {
+		// Default panel size is 3; authz has a 4-lens pool → it must get 4.
+		expect(panelSizeForCategory("authz", {})).toBe(4);
+		const lenses = lensesForCategory("authz", panelSizeForCategory("authz", {}));
+		expect(lenses).toContain("auth-context");
+	});
+
+	it("leaves 3-lens categories at the default size", () => {
+		expect(panelSizeForCategory("injection", {})).toBe(DEFAULT_VOTERS);
+		expect(panelSizeForCategory("xss", {})).toBe(DEFAULT_VOTERS);
+	});
+
+	it("honors a larger configured panel size, capped at MAX_VOTERS", () => {
+		expect(panelSizeForCategory("injection", { [VOTERS_ENV]: "5" })).toBe(5);
+		expect(panelSizeForCategory("authz", { [VOTERS_ENV]: "99" })).toBe(MAX_VOTERS);
+	});
+});
+
 describe("createSessionPool", () => {
 	it("hands out distinct sessions up to its size, never sharing one", async () => {
 		const pool = createSessionPool(SCREEN_SESSIONS);
