@@ -1553,7 +1553,7 @@ async function renderProjectStats(scans) {
   const last = active[0];
   const lastRun = last && last.startedAt ? new Date(last.startedAt).toLocaleDateString() : '—';
   // Severity breakdown from the most-recent scan that has findings.
-  let sev = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+  let sev = { critical: 0, high: 0, medium: 0, low: 0 };
   let findingsTotal = 0;
   const latestWithData = completed[0] || last;
   if (latestWithData) {
@@ -1562,7 +1562,7 @@ async function renderProjectStats(scans) {
       const findings = fd.findings || [];
       findingsTotal = findings.length;
       findings.forEach(function (f) {
-        const s = (f.data && f.data.severity) || f.severity || 'info';
+        const s = (f.data && f.data.severity) || f.severity || 'low';
         if (sev[s] != null) sev[s] += 1;
       });
     } catch (_) {}
@@ -1994,7 +1994,7 @@ var ORACLE_META = {
   not_replayable: 'Not replayable — the PoC could not be deterministically replayed.',
 };
 // Cluster-representative ranking: severity desc, then confidence desc (see cmpFindingPriority).
-var SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
+var SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
 var CONF_RANK = { confirmed: 2, firm: 1, tentative: 0 };
 function vulnCode(category) {
   var c = String(category || '').toLowerCase().trim();
@@ -2053,8 +2053,8 @@ function isManualReview(f) {
 // Order two findings so the higher-priority one sorts first: severity desc, then
 // confidence desc, then a live-exploited disposition. Picks a cluster's representative.
 function cmpFindingPriority(a, b) {
-  const sa = SEV_RANK[String(a.severity || 'info').toLowerCase()] || 0;
-  const sb = SEV_RANK[String(b.severity || 'info').toLowerCase()] || 0;
+  const sa = SEV_RANK[String(a.severity || 'low').toLowerCase()] || 0;
+  const sb = SEV_RANK[String(b.severity || 'low').toLowerCase()] || 0;
   if (sa !== sb) return sb - sa;
   const ca = CONF_RANK[String(a.confidence || '').toLowerCase()] || 0;
   const cb = CONF_RANK[String(b.confidence || '').toLowerCase()] || 0;
@@ -2106,7 +2106,7 @@ function renderFindings() {
       tab('manual', 'Manual review (' + manual.length + ')') + '</div>';
   }
 
-  const severities = ['all', 'critical', 'high', 'medium', 'low', 'info'];
+  const severities = ['all', 'critical', 'high', 'medium', 'low'];
   const sevRow = '<div class="findings-filters"><span class="findings-filter-label">Severity</span>' +
     severities.map((s) => '<button class="findings-filter' + (state.severityFilter === s ? ' active' : '') +
       '" onclick="setSeverityFilter(\'' + s + '\')">' + s + '</button>').join('') + '</div>';
@@ -2125,7 +2125,7 @@ function renderFindings() {
 }
 
 function renderFindingRow(f, i, members) {
-  const sev = String(f.severity || 'info').toLowerCase();
+  const sev = String(f.severity || 'low').toLowerCase();
   const conf = String(f.confidence || '');
   const cat = String(f.title || f.category || 'finding');
   const cwe = String(f.cwe || '');
@@ -2382,7 +2382,7 @@ async function loadScanReport(scanId) {
 function renderScanReport(r) {
   const panel = document.getElementById('panelReport');
   const counts = r.severity_counts || {};
-  const order = ['critical', 'high', 'medium', 'low', 'info'];
+  const order = ['critical', 'high', 'medium', 'low'];
   const chips = order.map(function (k) { return '<span class="diff-badge severity-' + k + '">' + k + ' ' + (counts[k] || 0) + '</span>'; }).join('');
   const meta = [];
   if (r.target) meta.push('Target: ' + escapeHtml(String(r.target)));
@@ -2396,7 +2396,7 @@ function renderScanReport(r) {
   if (fs.length) {
     html += '<div class="report-section"><h3>Key findings</h3>';
     html += fs.map(function (f) {
-      const sev = String(f.severity || 'info').toLowerCase();
+      const sev = String(f.severity || 'low').toLowerCase();
       let s = '<div class="report-finding"><div class="report-finding-head"><span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span> <strong>' + escapeHtml(String(f.id || '')) + '</strong> — ' + escapeHtml(String(f.title || '')) + '</div>';
       if (f.evidence) s += '<div class="report-kv"><span>Evidence</span><div>' + mdToHtml(String(f.evidence)) + '</div></div>';
       if (f.remediation) s += '<div class="report-kv"><span>Remediation</span><div>' + mdToHtml(String(f.remediation)) + '</div></div>';
