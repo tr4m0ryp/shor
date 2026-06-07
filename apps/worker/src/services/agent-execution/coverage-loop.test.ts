@@ -110,7 +110,7 @@ describe("runWithCoverage", () => {
 		const runner = fakeRunner([okResult()]);
 		const reader = steppingReader("injection-vuln", [
 			["sqlmap"],
-			["sqlmap", "commix"],
+			["sqlmap", "commix", "nosqli", "arjun"],
 		]);
 
 		const outcome = await runWithCoverage({
