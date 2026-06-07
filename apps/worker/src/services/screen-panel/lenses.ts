@@ -10,8 +10,6 @@
  * (a category/agent-keyed map of soft-scoping hints) so the two read the same.
  */
 
-import type { PlaywrightSession } from "../../types/agents.js";
-
 /**
  * The lens label that gates reachability. A reachability-lens `refute` can veto
  * a `support` majority (an unreachable sink cannot be confidently supported);
