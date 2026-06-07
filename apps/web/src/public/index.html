@@ -1054,11 +1054,17 @@ function setRoute(hash) { try { history.replaceState(null, '', hash); } catch (_
 function restoreRoute() {
   const m = (location.hash || '').match(/^#\/(scan|project|settings)(?:\/(.+))?$/);
   if (m && m[1] === 'settings') { showPage('settings'); return; }
-  // Always render a valid baseline first; the deep view overlays on success and,
-  // if its scan/project was deleted, the user safely lands on the dashboard.
+  if (m && (m[1] === 'scan' || m[1] === 'project') && m[2]) {
+    // Go straight to the deep view — hide the default-visible dashboard first so
+    // it never flashes during the async load. If the scan/project was deleted,
+    // openScan/openProject fall back to the dashboard (see their catch).
+    const tgt = document.getElementById('pageTargets');
+    if (tgt) tgt.style.display = 'none';
+    if (m[1] === 'project') openProject(decodeURIComponent(m[2]));
+    else openScan(decodeURIComponent(m[2]));
+    return;
+  }
   showPage('targets');
-  if (m && m[1] === 'project' && m[2]) openProject(decodeURIComponent(m[2]));
-  else if (m && m[1] === 'scan' && m[2]) openScan(decodeURIComponent(m[2]));
 }
 
 function showPage(page) {
@@ -1498,6 +1504,9 @@ async function openProject(id) {
     loadScans(id);
   } catch (err) {
     showToast(err.message, 'error');
+    // Open failed (e.g. deleted, or a refresh restoring a stale route) — land on
+    // the dashboard so the user is never left on a blank page.
+    showPage('targets');
   }
 }
 
@@ -1672,6 +1681,9 @@ async function openScan(scanId) {
     if (!isScanClosed(data.scan.status)) startScanPolling(scanId);
   } catch (err) {
     showToast(err.message, 'error');
+    // Open failed (e.g. deleted, or a refresh restoring a stale route) — land on
+    // the dashboard so the user is never left on a blank page.
+    showPage('targets');
   }
 }
 
