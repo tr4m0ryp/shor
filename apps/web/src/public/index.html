@@ -2176,7 +2176,7 @@ function renderFindingRow(f, i, members) {
       '<span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span>' +
       '<span class="finding-id">' + (f.displayId ? '<span class="vuln-num">' + escapeHtml(f.displayId) + '</span>' : '') + '</span>' +
       '<span class="finding-summary finding-title">' + escapeHtml(cat) + '</span>' +
-      '<span class="finding-badges">' + clusterBadge + reviewBadge + reachBadge + confBadge + '</span>' +
+      '<span class="finding-badges">' + clusterBadge + exploitedBadge + reviewBadge + reachBadge + confBadge + '</span>' +
       '<span class="finding-chevron">&rsaquo;</span>' +
     '</div>' +
     '<div class="finding-detail" id="findingDetail' + i + '" hidden>' + detailRows.join('') + '</div>'
