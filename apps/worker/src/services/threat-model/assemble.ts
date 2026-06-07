@@ -28,6 +28,7 @@ import type { PromptContext } from "../prompt-manager/prompt-context.js";
 import { renderHistoricalSeed, renderIdentities } from "./artifacts.js";
 import { renderThreatModel } from "./render.js";
 import { parseThreatModel } from "./schema.js";
+import { renderTargetSurface } from "./surface.js";
 
 /** Threat model emitted by the threat-model agent (task 005). */
 export const THREAT_MODEL_FILE = "threat_model.json";
