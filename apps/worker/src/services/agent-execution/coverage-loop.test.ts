@@ -105,7 +105,7 @@ describe("buildCoverageFollowUp", () => {
 
 describe("runWithCoverage", () => {
 	it("re-invokes the agent until the floor is reached, then exits", async () => {
-		// injection-vuln floor is 2. Round 0 runs only sqlmap (below floor); the
+		// injection-vuln floor is 4. Round 0 runs only sqlmap (below floor); the
 		// follow-up round adds commix → floor reached → loop exits.
 		const runner = fakeRunner([okResult()]);
 		const reader = steppingReader("injection-vuln", [
