@@ -221,14 +221,57 @@ describe("lensesForCategory", () => {
 	});
 });
 
-describe("sessionForVoter", () => {
-	it("assigns a distinct session per voter across a panel", () => {
-		const sessions = [1, 2, 3].map(sessionForVoter);
-		expect(sessions).toEqual(["agent1", "agent2", "agent3"]);
-		expect(new Set(sessions).size).toBe(3);
+describe("createSessionPool", () => {
+	it("hands out distinct sessions up to its size, never sharing one", async () => {
+		const pool = createSessionPool(SCREEN_SESSIONS);
+		const leases = await Promise.all(
+			SCREEN_SESSIONS.map(() => pool.acquire()),
+		);
+		const held = leases.map((l) => l.session);
+		expect(new Set(held).size).toBe(SCREEN_SESSIONS.length);
+		expect(pool.size).toBe(SCREEN_SESSIONS.length);
 	});
 
-	it("wraps within the 5-session pool beyond voter 5", () => {
-		expect(sessionForVoter(6)).toBe("agent1");
+	it("blocks acquire when full and resolves it as soon as a lease releases", async () => {
+		const pool = createSessionPool(["agent1", "agent2"]);
+		const a = await pool.acquire();
+		const b = await pool.acquire();
+
+		let thirdResolved = false;
+		const third = pool.acquire().then((lease) => {
+			thirdResolved = true;
+			return lease;
+		});
+		// Pool is full (2/2); the third acquire must stay pending.
+		await Promise.resolve();
+		expect(thirdResolved).toBe(false);
+
+		// Releasing one hands its session straight to the waiter.
+		b.release();
+		const recycled = await third;
+		expect(thirdResolved).toBe(true);
+		expect(recycled.session).toBe(b.session);
+
+		a.release();
+		recycled.release();
+	});
+
+	it("ignores a double release so a finally can call it unconditionally", async () => {
+		const pool = createSessionPool(["agent1"]);
+		const first = await pool.acquire();
+		first.release();
+		first.release(); // no-op — must not free a second phantom slot
+
+		// Exactly one slot exists, and it is free again: a fresh acquire resolves.
+		const reacquired = await pool.acquire();
+		expect(reacquired.session).toBe("agent1");
+
+		// A second concurrent acquire must block (the double release added no slot).
+		let extraResolved = false;
+		void pool.acquire().then(() => {
+			extraResolved = true;
+		});
+		await Promise.resolve();
+		expect(extraResolved).toBe(false);
 	});
 });
