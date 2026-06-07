@@ -21,10 +21,15 @@ export {
 	MAX_VOTERS,
 	REACHABILITY_LENS,
 	resolvePanelSize,
-	sessionForVoter,
 	VOTERS_ENV,
 } from "./lenses.js";
 export { runScreenPanel } from "./runner.js";
+export {
+	createSessionPool,
+	SCREEN_SESSIONS,
+	type SessionLease,
+	type SessionPool,
+} from "./session-pool.js";
 export type {
 	ScreenDecision,
 	ScreenVerdictEntry,
