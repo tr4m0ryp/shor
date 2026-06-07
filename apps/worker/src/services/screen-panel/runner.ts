@@ -262,7 +262,6 @@ export async function runScreenPanel(
 	concurrency: number = DEFAULT_CONCURRENCY,
 ): Promise<void> {
 	const { params, container, logger } = ctx;
-	const panelSize = resolvePanelSize(process.env);
 
 	// Resolve the distributed config once (login/rules/auth-context render the same
 	// for every voter). A parse failure falls open to null — voters still run.
