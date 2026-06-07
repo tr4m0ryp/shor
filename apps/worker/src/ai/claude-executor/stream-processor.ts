@@ -70,72 +70,116 @@ export async function processMessageStream(
 	let lastHeartbeat = Date.now();
 	const watchdog = createWatchdogState();
 
-	for await (const message of query({ prompt: fullPrompt, options })) {
-		// Heartbeat logging when loader is disabled
-		const now = Date.now();
-		if (
-			global.STORRON_DISABLE_LOADER &&
-			now - lastHeartbeat > HEARTBEAT_INTERVAL
-		) {
-			logger.info(
-				`[${Math.floor((now - timer.startTime) / 1000)}s] ${description} running... (Turn ${turnCount})`,
-			);
-			lastHeartbeat = now;
-		}
+	// Out-of-band progress-liveness watchdog. The turn/text watchdog above only
+	// runs on assistant messages, so it cannot see a SILENT hang inside a tool
+	// call (no messages arrive — this `for await` just parks). The liveness
+	// monitor ticks on its own timer, watching the agent's process-tree CPU/I/O
+	// plus stream activity, and aborts ONLY on sustained total non-progress (it
+	// never kills a slow-but-working tool). Scoped to THIS agent's tree via a
+	// token in the SDK env so it is correct under the 7-wide group.
+	const controller = new AbortController();
+	let livenessReason: string | null = null;
+	const liveness = startLivenessMonitor({
+		controller,
+		logger,
+		onHardAbort: (reason) => {
+			livenessReason = reason;
+		},
+	});
+	const queryOptions = {
+		...options,
+		abortController: controller,
+		env: { ...(options.env ?? {}), [liveness.tokenEnvVar]: liveness.token },
+	};
 
-		// Increment turn count for assistant messages
-		if (message.type === "assistant") {
-			turnCount++;
-			// Feed the watchdog with this turn's text + tool-call commands so it can
-			// detect stagnation (background-task feedback loops) and post-save loitering.
-			const { text, commands } = extractAssistantSignals(message);
-			recordAssistantTurn(watchdog, turnCount, text, commands);
-			const trigger = shouldTrigger(watchdog, turnCount);
-			if (trigger) {
-				watchdogFire(watchdog, trigger, logger);
+	try {
+		for await (const message of query({
+			prompt: fullPrompt,
+			options: queryOptions,
+		})) {
+			liveness.markMessage(); // any message = stream progress
+
+			// Heartbeat logging when loader is disabled
+			const now = Date.now();
+			if (
+				global.STORRON_DISABLE_LOADER &&
+				now - lastHeartbeat > HEARTBEAT_INTERVAL
+			) {
+				logger.info(
+					`[${Math.floor((now - timer.startTime) / 1000)}s] ${description} running... (Turn ${turnCount})`,
+				);
+				lastHeartbeat = now;
+			}
+
+			// Increment turn count for assistant messages
+			if (message.type === "assistant") {
+				turnCount++;
+				// Feed the watchdog with this turn's text + tool-call commands so it can
+				// detect stagnation (background-task feedback loops) and post-save loitering.
+				const { text, commands } = extractAssistantSignals(message);
+				recordAssistantTurn(watchdog, turnCount, text, commands);
+				const trigger = shouldTrigger(watchdog, turnCount);
+				if (trigger) {
+					watchdogFire(watchdog, trigger, logger);
+					break;
+				}
+			}
+
+			const dispatchResult = await dispatchMessage(
+				message as { type: string; subtype?: string },
+				turnCount,
+				{
+					execContext,
+					description,
+					progress,
+					auditLogger,
+					logger,
+					agentName: agentName ?? null,
+				},
+			);
+
+			if (dispatchResult.type === "throw") {
+				throw dispatchResult.error;
+			}
+
+			if (dispatchResult.type === "complete") {
+				result = dispatchResult.result;
+				inputTokens = dispatchResult.inputTokens;
+				outputTokens = dispatchResult.outputTokens;
+				cacheReadInputTokens = dispatchResult.cacheReadInputTokens;
+				cacheCreationInputTokens = dispatchResult.cacheCreationInputTokens;
+				numTurns = dispatchResult.numTurns;
+				if (dispatchResult.structuredOutput !== undefined) {
+					structuredOutput = dispatchResult.structuredOutput;
+				}
 				break;
 			}
-		}
 
-		const dispatchResult = await dispatchMessage(
-			message as { type: string; subtype?: string },
-			turnCount,
-			{
-				execContext,
-				description,
-				progress,
-				auditLogger,
-				logger,
-				agentName: agentName ?? null,
-			},
-		);
-
-		if (dispatchResult.type === "throw") {
-			throw dispatchResult.error;
-		}
-
-		if (dispatchResult.type === "complete") {
-			result = dispatchResult.result;
-			inputTokens = dispatchResult.inputTokens;
-			outputTokens = dispatchResult.outputTokens;
-			cacheReadInputTokens = dispatchResult.cacheReadInputTokens;
-			cacheCreationInputTokens = dispatchResult.cacheCreationInputTokens;
-			numTurns = dispatchResult.numTurns;
-			if (dispatchResult.structuredOutput !== undefined) {
-				structuredOutput = dispatchResult.structuredOutput;
-			}
-			break;
-		}
-
-		if (dispatchResult.type === "continue") {
-			if (dispatchResult.apiErrorDetected) {
-				apiErrorDetected = true;
-			}
-			// Capture model from SystemInitMessage, but override with router model if applicable
-			if (dispatchResult.model) {
-				model = getActualModelName(dispatchResult.model);
+			if (dispatchResult.type === "continue") {
+				if (dispatchResult.apiErrorDetected) {
+					apiErrorDetected = true;
+				}
+				// Capture model from SystemInitMessage, but override with router model if applicable
+				if (dispatchResult.model) {
+					model = getActualModelName(dispatchResult.model);
+				}
 			}
 		}
+	} catch (err) {
+		// A liveness hard-abort surfaces here (the SDK throws on AbortController);
+		// re-raise it as a typed, retryable failure so the lane fails OPEN and the
+		// run continues instead of hanging. Any other error propagates unchanged.
+		if (livenessReason !== null) {
+			throw new PentestError(livenessReason, "tool", true);
+		}
+		throw err;
+	} finally {
+		liveness.stop();
+	}
+
+	// The abort may end the stream without throwing — surface it the same way.
+	if (livenessReason !== null) {
+		throw new PentestError(livenessReason, "tool", true);
 	}
 
 	return {
