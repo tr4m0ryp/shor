@@ -43,7 +43,6 @@ function serverError(err: unknown): ApiResponse {
  *   /share/:slug/scans/:scanId
  *   /share/:slug/scans/:scanId/findings
  *   /share/:slug/scans/:scanId/attack-surface
- *   /share/:slug/scans/:scanId/diff
  *   /share/:slug/scans/:scanId/progress
  */
 export async function routeShare(method: string, segments: readonly string[]): Promise<ApiResponse | null> {
