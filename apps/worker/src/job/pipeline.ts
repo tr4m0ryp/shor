@@ -284,6 +284,10 @@ export async function runScanPipeline(
 		});
 	}
 
+	// 0b) Tool-health preflight — confirm the agents' security tools actually ship
+	// in this image (a missing binary otherwise no-ops silently). Best-effort.
+	await runToolHealthCheck(deliverablesPath, logger);
+
 	// 1) Prerequisites — sequential, fail-fast (vuln agents depend on these).
 	if (completedPhases.has("prereq")) {
 		logger.info("checkpoint: skipping completed phase", { phase: "prereq" });
