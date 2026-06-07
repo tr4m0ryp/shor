@@ -155,6 +155,7 @@ export async function runPreExecution(
 		deliverablesPath,
 		distributedConfig,
 		process.env,
+		webUrl,
 	);
 
 	// 2. Load prompt
