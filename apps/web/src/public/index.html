@@ -1712,7 +1712,6 @@ async function pollScan(scanId) {
       if (prev !== data.scan.status) {
         loadScanFindings(scanId);
         loadScanAttackSurface(scanId);
-        loadScanDiff(scanId);
       }
     }
   } catch (_) { /* transient; keep polling */ }
