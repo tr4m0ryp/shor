@@ -1,8 +1,28 @@
-URL: {{WEB_URL}}
+Primary origin: {{WEB_URL}}
 
-Live reachability — READ BEFORE CONCLUDING ANYTHING IS UNREACHABLE:
-- {{WEB_URL}} is the externally reachable origin. When it serves a single-page app (SPA), the backend API is almost always reverse-proxied on the SAME origin under a path prefix. ALWAYS probe `{{WEB_URL}}/api/`, `{{WEB_URL}}/api/v1/`, `{{WEB_URL}}/api/health`, `{{WEB_URL}}/graphql` (and any prefixes the recon/source analysis surfaced) before deciding the backend is isolated.
-- A direct backend port being closed (e.g. :8000, :3000, :80) does NOT mean the API is unreachable — the proxied path on this public origin is the real, testable attack surface. Validate every finding against that proxied path; only mark a finding VALIDATION_BLOCKED after the proxied `/api` paths have been tried and confirmed non-responsive.
+Reachable surface — AUTHORITATIVE (live origins recon observed on this target):
+{{TARGET_SURFACE}}
+
+Each finding's REAL attack surface is at the origin above that actually serves it
+— frequently a DISTINCT PORT (e.g. a REST API on :8080, an auth/OIDC service on
+:8090), NOT a path under {{WEB_URL}}. Map each endpoint to its service origin
+using the recon deliverable's "Open Ports & Services" / "Network Surface" section,
+and probe it THERE.
+
+READ BEFORE CONCLUDING ANYTHING IS UNREACHABLE:
+- {{WEB_URL}} (the primary origin) often serves only a single-page app (SPA) that
+  returns `index.html` for ANY unknown path. If a probe to `{{WEB_URL}}/<api-path>`
+  returns the SPA shell / index.html / a static-server 404 or 405, you are hitting
+  the SPA, NOT the API — switch to the API origin in the surface above (e.g. the
+  `:8080` origin) and probe the same path there.
+- Do NOT assume the API is reverse-proxied under {{WEB_URL}}/api/. That is only ONE
+  possible topology; the surface above is ground truth. ONLY when the surface lists
+  no separate API origin (or is "(none)" because recon has not run yet) should you
+  fall back to probing `{{WEB_URL}}/api/`, `/api/v1/`, `/api/health`, `/graphql` on
+  the primary origin.
+- Mark a finding VALIDATION_BLOCKED / unreachable ONLY after probing it against the
+  correct service origin from the surface above and confirming that origin is
+  genuinely non-responsive — never because the primary origin returned the SPA.
 
 Filesystem:
 - {{REPO_PATH}}/ (read only)
