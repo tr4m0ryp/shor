@@ -73,5 +73,6 @@ export function applyPromptContext(
 		)
 		.replace(/{{IDENTITIES}}/g, context.identities ?? NONE)
 		.replace(/{{FP_RULES}}/g, context.fpRules ?? NONE)
+		.replace(/{{TARGET_SURFACE}}/g, context.targetSurface ?? NONE)
 		.replace(/{{TARGET_POSTURE}}/g, context.targetPosture ?? NONE);
 }
