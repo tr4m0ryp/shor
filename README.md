@@ -20,4 +20,5 @@ Shor's discovery-and-verification pipeline ports ideas from Anthropic's defendin
 - **Anthropic — [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents)** — the orchestrator-workers and evaluator–optimizer patterns the pipeline is built on.
 - **[XBOW](https://xbow.com)** — validated, safe-PoC findings and its public challenge benchmark.
 - **[PentestGPT](https://github.com/GreyDGL/PentestGPT)** — LLM-driven specialist-sub-agent pentest orchestration.
+- **[Shannon](https://github.com/KeygraphHQ/shannon)** — open-source autonomous web-pentest agent.
 - **Strix** and **HexStrike AI** — additional prior art in agentic penetration testing.
