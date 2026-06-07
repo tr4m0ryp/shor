@@ -1047,6 +1047,20 @@ async function loadMe() {
 
 // ===================== Page routing =====================
 
+// Lightweight hash routing so a refresh restores the current view instead of
+// always bouncing to the dashboard. The route is written on navigation (via
+// replaceState, so no history clutter / no hashchange loops) and read on boot.
+function setRoute(hash) { try { history.replaceState(null, '', hash); } catch (_) {} }
+function restoreRoute() {
+  const m = (location.hash || '').match(/^#\/(scan|project|settings)(?:\/(.+))?$/);
+  if (m && m[1] === 'settings') { showPage('settings'); return; }
+  // Always render a valid baseline first; the deep view overlays on success and,
+  // if its scan/project was deleted, the user safely lands on the dashboard.
+  showPage('targets');
+  if (m && m[1] === 'project' && m[2]) openProject(decodeURIComponent(m[2]));
+  else if (m && m[1] === 'scan' && m[2]) openScan(decodeURIComponent(m[2]));
+}
+
 function showPage(page) {
   // Leaving any page stops the scan-detail live poll; openScan restarts it.
   stopScanPolling();
@@ -1073,6 +1087,11 @@ function showPage(page) {
     loadProjects();
     loadReposIntoPicker();
   }
+
+  // Reflect the no-id pages in the URL; project/scan set their own route in the
+  // opener (they carry the id), so don't overwrite those here.
+  if (page === 'settings') setRoute('#/settings');
+  else if (page !== 'projectDetail' && page !== 'scanDetail') setRoute('#/');
 }
 
 // ===================== Settings / GitHub =====================
@@ -1475,6 +1494,7 @@ async function openProject(id) {
     pbadge.className = 'mode-badge ' + pmode;
     pbadge.textContent = pmode === 'whitebox' ? 'White-box' : 'Black-box';
     showPage('projectDetail');
+    setRoute('#/project/' + data.project.id);
     loadScans(id);
   } catch (err) {
     showToast(err.message, 'error');
@@ -1642,6 +1662,7 @@ async function openScan(scanId) {
     document.getElementById('scanBackBtn').onclick = () => openProject(data.scan.projectId);
     state.scanTab = 'activity';
     showPage('scanDetail');
+    setRoute('#/scan/' + scanId);
     showScanTab('activity');
     loadScanProgress(scanId);
     loadScanFindings(scanId);
@@ -2442,7 +2463,7 @@ function renderUserRow(u) {
   // Warm the GitHub connection status in the background so navigating to
   // Settings shows "Connected as <name>" instantly (no on-open fetch wait).
   prefetchGithubStatus();
-  showPage('targets');
+  restoreRoute();
 })();
 </script>
 </body>
