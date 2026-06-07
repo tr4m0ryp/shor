@@ -317,6 +317,12 @@ export async function runScanPipeline(
 		await runScreenPanel(ctx, groupWidth);
 		saveCheckpoint(params.scanId, "screen", deliverablesPath, logger);
 	}
+
+	// 2a) Run-health summary — derive + loudly surface the silent underperformance
+	// signals (screen fail-open rate, vuln tool breadth) now that vuln + screen
+	// artifacts exist. Best-effort, never throws; reads the on-disk artifacts so it
+	// works whether the phases just ran or were checkpoint-skipped.
+	await emitRunHealth(deliverablesPath, logger);
 	if (completedPhases.has("exploit")) {
 		logger.info("checkpoint: skipping completed phase", { phase: "exploit" });
 	} else {
