@@ -14,11 +14,15 @@
  * `<deliverablesPath>/{category}_screen_verdicts.json` — the stable artifact
  * task 012 reads for fail-open routing.
  *
- * Candidates run one at a time so the panel's N voters never oversubscribe the
- * 5-session Playwright pool; within a candidate the voters run with bounded
- * concurrency (the pipeline's GROUP_CONCURRENCY, passed in). A category failure
- * is isolated: it logs, writes an empty verdicts file (stable fail-open
- * artifact), and the remaining categories continue.
+ * Everything fans out: categories run concurrently, candidates within a category
+ * run concurrently, and a candidate's voters run concurrently. A shared
+ * {@link SessionPool} — not the loop structure — is what bounds the work: each
+ * voter LEASES one of the isolated Playwright sessions for the duration of its
+ * run and releases it when done, so total in-flight voters never exceeds the pool
+ * size (and the operator can dial that down via GROUP_CONCURRENCY to spare a
+ * fragile target). A category failure is isolated: it logs, writes an empty
+ * verdicts file (stable fail-open artifact), and the remaining categories
+ * continue.
  */
 
 import fs from "node:fs";
@@ -33,8 +37,13 @@ import { loadPrompt } from "../prompt-manager.js";
 import { assembleScanPromptContext } from "../threat-model/index.js";
 import { buildVerdictEntry } from "./aggregate.js";
 import { lensesForCategory, resolvePanelSize } from "./lenses.js";
+import {
+	createSessionPool,
+	SCREEN_SESSIONS,
+	type SessionPool,
+} from "./session-pool.js";
 import type { ScreenVerdictEntry, ScreenVote } from "./types.js";
-import { runVoter } from "./voter.js";
+import { type VoterRunArgs, runVoter } from "./voter.js";
 
 /** Categories with a screen agent — the panel covers each `{category}-screen`. */
 const SCREEN_CATEGORIES = [
