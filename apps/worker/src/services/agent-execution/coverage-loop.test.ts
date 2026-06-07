@@ -126,7 +126,12 @@ describe("runWithCoverage", () => {
 		expect(runner.calls()).toBe(2);
 		expect(outcome.rounds).toBe(2);
 		expect(outcome.coverage.ok).toBe(true);
-		expect(outcome.coverage.ran).toEqual(["sqlmap", "commix"]);
+		expect(outcome.coverage.ran).toEqual([
+			"sqlmap",
+			"commix",
+			"nosqli",
+			"arjun",
+		]);
 		// Round 0 got the base prompt; round 1 got the injected follow-up.
 		expect(runner.prompts[0]).toBe("BASE");
 		expect(runner.prompts[1]).toContain("did NOT run");
