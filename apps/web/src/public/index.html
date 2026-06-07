@@ -1522,12 +1522,15 @@ function renderScanCard(s, num) {
 }
 
 // Aggregate stats from the project's scans + the latest scan's findings.
+// Archived scans are excluded from the overview entirely (count + findings),
+// so the "Vulnerabilities" total resets to 0 once everything is archived.
 async function renderProjectStats(scans) {
   const box = document.getElementById('projStats');
   if (!box) return;
-  const total = scans.length;
-  const completed = scans.filter(function (s) { return s.status === 'completed'; });
-  const last = scans[0];
+  const active = scans.filter(function (s) { return s.status !== 'archived'; });
+  const total = active.length;
+  const completed = active.filter(function (s) { return s.status === 'completed'; });
+  const last = active[0];
   const lastRun = last && last.startedAt ? new Date(last.startedAt).toLocaleDateString() : '—';
   // Severity breakdown from the most-recent scan that has findings.
   let sev = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
