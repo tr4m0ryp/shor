@@ -149,15 +149,15 @@ export class ProgressEmitter {
 		);
 	}
 
-	/** Announce an agent is now running (≥1 may run concurrently). */
-	async started(agent: AgentName): Promise<void> {
+	/** Announce an agent (or service phase) is now running (≥1 may run concurrently). */
+	async started(agent: ProgressAgent): Promise<void> {
 		this.running.add(agent);
 		this.starts[agent] = Date.now();
 		await this.emit();
 	}
 
 	/** Record an agent finished successfully and push the updated snapshot. */
-	async completed_(agent: AgentName, durationMs: number): Promise<void> {
+	async completed_(agent: ProgressAgent, durationMs: number): Promise<void> {
 		this.running.delete(agent);
 		const startedAt = this.starts[agent] ?? Date.now() - durationMs;
 		this.completed.push({ agent, status: "completed", durationMs, startedAt, finishedAt: Date.now() });
@@ -165,7 +165,7 @@ export class ProgressEmitter {
 	}
 
 	/** Record an agent failed; the terminal status is set by the findings POST. */
-	async failed(agent: AgentName, durationMs: number): Promise<void> {
+	async failed(agent: ProgressAgent, durationMs: number): Promise<void> {
 		this.running.delete(agent);
 		this.lastFailed = agent;
 		const startedAt = this.starts[agent] ?? Date.now() - durationMs;
