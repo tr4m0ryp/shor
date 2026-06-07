@@ -61,13 +61,13 @@ describe("buildCoverageMap", () => {
 	});
 
 	it("carries the below-floor shortfall through to the artifact", () => {
-		// The live skillTracker is empty at test time, so injection-vuln (floor 2)
-		// has run nothing → below floor → a shortfall must be surfaced.
+		// The live skillTracker is empty at test time, so injection-vuln (floor 4 —
+		// half its 8 recommended tools) has run nothing → below floor → a shortfall.
 		const map = buildCoverageMap({ "injection-vuln": [] });
 		const shortfall = map["injection-vuln"]?.shortfall;
 		expect(shortfall).toBeDefined();
 		expect(shortfall?.belowFloor).toBe(true);
-		expect(shortfall?.requiredFloor).toBe(2);
+		expect(shortfall?.requiredFloor).toBe(4);
 		expect(shortfall?.ranTools).toBe(0);
 	});
 });
