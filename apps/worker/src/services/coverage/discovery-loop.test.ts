@@ -120,7 +120,7 @@ describe("runWithCoverage: findings-convergence drives above the floor", () => {
 			deliverablesSubdir: "d",
 			logger: silentLogger,
 			runRound: runner.run,
-			reader: fixedReader("injection-vuln", ["sqlmap", "commix"]),
+			reader: fixedReader("injection-vuln", ["sqlmap", "commix", "nosqli", "arjun"]),
 			findingsReader: steppingFindings([2, 3, 3]),
 		});
 
@@ -138,7 +138,7 @@ describe("runWithCoverage: findings-convergence drives above the floor", () => {
 			deliverablesSubdir: "d",
 			logger: silentLogger,
 			runRound: runner.run,
-			reader: fixedReader("injection-vuln", ["sqlmap", "commix"]),
+			reader: fixedReader("injection-vuln", ["sqlmap", "commix", "nosqli", "arjun"]),
 			findingsReader: steppingFindings([0]), // empty queue, no new findings
 		});
 		expect(runner.calls()).toBe(1);
@@ -154,7 +154,7 @@ describe("runWithCoverage: findings-convergence drives above the floor", () => {
 			deliverablesSubdir: "d",
 			logger: silentLogger,
 			runRound: runner.run,
-			reader: fixedReader("injection-vuln", ["sqlmap", "commix"]),
+			reader: fixedReader("injection-vuln", ["sqlmap", "commix", "nosqli", "arjun"]),
 		});
 		expect(runner.calls()).toBe(1);
 	});
@@ -174,7 +174,7 @@ describe("runWithCoverage: discovery ceiling", () => {
 			deliverablesSubdir: "d",
 			logger,
 			runRound: runner.run,
-			reader: fixedReader("injection-vuln", ["sqlmap", "commix"]),
+			reader: fixedReader("injection-vuln", ["sqlmap", "commix", "nosqli", "arjun"]),
 			// Strictly increasing → +1 every round, so discovery never converges.
 			findingsReader: steppingFindings([1, 2, 3, 4, 5, 6, 7]),
 		});
@@ -252,7 +252,7 @@ describe("runWithCoverage: multi-modal lenses", () => {
 			deliverablesSubdir: "d",
 			logger: silentLogger,
 			runRound: runner.run,
-			reader: fixedReader("injection-vuln", ["sqlmap", "commix"]),
+			reader: fixedReader("injection-vuln", ["sqlmap", "commix", "nosqli", "arjun"]),
 			findingsReader: steppingFindings([1, 2, 3, 4, 5, 6, 7]),
 		});
 
@@ -274,7 +274,7 @@ describe("runWithCoverage: multi-modal lenses", () => {
 			deliverablesSubdir: "d",
 			logger: silentLogger,
 			runRound: runner.run,
-			reader: fixedReader("injection-vuln", ["sqlmap", "commix"]),
+			reader: fixedReader("injection-vuln", ["sqlmap", "commix", "nosqli", "arjun"]),
 			findingsReader: steppingFindings([1, 2, 2]),
 			partition: "auth-routes",
 		});
