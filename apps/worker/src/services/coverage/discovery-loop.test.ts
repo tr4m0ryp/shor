@@ -206,7 +206,10 @@ describe("runWithCoverage: breadth floor stays a minimum", () => {
 			deliverablesSubdir: "d",
 			logger: silentLogger,
 			runRound: runner.run,
-			reader: steppingReader("injection-vuln", [["sqlmap"], ["sqlmap", "commix"]]),
+			reader: steppingReader("injection-vuln", [
+				["sqlmap"],
+				["sqlmap", "commix", "nosqli", "arjun"],
+			]),
 			findingsReader: steppingFindings([0, 0]), // never any findings
 		});
 		expect(runner.calls()).toBe(2); // one-shot + 1 breadth continuation
