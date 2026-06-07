@@ -13,9 +13,9 @@ import {
 	MAX_VOTERS,
 	REACHABILITY_LENS,
 	resolvePanelSize,
-	sessionForVoter,
 	VOTERS_ENV,
 } from "./lenses.js";
+import { createSessionPool, SCREEN_SESSIONS } from "./session-pool.js";
 import type { ScreenDecision, ScreenVote } from "./types.js";
 
 /** Build a ballot list from `[lens, verdict]` pairs (voter ordinal = index+1). */
