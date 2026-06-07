@@ -146,9 +146,6 @@ async function routeScans(
   if (sub === 'attack-surface') {
     return method === 'GET' ? getScanAttackSurface(id, cookieHeader) : methodNotAllowed;
   }
-  if (sub === 'diff') {
-    return method === 'GET' ? getScanDiff(id, cookieHeader) : methodNotAllowed;
-  }
   if (sub === 'report') {
     return method === 'GET' ? getScanReport(id, cookieHeader) : methodNotAllowed;
   }
