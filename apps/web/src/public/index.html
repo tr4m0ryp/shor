@@ -501,7 +501,7 @@ body.guest .sidebar nav { display: none; }
 .finding-detail[hidden] { display: none; }
 .finding-field { display: grid; grid-template-columns: 180px 1fr; gap: 8px 16px; margin-bottom: 6px; font-size: 13px; }
 .finding-field dt { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-.finding-field dd { color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.finding-field dd { color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; min-width: 0; }
 .finding-field.highlight dt { color: var(--accent); }
 .finding-field.highlight dd { font-weight: 500; }
 .confidence-badge {
