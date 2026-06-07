@@ -100,22 +100,23 @@ function readCandidateIds(
 	}
 }
 
-/** Run an array of voter thunks with at most `limit` in flight; ballots returned voter-ordered. */
-async function runBounded(
-	thunks: readonly (() => Promise<ScreenVote>)[],
-	limit: number,
-): Promise<ScreenVote[]> {
-	const queue = [...thunks];
-	const collected: ScreenVote[] = [];
-	const worker = async (): Promise<void> => {
-		for (let job = queue.shift(); job !== undefined; job = queue.shift()) {
-			collected.push(await job());
-		}
-	};
-	const count = Math.max(1, Math.min(limit, thunks.length));
-	await Promise.all(Array.from({ length: count }, () => worker()));
-	collected.sort((a, b) => a.voter - b.voter);
-	return collected;
+/**
+ * Lease a session, run one voter on it, and ALWAYS release — a voter holds a
+ * session only for the span of its own run, so the freed slot immediately serves
+ * the next waiting voter. `runVoter` never throws (it fails open to an `uncertain`
+ * ballot), but the lease is released in a `finally` regardless, so an unexpected
+ * throw can never leak a session and starve the pool.
+ */
+async function runLeasedVoter(
+	pool: SessionPool,
+	args: Omit<VoterRunArgs, "session">,
+): Promise<ScreenVote> {
+	const lease = await pool.acquire();
+	try {
+		return await runVoter({ ...args, session: lease.session });
+	} finally {
+		lease.release();
+	}
 }
 
 /** Atomically-ish write a category's verdict array (pretty-printed for diffable audits). */
