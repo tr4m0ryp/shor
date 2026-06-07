@@ -101,9 +101,9 @@ async function post(config: SinkConfig, snapshot: ProgressSnapshot, logger: Acti
 export class ProgressEmitter {
 	private readonly config: SinkConfig | undefined;
 	private readonly completed: AgentProgress[] = [];
-	private readonly running = new Set<AgentName>();
+	private readonly running = new Set<ProgressAgent>();
 	private readonly starts: Record<string, number> = {};
-	private lastFailed: AgentName | null = null;
+	private lastFailed: ProgressAgent | null = null;
 	private lastSkillEmit = 0;
 
 	constructor(
