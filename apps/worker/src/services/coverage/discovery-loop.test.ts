@@ -197,7 +197,7 @@ describe("runWithCoverage: discovery ceiling", () => {
 
 describe("runWithCoverage: breadth floor stays a minimum", () => {
 	it("keeps running to reach the floor even when no findings appear", async () => {
-		// Round 0 below floor (1/2) with zero findings: a dry round must NOT halt a
+		// Round 0 below floor (1/4) with zero findings: a dry round must NOT halt a
 		// below-floor agent — breadth wins until the floor is met.
 		const runner = fakeRunner([okResult()]);
 		const outcome = await runWithCoverage({
