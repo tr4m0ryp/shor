@@ -1772,13 +1772,28 @@ function renderProgress(view) {
 
 // Gantt timeline: one bar per agent positioned on the run's time axis. Parallel
 // agents overlap, so the 2-wide vuln/exploit phases are visible.
+// Phase-group prefix shown ONLY on the flat timeline rows (the phase cards are
+// already grouped under headers, so they show the plain category name).
+function phaseTimelinePrefix(id) {
+  return id === 'vulnerability-analysis' ? '(VA) '
+    : id === 'adversarial-screen' ? '(AS) '
+    : id === 'exploitation' ? '(V) '
+    : '';
+}
+
 function renderTimeline(view) {
   if (!view.runStart || !view.runEnd || view.runEnd <= view.runStart) return '';
   const span = view.runEnd - view.runStart;
-  const agents = (view.phases || []).reduce(function (acc, p) { return acc.concat(p.agents); }, [])
-    .filter(function (a) { return a.startedAt != null; });
-  if (agents.length === 0) return '';
-  const rows = agents.map(function (a) {
+  // Flatten agents but carry each one's phase prefix so the timeline disambiguates
+  // the repeated category names across the VA / AS / V phases.
+  const items = (view.phases || []).reduce(function (acc, p) {
+    const prefix = phaseTimelinePrefix(p.id);
+    (p.agents || []).forEach(function (a) { acc.push({ a: a, prefix: prefix }); });
+    return acc;
+  }, []).filter(function (x) { return x.a.startedAt != null; });
+  if (items.length === 0) return '';
+  const rows = items.map(function (x) {
+    const a = x.a;
     const start = a.startedAt;
     const end = a.finishedAt != null ? a.finishedAt : view.runEnd;
     const left = Math.max(0, (start - view.runStart) / span * 100);
@@ -1787,7 +1802,7 @@ function renderTimeline(view) {
     // total). durationMs counts only the agent's active model time, so a step that
     // sat in a long tool run (sqlmap/playwright) showed a tiny label on a wide bar.
     const dur = fmtDur(end - start);
-    return '<div class="gantt-row"><div class="gantt-row__label">' + escapeHtml(a.label) + '</div>' +
+    return '<div class="gantt-row"><div class="gantt-row__label">' + escapeHtml(x.prefix + a.label) + '</div>' +
       '<div class="gantt-row__track"><div class="gantt-bar ' + a.status + '" style="left:' + left.toFixed(1) + '%;width:' + width.toFixed(1) + '%">' +
         (width > 9 && dur ? '<span class="gantt-bar__dur">' + dur + '</span>' : '') +
       '</div></div></div>';
