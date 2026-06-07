@@ -117,6 +117,7 @@ export async function runVoter(args: VoterRunArgs): Promise<ScreenVote> {
 		candidateId,
 		lens,
 		voter,
+		session,
 		sourceDir,
 		deliverablesSubdir,
 		modelTier,
@@ -125,7 +126,6 @@ export async function runVoter(args: VoterRunArgs): Promise<ScreenVote> {
 		logger,
 	} = args;
 
-	const session = sessionForVoter(voter);
 	const prompt = `${basePrompt}\n${voterFramingBlock({ lens, voter, candidateId, session })}`;
 
 	const result = await runStructured<ScreenVerdict>({
