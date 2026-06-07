@@ -19,6 +19,7 @@ export {
 	LENSES,
 	lensesForCategory,
 	MAX_VOTERS,
+	panelSizeForCategory,
 	REACHABILITY_LENS,
 	resolvePanelSize,
 	VOTERS_ENV,
