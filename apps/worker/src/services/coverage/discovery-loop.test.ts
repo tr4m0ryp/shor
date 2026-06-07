@@ -227,7 +227,7 @@ describe("runWithCoverage: breadth floor stays a minimum", () => {
 			deliverablesSubdir: "d",
 			logger: silentLogger,
 			runRound: runner.run,
-			reader: fixedReader("injection-vuln", ["sqlmap"]), // 1/2 forever
+			reader: fixedReader("injection-vuln", ["sqlmap"]), // 1/4 forever
 			findingsReader: steppingFindings([1, 2, 3, 4, 5]),
 		});
 		expect(runner.calls()).toBe(MAX_COVERAGE_ROUNDS + 1);
