@@ -56,8 +56,8 @@ const SCREEN_CATEGORIES = [
 	"misconfig-web",
 ] as const;
 
-/** Default voter concurrency when the caller passes none (mirrors GROUP_CONCURRENCY). */
-const DEFAULT_CONCURRENCY = 2;
+/** Default in-flight-voter cap when the caller passes none — the full session pool. */
+const DEFAULT_CONCURRENCY = SCREEN_SESSIONS.length;
 
 /**
  * Read the candidate ids from a `{category}_exploitation_queue.json` file. Mirrors
