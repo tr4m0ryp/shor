@@ -35,13 +35,20 @@ import { lookupDisposition, readDispositions, runOracleReplay } from "./replay/i
  * markdown-parsed dispositions in place (the oracle only ever tightens them).
  */
 export async function runOraclePhase(ctx: AgentContext): Promise<void> {
-	const { deliverablesPath, logger } = ctx;
+	const { deliverablesPath, logger, progress } = ctx;
+	// Emit phase progress under the "oracle" service marker so the dashboard's
+	// Adjudication card shows running → done instead of sitting at "0/0 QUEUED"
+	// (this phase runs a deterministic replay service, not a tracked LLM agent).
+	const startedAt = Date.now();
+	await progress.started("oracle");
 	try {
 		await runOracleReplay(deliverablesPath, logger);
+		await progress.completed_("oracle", Date.now() - startedAt);
 	} catch (err) {
 		logger.error("Oracle replay phase failed; markdown dispositions remain authoritative", {
 			error: err instanceof Error ? err.message : String(err),
 		});
+		await progress.failed("oracle", Date.now() - startedAt);
 	}
 }
 
