@@ -86,9 +86,18 @@ export interface AgentDefinition {
 }
 
 /**
- * Vulnerability types supported by the pipeline.
+ * Vulnerability types supported by the pipeline. `logic` and `misconfig-web` are
+ * first-class here so they share the real queue+deliverable validator and
+ * `VULN_TYPE_CONFIG` like the original five (no more presence-only stub).
  */
-export type VulnType = "injection" | "xss" | "auth" | "ssrf" | "authz";
+export type VulnType =
+	| "injection"
+	| "xss"
+	| "auth"
+	| "ssrf"
+	| "authz"
+	| "logic"
+	| "misconfig-web";
 
 /**
  * Decision returned by queue validation for exploitation phase.
