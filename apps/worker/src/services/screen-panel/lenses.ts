@@ -73,23 +73,3 @@ export function lensesForCategory(category: string, n: number): string[] {
 	}
 	return out;
 }
-
-/** The fixed pool of isolated Playwright sessions. */
-const SESSIONS: readonly PlaywrightSession[] = [
-	"agent1",
-	"agent2",
-	"agent3",
-	"agent4",
-	"agent5",
-];
-
-/**
- * The distinct Playwright session for a 1-based voter ordinal. Within one panel
- * the voters span agent1..agentN, so concurrently-running voters never share a
- * browser context (independence). Panels run one candidate at a time, so the
- * pool is never oversubscribed.
- */
-export function sessionForVoter(voter: number): PlaywrightSession {
-	const idx = (voter - 1) % SESSIONS.length;
-	return SESSIONS[idx] ?? "agent1";
-}
