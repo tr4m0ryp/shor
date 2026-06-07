@@ -2256,7 +2256,7 @@ function renderAttackScenario(scenario, index) {
     sections.push('<div class="attack-scenario-section"><div class="field-label">Requires vulnerabilities</div><div class="needs-tags">' +
       needs.map(function (n) {
         return n.fp
-          ? '<span class="needs-tag" title="Open ' + escapeHtml(n.id) + '" onclick="openFindingFromDiff(\'' + escapeHtml(n.fp) + '\')">' + escapeHtml(n.id) + '</span>'
+          ? '<span class="needs-tag" title="Open ' + escapeHtml(n.id) + '" onclick="openFindingByFingerprint(\'' + escapeHtml(n.fp) + '\')">' + escapeHtml(n.id) + '</span>'
           : '<span class="needs-tag needs-tag--static">' + escapeHtml(n.id) + '</span>';
       }).join('') + '</div></div>');
   }
