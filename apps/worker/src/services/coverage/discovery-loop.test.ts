@@ -214,7 +214,7 @@ describe("runWithCoverage: breadth floor stays a minimum", () => {
 		});
 		expect(runner.calls()).toBe(2); // one-shot + 1 breadth continuation
 		expect(outcome.coverage.ok).toBe(true);
-		expect(outcome.coverage.ran).toEqual(["sqlmap", "commix"]);
+		expect(outcome.coverage.ran).toEqual(["sqlmap", "commix", "nosqli", "arjun"]);
 	});
 
 	it("bounds a never-reached floor by MAX_COVERAGE_ROUNDS even as findings arrive", async () => {
