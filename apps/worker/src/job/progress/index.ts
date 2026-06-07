@@ -20,11 +20,30 @@
  */
 
 import { AGENT_PHASE_MAP } from "../../session-manager.js";
+import type { PhaseName } from "../../session-manager.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import type { AgentName } from "../../types/agents.js";
 import { readSinkConfig, type SinkConfig } from "../findings/sink.js";
 import { buildCoverageMap, type CoverageSummary } from "./coverage-map.js";
 import { skillTracker } from "./skill-tracker.js";
+
+/**
+ * Service phases that report progress but are NOT LLM agents — they have no
+ * `AGENTS` entry and are absent from `ALL_AGENTS` (so they can't pollute the
+ * agent registry / its exhaustive maps). The deterministic post-exploitation
+ * oracle is one: it does real work (replays PoCs) but runs no agent, so without
+ * a marker its phase card sits at "0/0 QUEUED" forever. Emitting under this key
+ * lets the dashboard render it running/done like any other phase.
+ */
+export type ServicePhaseAgent = "oracle";
+
+/** Any progress key: a real agent, or a non-agent service-phase marker. */
+type ProgressAgent = AgentName | ServicePhaseAgent;
+
+/** Resolve the phase for any progress key (service markers map to their own phase). */
+function phaseOf(agent: ProgressAgent): PhaseName {
+	return agent === "oracle" ? "oracle" : AGENT_PHASE_MAP[agent];
+}
 
 interface AgentProgress {
 	agent: string;
