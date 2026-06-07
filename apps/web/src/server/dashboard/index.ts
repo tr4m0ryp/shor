@@ -18,7 +18,6 @@
  *   GET    /scans/:id                 scan header + finding count
  *   GET    /scans/:id/findings        scan's findings (GET; POST is the sink)
  *   GET    /scans/:id/attack-surface  scan's attack-surface doc (fix prompts)
- *   GET    /scans/:id/diff            scan-to-scan diff (new/open/fixed/regressed)
  *   GET    /users                     tenant users (multi-user view)
  *   GET    /settings/github           GitHub connection status { connected, login? }
  *   POST   /settings/github           connect a PAT { token } → { connected, login }
