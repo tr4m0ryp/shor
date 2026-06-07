@@ -30,14 +30,14 @@ describe("evaluateCoverage", () => {
 	});
 
 	it("fails when fewer than minCount candidate tools ran", () => {
-		// injection-vuln floor is 2; one tool used.
+		// injection-vuln floor is 4 (half of 8 recommended); one tool used.
 		const result = evaluateCoverage(
 			"injection-vuln",
 			readerFor("injection-vuln", ["sqlmap"]),
 		);
 		expect(result.ok).toBe(false);
 		expect(result.ran).toEqual(["sqlmap"]);
-		expect(result.floor).toBe(2);
+		expect(result.floor).toBe(4);
 		expect(result.hardMissing).toEqual([]);
 		expect(result.missing).not.toContain("sqlmap");
 		expect(result.missing.length).toBeGreaterThan(0);
@@ -46,11 +46,23 @@ describe("evaluateCoverage", () => {
 	it("passes when at least minCount candidate tools ran", () => {
 		const result = evaluateCoverage(
 			"injection-vuln",
-			readerFor("injection-vuln", ["sqlmap", "commix"]),
+			readerFor("injection-vuln", ["sqlmap", "commix", "nosqli", "arjun"]),
 		);
 		expect(result.ok).toBe(true);
-		expect(result.ran).toEqual(["sqlmap", "commix"]);
+		expect(result.ran).toEqual(["sqlmap", "commix", "nosqli", "arjun"]);
 		expect(result.hardMissing).toEqual([]);
+	});
+
+	it("policies logic-vuln and misconfig-web with a floor (was unpoliced → floor 0)", () => {
+		// logic-vuln recommended set is 3 tools → floor 2; running nothing fails.
+		const none = evaluateCoverage("logic-vuln", () => []);
+		expect(none.ok).toBe(false);
+		expect(none.floor).toBe(2);
+		const met = evaluateCoverage(
+			"logic-vuln",
+			readerFor("logic-vuln", ["semgrep", "arjun"]),
+		);
+		expect(met.ok).toBe(true);
 	});
 
 	it("counts only candidate tools toward coverage (ignores off-policy tools)", () => {
