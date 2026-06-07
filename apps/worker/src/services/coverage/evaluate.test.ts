@@ -121,7 +121,7 @@ describe("evaluateCoverage", () => {
 
 	describe("below-floor shortfall signal (T4)", () => {
 		it("attaches a structured shortfall when below the floor", () => {
-			// injection-vuln floor is 2; one tool used → below floor.
+			// injection-vuln floor is 4; one tool used → below floor.
 			const result = evaluateCoverage(
 				"injection-vuln",
 				readerFor("injection-vuln", ["sqlmap"]),
@@ -130,7 +130,7 @@ describe("evaluateCoverage", () => {
 			expect(result.shortfall).toEqual({
 				belowFloor: true,
 				ranTools: 1,
-				requiredFloor: 2,
+				requiredFloor: 4,
 				missing: result.missing,
 			});
 		});
@@ -138,7 +138,7 @@ describe("evaluateCoverage", () => {
 		it("omits the shortfall when the floor is met", () => {
 			const result = evaluateCoverage(
 				"injection-vuln",
-				readerFor("injection-vuln", ["sqlmap", "commix"]),
+				readerFor("injection-vuln", ["sqlmap", "commix", "nosqli", "arjun"]),
 			);
 			expect(result.ok).toBe(true);
 			expect(result.shortfall).toBeUndefined();
