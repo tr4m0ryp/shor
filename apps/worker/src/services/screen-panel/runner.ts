@@ -188,6 +188,7 @@ async function runCategoryPanel(
 			deliverablesPath,
 			config,
 			process.env,
+			params.targetUrl,
 		);
 		const basePrompt = await loadPrompt(
 			def.promptTemplate,
