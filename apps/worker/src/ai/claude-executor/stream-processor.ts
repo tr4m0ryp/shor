@@ -5,6 +5,7 @@
 // as published by the Free Software Foundation.
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { PentestError } from "../../services/error-handling.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import type { Timer } from "../../utils/metrics.js";
 import type { createAuditLogger } from "../audit-logger.js";
@@ -12,6 +13,7 @@ import { dispatchMessage } from "../message-handlers.js";
 import type { detectExecutionContext } from "../output-formatters.js";
 import type { createProgressManager } from "../progress-manager.js";
 import { getActualModelName } from "../router-utils.js";
+import { startLivenessMonitor } from "./liveness/index.js";
 import {
 	createWatchdogState,
 	recordAssistantTurn,
