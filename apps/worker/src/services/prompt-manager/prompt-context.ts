@@ -35,6 +35,13 @@ export interface PromptContext {
 	/** `{{FP_RULES}}` — org false-positive precedents (task 016). */
 	fpRules?: string;
 	/**
+	 * `{{TARGET_SURFACE}}` — the live service ORIGINS recon observed (one per
+	 * line). Authoritative probe surface: services may live on distinct ports
+	 * (API on :8080, OIDC on :8090), NOT necessarily under `{{WEB_URL}}`. Absent
+	 * until recon has produced its deliverable, then renders "(none)".
+	 */
+	targetSurface?: string;
+	/**
 	 * `{{TARGET_POSTURE}}` — EXPLOIT/screen impact posture (task 003).
 	 * assembleScanPromptContext selects the minimal-impact block by DEFAULT and
 	 * the disposable-target block only on operator opt-in (SHOR_EXPENDABLE_TARGET).
