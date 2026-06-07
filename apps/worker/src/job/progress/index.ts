@@ -136,7 +136,7 @@ export class ProgressEmitter {
 			this.config,
 			{
 				status: "running",
-				currentPhase: rep ? AGENT_PHASE_MAP[rep] : null,
+				currentPhase: rep ? phaseOf(rep) : null,
 				currentAgent: rep,
 				failedAgent: this.lastFailed,
 				runningAgents: [...this.running],
