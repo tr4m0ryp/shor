@@ -132,9 +132,17 @@ export const PIPELINE_PLAN: readonly PhaseSpec[] = [
   {
     id: 'oracle',
     label: 'Adjudication',
-    // Post-exploitation oracle phase — runs as a worker service (no tracked
-    // agent), so this card carries no agents (task 013/017 fill the view).
-    agents: [],
+    // Post-exploitation oracle: a deterministic replay SERVICE, not an LLM agent
+    // (absent from the worker's ALL_AGENTS). The worker emits its progress under
+    // the service key 'oracle' (ProgressEmitter.ServicePhaseAgent), so this single
+    // tracked unit makes the card render running/done instead of "0/0 QUEUED".
+    agents: [
+      {
+        name: 'oracle',
+        label: 'Replay & adjudicate',
+        subtasks: ['Replay captured PoCs', 'Match expected signals', 'Write dispositions'],
+      },
+    ],
   },
   {
     id: 'reporting',
