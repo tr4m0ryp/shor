@@ -73,3 +73,18 @@ export function lensesForCategory(category: string, n: number): string[] {
 	}
 	return out;
 }
+
+/**
+ * Panel size for a category: the larger of the configured panel size and the
+ * category's lens-pool size, capped at {@link MAX_VOTERS}. This guarantees a
+ * category with an extra lens (authz's `auth-context`, a 4-lens pool) actually
+ * runs a voter for it — at the default panel size of 3 that 4th lens otherwise
+ * lay dormant and every category screened with the same 3 base lenses.
+ */
+export function panelSizeForCategory(
+	category: string,
+	env: NodeJS.ProcessEnv = process.env,
+): number {
+	const poolSize = (LENSES[category] ?? BASE_LENSES).length;
+	return Math.min(MAX_VOTERS, Math.max(resolvePanelSize(env), poolSize));
+}
