@@ -1673,7 +1673,6 @@ function showScanTab(tab) {
   document.getElementById('panelActivity').style.display = tab === 'activity' ? 'block' : 'none';
   document.getElementById('panelFindings').style.display = tab === 'findings' ? 'block' : 'none';
   document.getElementById('panelAttackSurface').style.display = tab === 'attackSurface' ? 'block' : 'none';
-  document.getElementById('panelDiff').style.display = tab === 'diff' ? 'block' : 'none';
   document.getElementById('panelReport').style.display = tab === 'report' ? 'block' : 'none';
   if (tab === 'report' && state.currentScan) loadScanReport(state.currentScan.id);
 }
