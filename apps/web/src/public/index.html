@@ -1768,10 +1768,10 @@ function renderProgress(view) {
   const banner = renderProgressBanner(view);
   const timeline = renderTimeline(view);
   const arsenal = renderArsenal(view);
-  // Activity overview: merge the consecutive "Sinas" phases (report + attack
-  // surface) into one card, and prepend the Sonnet "Finding refinement" step —
-  // it runs on Sinas with the report/attack-surface but isn't an engine pipeline
-  // agent, so it has no live timing.
+  // Activity overview: merge the consecutive "Documenting" phases (report +
+  // attack surface) into one card, and prepend the Sonnet "Finding refinement"
+  // step — it runs alongside the report/attack-surface but isn't an engine
+  // pipeline agent, so it has no live timing.
   const merged = [];
   (view.phases || []).forEach(function (p) {
     const last = merged[merged.length - 1];
@@ -1779,7 +1779,7 @@ function renderProgress(view) {
     else merged.push({ id: p.id, label: p.label, status: p.status, agents: (p.agents || []).slice() });
   });
   merged.forEach(function (p) {
-    if (p.label === 'Sinas') {
+    if (p.label === 'Documenting') {
       const refStatus = (p.agents[0] && p.agents[0].status) || 'completed';
       p.agents = [{ name: 'finding-refinement', label: 'Finding refinement', status: refStatus, durationMs: null, skills: [], subtasks: [], startedAt: null, finishedAt: null }].concat(p.agents);
     }
@@ -2370,7 +2370,7 @@ async function loadScanReport(scanId) {
   try {
     const data = await gapi('GET', '/scans/' + scanId + '/report');
     if (!data.report) {
-      panel.innerHTML = '<div class="panel-empty">No finalized report yet. Sinas generates the consolidated report at the end of a scan.</div>';
+      panel.innerHTML = '<div class="panel-empty">No finalized report yet. The documenting phase generates the consolidated report at the end of a scan.</div>';
       return;
     }
     renderScanReport(data.report);
