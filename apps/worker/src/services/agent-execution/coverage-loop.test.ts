@@ -140,7 +140,12 @@ describe("runWithCoverage", () => {
 
 	it("does not continue when round 0 already meets the floor", async () => {
 		const runner = fakeRunner([okResult()]);
-		const reader = fixedReader("injection-vuln", ["sqlmap", "commix"]);
+		const reader = fixedReader("injection-vuln", [
+			"sqlmap",
+			"commix",
+			"nosqli",
+			"arjun",
+		]);
 
 		const outcome = await runWithCoverage({
 			agentName: "injection-vuln",
