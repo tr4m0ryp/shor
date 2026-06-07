@@ -4,6 +4,14 @@
 
 Shor is an autonomous offensive-security engine for web apps: a multi-agent pipeline — recon, source-grounded vulnerability analysis, adversarial screening, and live exploitation — that proves every finding by replaying its PoC. Built to break web apps the way a real attacker would, and surface only validated, exploitable bugs.
 
+## Tooling
+
+Shor's agents don't just reason — they wield 30+ real offensive-security tools, exposed to the model as invokable **skills**. So recon, exploitation, and static analysis run on the same industry tooling a human pentester reaches for:
+
+- **Recon:** nmap · naabu · httpx · katana · ffuf · arjun · paramspider · subfinder · dnsx · gau · waybackurls · kxss · wafw00f · nuclei
+- **Exploitation:** sqlmap · commix · nosqli · xsstrike · dalfox · ssrfmap · sstimap · jwt_tool · hydra · interactsh-client · playwright
+- **Static analysis:** semgrep · gitleaks · trufflehog · osv-scanner · trivy
+
 ## Acknowledgements
 
 Shor's discovery-and-verification pipeline ports ideas from Anthropic's defending-code reference harness, and its agent design follows Anthropic's *Building Effective Agents* patterns. It also builds on prior work in autonomous, validated penetration testing:
