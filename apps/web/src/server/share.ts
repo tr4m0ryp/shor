@@ -109,10 +109,6 @@ async function routeShareScan(
     return ok({ attackSurface: surface ? surface.data : { scenarios: [] } });
   }
 
-  if (sub === 'diff') {
-    return ok({ diff: await computeShareDiff(tenantId, projectId, scanId) });
-  }
-
   if (sub === 'progress') {
     return ok({ progress: deriveProgressView(scan) });
   }
