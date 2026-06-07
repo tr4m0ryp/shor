@@ -122,8 +122,8 @@ export class ProgressEmitter {
 	}
 
 	/** A representative running agent for the banner (last started). */
-	private representative(): AgentName | null {
-		let rep: AgentName | null = null;
+	private representative(): ProgressAgent | null {
+		let rep: ProgressAgent | null = null;
 		for (const a of this.running) rep = a;
 		return rep;
 	}
