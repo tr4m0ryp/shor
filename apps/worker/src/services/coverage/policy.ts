@@ -15,7 +15,10 @@
  * Defaults:
  *   - recon       minCount 6
  *   - pre-recon   minCount 2
- *   - *-vuln      minCount 2
+ *   - *-vuln      minCount = HALF of the category's recommended tool set, rounded
+ *                 up (e.g. injection 8→4, xss 6→3, the 3-tool categories →2). A
+ *                 flat floor of 2 let an 8-tool category "pass" on a quarter of
+ *                 its kit; scaling to the recommended set keeps breadth honest.
  *   - *-exploit   minCount 1
  *   - `required = []` for every agent: each exploit category has several valid
  *     tools, so a hard-fail would burn a retry on a false negative. Breadth is
@@ -25,6 +28,7 @@
  */
 
 import type { AgentName } from "../../types/agents.js";
+import { RECOMMENDED } from "../prompt-manager/skill-recommendations.js";
 import type { CoveragePolicy } from "./types.js";
 
 /** Maximum number of in-process coverage continuation rounds per agent. */
