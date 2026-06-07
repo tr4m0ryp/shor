@@ -28,14 +28,16 @@ import { applyPromptContext } from "../prompt-manager/prompt-context.js";
 import type { ScreenVote } from "./types.js";
 
 /**
- * A screen is meant to be a FAST pass/reject (a few focused probes), not a full
- * exploit. Without a cap, voters inherit the runner's 10_000-turn default and can
- * run away (90+ turns), stalling the whole adversarial-screen phase. Cap each
- * voter; hitting the cap fails open to "uncertain" (no recall lost). Env-overridable
- * (SHOR_SCREEN_VOTER_MAX_TURNS) so it can be tuned without a redeploy.
+ * A screen is a focused pass/reject, not a full exploit — but it DOES live-probe
+ * the target, so the cap must leave room to reach the right service origin and run
+ * a couple of probes. The old 15 was too tight: against a target whose API sits on
+ * a separate port, voters burned all 15 turns flailing at the SPA and fail-opened
+ * en masse. 30 gives genuine probing headroom while still bounding runaway loops;
+ * hitting the cap still fails open to "uncertain" (no recall lost). Env-overridable
+ * (SHOR_SCREEN_VOTER_MAX_TURNS).
  */
 const SCREEN_VOTER_MAX_TURNS =
-	Number(process.env.SHOR_SCREEN_VOTER_MAX_TURNS) || 15;
+	Number(process.env.SHOR_SCREEN_VOTER_MAX_TURNS) || 30;
 
 /**
  * The authoritative voter framing appended AFTER the rendered screen prompt (so
