@@ -9,14 +9,18 @@ import type { AgentName } from "../../types/agents.js";
 import { policyFor } from "./evaluate.js";
 import { COVERAGE_POLICY, MAX_COVERAGE_ROUNDS } from "./policy.js";
 
+// Vuln floors are half the recommended tool set, rounded up: injection 8→4,
+// xss 6→3, the 3-tool categories (auth/ssrf/authz/logic/misconfig-web) →2.
 const EXPECTED_MIN_COUNT: Partial<Record<AgentName, number>> = {
 	"pre-recon": 2,
 	recon: 6,
-	"injection-vuln": 2,
-	"xss-vuln": 2,
+	"injection-vuln": 4,
+	"xss-vuln": 3,
 	"auth-vuln": 2,
 	"ssrf-vuln": 2,
 	"authz-vuln": 2,
+	"logic-vuln": 2,
+	"misconfig-web-vuln": 2,
 	"injection-exploit": 1,
 	"xss-exploit": 1,
 	"auth-exploit": 1,
