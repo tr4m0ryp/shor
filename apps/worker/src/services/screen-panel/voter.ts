@@ -92,6 +92,8 @@ export interface VoterRunArgs {
 	candidateId: string;
 	lens: string;
 	voter: number;
+	/** The isolated Playwright session this voter drives, leased from the pool. */
+	session: PlaywrightSession;
 	/** Agent cwd (the repo path) — the voter's `sourceDir`. */
 	sourceDir: string;
 	/** Relative deliverables subdir, forwarded to the SDK env. */
