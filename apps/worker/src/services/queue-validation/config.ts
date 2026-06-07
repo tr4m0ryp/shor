@@ -28,4 +28,12 @@ export const VULN_TYPE_CONFIG: VulnTypeConfig = Object.freeze({
 		deliverable: "authz_analysis_deliverable.md",
 		queue: "authz_exploitation_queue.json",
 	}),
+	logic: Object.freeze({
+		deliverable: "logic_analysis_deliverable.md",
+		queue: "logic_exploitation_queue.json",
+	}),
+	"misconfig-web": Object.freeze({
+		deliverable: "misconfig-web_analysis_deliverable.md",
+		queue: "misconfig-web_exploitation_queue.json",
+	}),
 }) as VulnTypeConfig;
