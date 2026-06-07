@@ -3,7 +3,7 @@
  *
  * A dashboard owner mints an opaque `share_slug` on a project (`POST
  * /projects/:id/share`). Anyone holding `/<...>?share=<slug>` may READ that ONE
- * project plus its scans / findings / attack-surface / diff / progress with no
+ * project plus its scans / findings / attack-surface / progress with no
  * session cookie and no ability to mutate anything. Mirrors the authed dashboard
  * read handlers (`server/dashboard/projects.ts`, `scans.ts`, `scan-progress`)
  * but resolves a slug instead of a session.
@@ -19,8 +19,6 @@
  */
 
 import { attackSurfaceRepo, findingRepo, projectRepo, scanRepo } from '../db/repositories/index.js';
-import type { DiffResult } from '../findings/index.js';
-import { diffFingerprints } from '../findings/index.js';
 import { deriveProgressView } from '../scan-progress/index.js';
 import { fetchSinasReport } from './dashboard/scans.js';
 import type { ApiResponse } from './router.js';
@@ -45,7 +43,6 @@ function serverError(err: unknown): ApiResponse {
  *   /share/:slug/scans/:scanId
  *   /share/:slug/scans/:scanId/findings
  *   /share/:slug/scans/:scanId/attack-surface
- *   /share/:slug/scans/:scanId/diff
  *   /share/:slug/scans/:scanId/progress
  */
 export async function routeShare(method: string, segments: readonly string[]): Promise<ApiResponse | null> {
@@ -112,10 +109,6 @@ async function routeShareScan(
     return ok({ attackSurface: surface ? surface.data : { scenarios: [] } });
   }
 
-  if (sub === 'diff') {
-    return ok({ diff: await computeShareDiff(tenantId, projectId, scanId) });
-  }
-
   if (sub === 'progress') {
     return ok({ progress: deriveProgressView(scan) });
   }
@@ -125,44 +118,4 @@ async function routeShareScan(
   }
 
   return notFound;
-}
-
-/**
- * Read-only scan-to-scan diff for a public share. Mirrors the authed
- * `getScanDiff` (new/open/fixed/regressed counts) but uses the PURE
- * `diffFingerprints` set-difference so it performs NO writes — the authed path's
- * `computeStatusTransitions` persists finding statuses, which a guest link must
- * never do. `regressed` is not derivable without mutating the prior row's status
- * read, so it stays 0 here (matches `diffFingerprints`' documented semantics).
- */
-async function computeShareDiff(tenantId: string, projectId: string, scanId: string): Promise<DiffResult> {
-  const projectScans = await scanRepo.listByProject(tenantId, projectId);
-  const index = projectScans.findIndex((s) => s.id === scanId);
-  // listByProject is ordered started_at DESC NULLS LAST → prior scan is the next one.
-  const priorScanId = index >= 0 && index + 1 < projectScans.length ? (projectScans[index + 1]?.id ?? null) : null;
-
-  const currentFps = await findingRepo.fingerprintsForScan(tenantId, scanId);
-  const priorFps = priorScanId ? await findingRepo.fingerprintsForScan(tenantId, priorScanId) : [];
-  const sets = diffFingerprints(currentFps, priorFps);
-
-  const currentById = new Map<string, string>();
-  for (const f of await findingRepo.listByScan(tenantId, scanId)) currentById.set(f.fingerprint, f.id);
-
-  const transitions = [
-    ...sets.new.map((fp) => ({ fingerprint: fp, findingId: currentById.get(fp) ?? null, from: null, to: 'new' as const })),
-    ...sets.open.map((fp) => ({
-      fingerprint: fp,
-      findingId: currentById.get(fp) ?? null,
-      from: 'open' as const,
-      to: 'open' as const,
-    })),
-    ...sets.fixed.map((fp) => ({ fingerprint: fp, findingId: null, from: 'open' as const, to: 'fixed' as const })),
-  ];
-
-  return {
-    scanId,
-    priorScanId,
-    transitions,
-    counts: { new: sets.new.length, open: sets.open.length, fixed: sets.fixed.length, regressed: 0 },
-  };
 }

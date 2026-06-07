@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shor</title>
-<meta name="description" content="Shor -- AI web-pentest platform. Projects, scans, findings, attack surface, and scan-to-scan diffs.">
+<meta name="description" content="Shor -- AI web-pentest platform. Projects, scans, findings, and attack surface.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F26419' stroke-width='1.5'%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4'/%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4' transform='rotate(60 12 12)'/%3E%3Cellipse cx='12' cy='12' rx='10' ry='4.4' transform='rotate(120 12 12)'/%3E%3Ccircle cx='12' cy='12' r='2.1' fill='%23F26419' stroke='none'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -197,15 +197,11 @@ body {
 .badge-failed { background: #39191C; color: #F87171; }
 .badge-cancelled { background: #39191C; color: #F87171; }
 
-/* === Diff status badges (new/open/fixed/regressed) === */
+/* === Pill count badge (severity counts in the report header) === */
 .diff-badge {
   display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px;
   font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
 }
-.diff-new { background: #16243F; color: #7AA7FF; }
-.diff-open { background: var(--card-hover); color: var(--text-secondary); }
-.diff-fixed { background: #15321F; color: #4ADE80; }
-.diff-regressed { background: #39191C; color: #F87171; }
 
 /* === Empty state === */
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
@@ -321,7 +317,6 @@ body {
 .needs-tag:hover { background: rgba(242,100,25,.22); }
 .needs-tag--static { cursor: default; opacity: .8; }
 .needs-tag--static:hover { background: rgba(242,100,25,.10); }
-.diff-trans { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-left: 6px; }
 .finding-title { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .finding-field dd code, .field-value code, .attack-chain code, .report-body code { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; background: #1B1E23; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
 .md-code { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; line-height: 1.5; background: #0F1115; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin: 6px 0; white-space: pre; overflow-x: auto; color: var(--text-secondary); }
@@ -514,7 +509,7 @@ body.guest .sidebar nav { display: none; }
   font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase;
   background: var(--card-hover); color: var(--text-secondary); border: 1px solid var(--border);
 }
-/* Confirmed — live PoC proven. Green tint to match the validated-badge. */
+/* Confirmed — live PoC proven. Green tint. */
 .confidence-confirmed {
   background: #15321F; color: #4ADE80; border-color: rgba(74,222,128,.3);
 }
@@ -544,13 +539,12 @@ body.guest .sidebar nav { display: none; }
   content: ''; position: absolute; bottom: calc(100% + 3px); right: 9px; z-index: 60;
   border: 5px solid transparent; border-top-color: var(--border-light); pointer-events: none;
 }
-/* Live-validated (disposition: exploited) — proven by live exploitation. */
-.validated-badge {
-  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px;
+/* Live-exploited (disposition: exploited) — proven by live exploitation. */
+.exploited-badge {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px;
   font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
   background: #15321F; color: #4ADE80; border: 1px solid rgba(74,222,128,.35);
 }
-.validated-badge::before { content: '\2713'; font-weight: 700; }
 /* Set aside for manual review (disposition: unverified_out_of_scope). */
 .review-badge {
   display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px;
@@ -864,13 +858,11 @@ body.guest .sidebar nav { display: none; }
         <button class="detail-tab active" data-tab="activity" onclick="showScanTab('activity')">Activity</button>
         <button class="detail-tab" data-tab="findings" onclick="showScanTab('findings')">Findings <span class="count" id="findingsCount">0</span></button>
         <button class="detail-tab" data-tab="attackSurface" onclick="showScanTab('attackSurface')">Attack Surface <span class="count" id="attackSurfaceCount">0</span></button>
-        <button class="detail-tab" data-tab="diff" onclick="showScanTab('diff')">Diff <span class="count" id="diffCount">0</span></button>
         <button class="detail-tab" data-tab="report" onclick="showScanTab('report')">Report</button>
       </div>
       <div class="detail-panel" id="panelActivity"></div>
       <div class="detail-panel" id="panelFindings" style="display:none"></div>
       <div class="detail-panel" id="panelAttackSurface" style="display:none"></div>
-      <div class="detail-panel" id="panelDiff" style="display:none"></div>
       <div class="detail-panel" id="panelReport" style="display:none"></div>
     </div>
 
@@ -1650,7 +1642,6 @@ async function openScan(scanId) {
     loadScanProgress(scanId);
     loadScanFindings(scanId);
     loadScanAttackSurface(scanId);
-    loadScanDiff(scanId);
     // Poll the live feed while the run is active; the poller self-stops on a
     // terminal status (and showPage stops it when navigating away).
     if (!isScanClosed(data.scan.status)) startScanPolling(scanId);
@@ -1681,7 +1672,6 @@ function showScanTab(tab) {
   document.getElementById('panelActivity').style.display = tab === 'activity' ? 'block' : 'none';
   document.getElementById('panelFindings').style.display = tab === 'findings' ? 'block' : 'none';
   document.getElementById('panelAttackSurface').style.display = tab === 'attackSurface' ? 'block' : 'none';
-  document.getElementById('panelDiff').style.display = tab === 'diff' ? 'block' : 'none';
   document.getElementById('panelReport').style.display = tab === 'report' ? 'block' : 'none';
   if (tab === 'report' && state.currentScan) loadScanReport(state.currentScan.id);
 }
@@ -1704,7 +1694,7 @@ function startScanPolling(scanId) {
 }
 
 // One poll tick: refresh status badge + progress feed; when the run closes,
-// stop polling and pull the now-final findings/diff in.
+// stop polling and pull the now-final findings in.
 async function pollScan(scanId) {
   if (!state.currentScan || state.currentScan.id !== scanId) { stopScanPolling(); return; }
   try {
@@ -1721,7 +1711,6 @@ async function pollScan(scanId) {
       if (prev !== data.scan.status) {
         loadScanFindings(scanId);
         loadScanAttackSurface(scanId);
-        loadScanDiff(scanId);
       }
     }
   } catch (_) { /* transient; keep polling */ }
@@ -2121,8 +2110,8 @@ function renderFindingRow(f, i, members) {
   // keep `aria-label` for assistive tech. The reason text appears immediately on hover.
   const confBadge = conf ? '<span class="confidence-badge confidence-' + escapeHtml(conf.toLowerCase()) + '" data-tip="' + escapeHtml(confTip) + '" aria-label="' + escapeHtml(confTip) + '">' + confLabel + '</span>' : '';
   const disp = String(f.disposition || '').toLowerCase();
-  const validatedBadge = disp === 'exploited'
-    ? '<span class="validated-badge" title="Validated — proven by live exploitation during the scan">Validated</span>'
+  const exploitedBadge = disp === 'exploited'
+    ? '<span class="exploited-badge" title="Exploited — proven by live exploitation during the scan">Exploited</span>'
     : '';
   const reviewBadge = (disp === 'unverified_out_of_scope' || disp === 'unverified_screen_rejected')
     ? '<span class="review-badge" title="' + (disp === 'unverified_screen_rejected'
@@ -2187,7 +2176,7 @@ function renderFindingRow(f, i, members) {
       '<span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span>' +
       '<span class="finding-id">' + (f.displayId ? '<span class="vuln-num">' + escapeHtml(f.displayId) + '</span>' : '') + '</span>' +
       '<span class="finding-summary finding-title">' + escapeHtml(cat) + '</span>' +
-      '<span class="finding-badges">' + clusterBadge + validatedBadge + reviewBadge + reachBadge + confBadge + '</span>' +
+      '<span class="finding-badges">' + clusterBadge + exploitedBadge + reviewBadge + reachBadge + confBadge + '</span>' +
       '<span class="finding-chevron">&rsaquo;</span>' +
     '</div>' +
     '<div class="finding-detail" id="findingDetail' + i + '" hidden>' + detailRows.join('') + '</div>'
@@ -2266,7 +2255,7 @@ function renderAttackScenario(scenario, index) {
     sections.push('<div class="attack-scenario-section"><div class="field-label">Requires vulnerabilities</div><div class="needs-tags">' +
       needs.map(function (n) {
         return n.fp
-          ? '<span class="needs-tag" title="Open ' + escapeHtml(n.id) + '" onclick="openFindingFromDiff(\'' + escapeHtml(n.fp) + '\')">' + escapeHtml(n.id) + '</span>'
+          ? '<span class="needs-tag" title="Open ' + escapeHtml(n.id) + '" onclick="openFindingByFingerprint(\'' + escapeHtml(n.fp) + '\')">' + escapeHtml(n.id) + '</span>'
           : '<span class="needs-tag needs-tag--static">' + escapeHtml(n.id) + '</span>';
       }).join('') + '</div></div>');
   }
@@ -2318,75 +2307,10 @@ async function copyFixPrompt(scenarioId) {
   }
 }
 
-// ----- Diff (scan-to-scan) -----
-
-async function loadScanDiff(scanId) {
-  const panel = document.getElementById('panelDiff');
-  try {
-    // The diff rows are titled from the findings; make sure they're loaded first
-    // (openScan starts findings + diff in parallel and the diff often wins).
-    if (!state.findingsCache || !state.findingsCache.length) {
-      try { await loadScanFindings(scanId); } catch (_) {}
-    }
-    const data = await gapi('GET', '/scans/' + scanId + '/diff');
-    const diff = data.diff || { transitions: [], counts: {}, priorScanId: null };
-    const counts = diff.counts || {};
-    const total = (diff.transitions || []).length;
-    document.getElementById('diffCount').textContent = String(total);
-
-    const summary = '<div class="findings-filters">' +
-      '<span class="diff-badge diff-new">new ' + (counts.new || 0) + '</span>' +
-      '<span class="diff-badge diff-open">open ' + (counts.open || 0) + '</span>' +
-      '<span class="diff-badge diff-fixed">fixed ' + (counts.fixed || 0) + '</span>' +
-      '<span class="diff-badge diff-regressed">regressed ' + (counts.regressed || 0) + '</span>' +
-      '</div>';
-
-    const priorNote = diff.priorScanId
-      ? '<div class="panel-section"><h3>Compared against prior scan ' + escapeHtml(String(diff.priorScanId).slice(0, 8)) + '</h3></div>'
-      : '<div class="panel-section"><h3>First scan for this target &mdash; all findings are new</h3></div>';
-
-    const transitions = (diff.transitions || []);
-    if (transitions.length === 0) {
-      panel.innerHTML = summary + priorNote + '<div class="panel-empty">No findings to diff.</div>';
-      return;
-    }
-    // Map fingerprint -> finding (loaded on scan open) so each diff row can show
-    // the vulnerability title + severity and open its detail. `fixed` findings
-    // live in the PRIOR scan, so they won't be in this scan's cache.
-    const byFp = {};
-    (state.findingsCache || []).forEach((f) => { if (f && f.fingerprint) byFp[String(f.fingerprint)] = f; });
-    // Strip markdown markers for a clean one-line preview.
-    const rows = transitions.map((t) => {
-      const to = String(t.to || 'open');
-      const fp = String(t.fingerprint || '');
-      const f = byFp[fp];
-      const idTag = f && f.displayId ? '<span class="vuln-num">' + escapeHtml(f.displayId) + '</span>' : '';
-      const titleText = (t.title ? String(t.title) : '')
-        || (f ? String(f.title || f.category || '') : '')
-        || (t.category ? String(t.category) : '')
-        || (to === 'fixed' ? 'Fixed since last scan' : 'finding ' + fp.slice(0, 8));
-      const sev = String(t.severity || (f && f.severity) || 'info').toLowerCase();
-      const sevBadge = sev ? '<span class="finding-type-badge severity-' + escapeHtml(sev) + '">' + escapeHtml(sev) + '</span>' : '';
-      const trans = t.from ? ' <span class="diff-trans">' + escapeHtml(String(t.from)) + ' &rarr; ' + escapeHtml(to) + '</span>' : '';
-      return (
-        '<div class="finding-row"' + (f ? ' onclick="openFindingFromDiff(\'' + escapeHtml(fp) + '\')"' : ' style="cursor:default"') + '>' +
-          '<span class="diff-badge diff-' + escapeHtml(to) + '">' + escapeHtml(to) + '</span>' +
-          '<span class="finding-id">' + idTag + trans + '</span>' +
-          '<span class="finding-summary finding-title">' + escapeHtml(titleText) + '</span>' +
-          '<span class="finding-badges">' + sevBadge + '</span>' +
-          (f ? '<span class="finding-chevron">&rsaquo;</span>' : '<span></span>') +
-        '</div>'
-      );
-    }).join('');
-    panel.innerHTML = summary + priorNote + rows;
-  } catch (err) {
-    panel.innerHTML = '<div class="panel-empty">' + escapeHtml(err.message) + '</div>';
-  }
-}
-
-// Jump from a diff row to the matching finding: switch to the Findings tab,
-// clear the severity filter, expand the finding, and scroll it into view.
-function openFindingFromDiff(fp) {
+// Jump to a finding by fingerprint (from an attack-surface "requires" tag):
+// switch to the Findings tab, clear the severity filter, expand the finding,
+// and scroll it into view.
+function openFindingByFingerprint(fp) {
   state.severityFilter = 'all';
   showScanTab('findings');
   renderFindings();
