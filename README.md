@@ -3,3 +3,13 @@
 > Readme coming soon.
 
 Shor is an autonomous offensive-security engine for web apps: a multi-agent pipeline — recon, source-grounded vulnerability analysis, adversarial screening, and live exploitation — that proves every finding by replaying its PoC. Built to break web apps the way a real attacker would, and surface only validated, exploitable bugs.
+
+## Acknowledgements
+
+Shor's discovery-and-verification pipeline ports ideas from Anthropic's defending-code reference harness, and its agent design follows Anthropic's *Building Effective Agents* patterns. It also builds on prior work in autonomous, validated penetration testing:
+
+- **Anthropic — Defending code reference harness** — the discovery + verification pipeline Shor is based on ([repo](https://github.com/anthropics/defending-code-reference-harness), [Claude Code security](https://www.anthropic.com/news/claude-code-security)).
+- **Anthropic — [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents)** — the orchestrator-workers and evaluator–optimizer patterns the pipeline is built on.
+- **[XBOW](https://xbow.com)** — validated, safe-PoC findings and its public challenge benchmark.
+- **[PentestGPT](https://github.com/GreyDGL/PentestGPT)** — LLM-driven specialist-sub-agent pentest orchestration.
+- **Strix** and **HexStrike AI** — additional prior art in agentic penetration testing.
