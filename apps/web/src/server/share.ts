@@ -3,7 +3,7 @@
  *
  * A dashboard owner mints an opaque `share_slug` on a project (`POST
  * /projects/:id/share`). Anyone holding `/<...>?share=<slug>` may READ that ONE
- * project plus its scans / findings / attack-surface / diff / progress with no
+ * project plus its scans / findings / attack-surface / progress with no
  * session cookie and no ability to mutate anything. Mirrors the authed dashboard
  * read handlers (`server/dashboard/projects.ts`, `scans.ts`, `scan-progress`)
  * but resolves a slug instead of a session.
