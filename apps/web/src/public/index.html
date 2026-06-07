@@ -2110,6 +2110,9 @@ function renderFindingRow(f, i, members) {
   // keep `aria-label` for assistive tech. The reason text appears immediately on hover.
   const confBadge = conf ? '<span class="confidence-badge confidence-' + escapeHtml(conf.toLowerCase()) + '" data-tip="' + escapeHtml(confTip) + '" aria-label="' + escapeHtml(confTip) + '">' + confLabel + '</span>' : '';
   const disp = String(f.disposition || '').toLowerCase();
+  const exploitedBadge = disp === 'exploited'
+    ? '<span class="exploited-badge" title="Exploited — proven by live exploitation during the scan">Exploited</span>'
+    : '';
   const reviewBadge = (disp === 'unverified_out_of_scope' || disp === 'unverified_screen_rejected')
     ? '<span class="review-badge" title="' + (disp === 'unverified_screen_rejected'
         ? 'Manual review — the adversarial screen refuted this hypothesis before exploitation. Verify manually.'
