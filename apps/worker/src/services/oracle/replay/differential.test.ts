@@ -32,7 +32,12 @@ afterEach(async () => {
   for (const d of tmpDirs.splice(0)) await fsp.rm(d, { recursive: true, force: true });
 });
 
-const POC: Poc = { id: 'AUTHZ-VULN-1', kind: 'http', request: { method: 'GET', url: 'http://t/admin' }, expected_signal: { type: 'status', match: 200 } };
+const POC: Poc = {
+  id: 'AUTHZ-VULN-1',
+  kind: 'http',
+  request: { method: 'GET', url: 'http://t/admin' },
+  expected_signal: { type: 'status', match: 200 },
+};
 const ok: ExecOutcome = { observed: true, status: 200, body: '' };
 const forbidden: ExecOutcome = { observed: true, status: 403, body: '' };
 
@@ -51,7 +56,9 @@ describe('decidePremise', () => {
   });
 
   it('undefined when only anonymous could be tried and it did not reproduce', () => {
-    const lower: DifferentialOutcome[] = [{ label: 'anonymous', authenticated: false, outcome: { observed: true, status: 401, body: '' } }];
+    const lower: DifferentialOutcome[] = [
+      { label: 'anonymous', authenticated: false, outcome: { observed: true, status: 401, body: '' } },
+    ];
     expect(decidePremise(POC, lower)).toBeUndefined();
   });
 
@@ -61,7 +68,10 @@ describe('decidePremise', () => {
 });
 
 describe('httpExecutor — differential auth-header replacement', () => {
-  function ctxCapturing(captured: { headers: Record<string, string> | undefined }, identity?: ExecCtx['currentIdentity']): ExecCtx {
+  function ctxCapturing(
+    captured: { headers: Record<string, string> | undefined },
+    identity?: ExecCtx['currentIdentity'],
+  ): ExecCtx {
     return {
       fetchImpl: (async (_url: string, init?: RequestInit) => {
         captured.headers = init?.headers as Record<string, string> | undefined;
@@ -76,7 +86,10 @@ describe('httpExecutor — differential auth-header replacement', () => {
 
   it('strips the PoC captured auth and applies the identity Cookie', async () => {
     const captured: { headers: Record<string, string> | undefined } = { headers: undefined };
-    const poc: Poc = { ...POC, request: { method: 'GET', url: 'http://t/admin', headers: { Cookie: 'admin=1', 'X-Trace': 'keep' } } };
+    const poc: Poc = {
+      ...POC,
+      request: { method: 'GET', url: 'http://t/admin', headers: { Cookie: 'admin=1', 'X-Trace': 'keep' } },
+    };
     await httpExecutor(poc, ctxCapturing(captured, { label: 'member', headers: { Cookie: 'sess=low' } }));
     expect(captured.headers?.Cookie).toBe('sess=low'); // privileged cookie replaced
     expect(captured.headers?.['X-Trace']).toBe('keep'); // non-auth header preserved
@@ -126,7 +139,10 @@ describe('runOracleReplay — premise integration', () => {
     await fsp.writeFile(path.join(deliverables, 'authz_poc.json'), JSON.stringify([POC]));
     const idRoot = path.join(root, '.playwright-cli', 'identities', 'identity-member');
     await fsp.mkdir(idRoot, { recursive: true });
-    await fsp.writeFile(path.join(idRoot, 'storage-state.json'), JSON.stringify({ cookies: [{ name: 'sess', value: 'low' }], origins: [] }));
+    await fsp.writeFile(
+      path.join(idRoot, 'storage-state.json'),
+      JSON.stringify({ cookies: [{ name: 'sess', value: 'low' }], origins: [] }),
+    );
 
     // Fetch: 200 only when the request carries the member cookie? No — model a real
     // authz gate: member (sess=low) and anonymous both get 403/401 → premise invalid.
