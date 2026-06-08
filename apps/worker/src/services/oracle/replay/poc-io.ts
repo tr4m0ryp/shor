@@ -206,13 +206,21 @@ export function lookupDisposition(
 	map: Map<string, OracleDisposition>,
 	id: string,
 ): OracleDisposition | undefined {
+	return lookupByVulnId(map, id);
+}
+
+/**
+ * Generic id-tolerant lookup (canonical match, then trailing-number fallback) used
+ * for both the disposition and premise maps. `undefined` is a valid stored value, so
+ * presence is decided by `has`, not by a truthiness check.
+ */
+export function lookupByVulnId<T>(map: Map<string, T>, id: string): T | undefined {
 	const canon = canonicalVulnId(id);
-	const direct = map.get(canon);
-	if (direct) return direct;
+	if (map.has(canon)) return map.get(canon);
 	const num = canon.match(/(\d+)$/)?.[1];
 	if (!num) return undefined;
-	for (const [key, disp] of map) {
-		if (key.match(/(\d+)$/)?.[1] === num) return disp;
+	for (const [key, value] of map) {
+		if (key.match(/(\d+)$/)?.[1] === num) return value;
 	}
 	return undefined;
 }
