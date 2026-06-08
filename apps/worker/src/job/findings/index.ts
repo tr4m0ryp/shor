@@ -25,6 +25,7 @@ import { applyOracleDispositions } from "../../services/oracle/index.js";
 import { applyScreenVerdicts } from "../../services/screen-verdicts/index.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
 import { clusterDeterministic } from "./dedup-collapse.js";
+import { demoteDevCredentials } from "./dev-credential-guard.js";
 import { lookupEvidence, readEvidence } from "./evidence.js";
 import { gateAndMapFindings, readManualReviewAppendix } from "./gating.js";
 import { FINDING_CATEGORIES, readQueues } from "./queue.js";
@@ -229,10 +230,16 @@ export async function collectFindings(
 	);
 	const improved = applyImprovedText(deliverablesPath, emitted, logger);
 
+	// Demote intentional dev/test credentials (committed scaffolding that production
+	// overrides) from critical/high to low — a committed `// For local testing` key is
+	// not a leaked production secret. Runs on the source root so a trailing dev-marker
+	// comment on the cited line is seen. Pure; non-secret findings pass through.
+	const guarded = demoteDevCredentials(improved, opts?.analyzedSourceRoot, logger);
+
 	// Final emitted-set passes (ordered): cluster near-duplicates by root cause
 	// (T12, async + opt-in), then grade. `gradeFindings` is an identity no-op today
 	// (task 015); the dedup pass is identity unless the judge is enabled.
-	const clustered = await clusterFindings(improved, {
+	const clustered = await clusterFindings(guarded, {
 		deliverablesPath,
 		logger,
 	});

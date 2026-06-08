@@ -210,6 +210,13 @@ export interface FindingRecord {
    */
   location_verified?: boolean;
   /**
+   * Set TRUE by the dev-credential guard (`dev-credential-guard.ts`) when a hardcoded-
+   * secret finding is an intentional local/dev placeholder (test-marker comment,
+   * placeholder/doubled-fake value) that production overrides — demoted to `low`, not a
+   * leaked production secret. OPTIONAL / back-compat.
+   */
+  dev_credential_scaffolding?: boolean;
+  /**
    * Fingerprints / ids of other findings folded into this one as duplicates by the
    * finalize dedup-collapse (T6). Members are preserved (recall-safe); the report
    * shows the cluster once. OPTIONAL / back-compat.

@@ -32,6 +32,72 @@ describe('resolveCwe — explicit CWE wins', () => {
     expect(r.cwe).toBe('CWE-77');
     expect(r.inferred).toBe(false);
   });
+
+  it('REJECTS an injection CWE mis-stamped on a non-injection finding (scan-0008 CWE-78 bug)', () => {
+    // Agent stamped CWE-78 (OS command) on a header-spoofing misconfig → drop it, let
+    // the mechanism map decide (forwarded-header spoofing → CWE-290).
+    const r = resolveCwe(
+      raw({ cwe: 'CWE-78', vulnerability_type: 'Spoofable X-Forwarded-For (KnownProxies cleared)' }),
+      'misconfig-web',
+      'CWE-16',
+    );
+    expect(r.cwe).toBe('CWE-290');
+  });
+
+  it('keeps an injection CWE when the finding really IS injection/xss', () => {
+    expect(resolveCwe(raw({ cwe: 'CWE-78' }), 'injection', 'CWE-89').cwe).toBe('CWE-78');
+    expect(resolveCwe(raw({ cwe: 'CWE-79' }), 'xss', 'CWE-79').cwe).toBe('CWE-79');
+  });
+});
+
+describe('resolveCwe — scan-0008 gap mechanism rules', () => {
+  const cases: Array<[string, Record<string, unknown>, FindingCategory, string, string]> = [
+    [
+      'missing authz → CWE-862',
+      { vulnerability_type: 'Missing authorization (BOLA) on GET /Users/{id}' },
+      'authz',
+      'CWE-287',
+      'CWE-862',
+    ],
+    [
+      'missing auth → CWE-306',
+      { vulnerability_type: 'Unauthenticated endpoint ([AllowAnonymous]) upload' },
+      'authz',
+      'CWE-287',
+      'CWE-306',
+    ],
+    [
+      'clickjacking → CWE-1021',
+      { vulnerability_type: 'Missing X-Frame-Options (clickjacking)' },
+      'misconfig-web',
+      'CWE-16',
+      'CWE-1021',
+    ],
+    [
+      'missing CSP → CWE-693',
+      { vulnerability_type: 'Content-Security-Policy header missing' },
+      'misconfig-web',
+      'CWE-16',
+      'CWE-693',
+    ],
+    [
+      'localStorage tokens → CWE-922',
+      { vulnerability_type: 'JWT stored in localStorage' },
+      'auth',
+      'CWE-287',
+      'CWE-922',
+    ],
+    [
+      'no rate limiting → CWE-307',
+      { vulnerability_type: 'No rate limiting / brute force protection' },
+      'auth',
+      'CWE-287',
+      'CWE-307',
+    ],
+  ];
+  it.each(cases)('%s', (_name, rawFields, category, def, expected) => {
+    expect(resolveCwe(raw(rawFields), category, def).cwe).toBe(expected);
+  });
 });
 
 describe('resolveCwe — mechanism mapping', () => {

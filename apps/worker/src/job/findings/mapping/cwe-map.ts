@@ -93,10 +93,13 @@ const MECHANISM_RULES: readonly MechanismRule[] = [
     cwe: 'CWE-89',
     match: (t) => has(t, 'sql injection', 'sqli', 'sql-injection'),
   },
-  // OS command injection → CWE-78.
+  // OS command injection → CWE-78. NB: match `rce` only as a whole word — the bare
+  // substring also matches "fo[rce]", "sou[rce]", "enfo[rce]" and mis-tagged
+  // rate-limit / forwarded-header / resource findings as command injection (scan 0008).
   {
     cwe: 'CWE-78',
-    match: (t) => has(t, 'command injection', 'os command', 'rce', 'remote code execution', 'shell injection'),
+    match: (t) =>
+      has(t, 'command injection', 'os command', 'remote code execution', 'shell injection') || /\brce\b/.test(t),
   },
   // JWT algorithm confusion — ONLY when asymmetric (RS/ES/PS → HS) is named.
   // `alg:none` is a SEPARATE weakness (improper signature verification, below).
@@ -157,6 +160,90 @@ const MECHANISM_RULES: readonly MechanismRule[] = [
     cwe: 'CWE-942',
     match: (t) => has(t, 'cors') && has(t, 'misconfig', 'wildcard', 'permissive', '*'),
   },
+  // Clickjacking / missing anti-framing header → CWE-1021.
+  {
+    cwe: 'CWE-1021',
+    match: (t) => has(t, 'clickjack', 'x-frame-options', 'frame-ancestors', 'framing'),
+  },
+  // Missing/weak security headers (CSP, HSTS, nosniff) → CWE-693.
+  {
+    cwe: 'CWE-693',
+    match: (t) =>
+      has(
+        t,
+        'content-security-policy',
+        'content security policy',
+        'csp',
+        'hsts',
+        'strict-transport-security',
+        'x-content-type-options',
+        'nosniff',
+        'security header',
+      ) && has(t, 'missing', 'absent', 'no ', 'not set', 'lacks', 'without', 'disabled'),
+  },
+  // Spoofable forwarded / host headers (trusting X-Forwarded-*) → CWE-290.
+  {
+    cwe: 'CWE-290',
+    match: (t) =>
+      has(t, 'x-forwarded', 'forwarded header', 'forwarded-for', 'host header', 'knownproxies', 'knownipnetworks') ||
+      (has(t, 'spoof') && has(t, 'header', 'forwarded', 'proto')),
+  },
+  // Insecure client-side token storage (localStorage / sessionStorage) → CWE-922.
+  {
+    cwe: 'CWE-922',
+    match: (t) =>
+      has(t, 'localstorage', 'local storage', 'sessionstorage', 'session storage') &&
+      has(t, 'token', 'jwt', 'credential', 'secret'),
+  },
+  // No brute-force protection / rate limiting / lockout → CWE-307.
+  {
+    cwe: 'CWE-307',
+    match: (t) =>
+      has(t, 'rate limit', 'rate-limit', 'rate limiting', 'brute force', 'brute-force', 'lockout', 'throttl'),
+  },
+  // Insufficient session/token expiration or no revocation → CWE-613.
+  {
+    cwe: 'CWE-613',
+    match: (t) =>
+      has(t, 'session', 'token') &&
+      has(t, 'expiration', 'expiry', 'revocation', 'revoke', 'logout', 'not invalidated') &&
+      has(t, 'no ', 'missing', 'not ', 'insufficient', 'without', 'never', 'client-side', 'client side'),
+  },
+  // Missing authentication on a critical function (e.g. [AllowAnonymous]) → CWE-306.
+  {
+    cwe: 'CWE-306',
+    match: (t) =>
+      has(
+        t,
+        'allowanonymous',
+        'allow anonymous',
+        'missing authentication',
+        'no authentication',
+        'without authentication',
+        'unauthenticated',
+      ) && !has(t, 'authoriz'),
+  },
+  // Missing authorization / BOLA / BFLA (authenticated but no role/ownership check) → CWE-862.
+  {
+    cwe: 'CWE-862',
+    match: (t) =>
+      has(
+        t,
+        'missing authorization',
+        'no authorization',
+        'broken object level',
+        'broken function level',
+        'bola',
+        'bfla',
+        'missing authz',
+        'no authz',
+        'lacks authorization',
+        'without authorization',
+        'no role check',
+        'no ownership check',
+        'missing access control',
+      ),
+  },
 ];
 
 /**
@@ -177,16 +264,24 @@ function mechanismText(raw: Record<string, unknown>): string {
 }
 
 /**
- * Resolve the CWE for a finding: explicit raw CWE wins, then a mechanism match,
- * then the category default (with `inferred: true`). Pure + deterministic.
+ * Injection-family CWEs an agent sometimes MIS-stamps onto non-injection findings
+ * (scan 0008: CWE-78 OS-command stamped on header-spoofing and missing-authz). An
+ * explicit injection CWE is only trustworthy when the finding is genuinely an
+ * injection/xss category; otherwise it is dropped and the mechanism map decides.
  */
-export function resolveCwe(
-  raw: Record<string, unknown>,
-  _category: FindingCategory,
-  defaultCwe: string,
-): CweResolution {
+const INJECTION_CWES = new Set(['CWE-78', 'CWE-89', 'CWE-77', 'CWE-94', 'CWE-95', 'CWE-90', 'CWE-91', 'CWE-564']);
+
+/**
+ * Resolve the CWE for a finding: a TRUSTWORTHY explicit raw CWE wins, then a
+ * mechanism match, then the category default (with `inferred: true`). An explicit
+ * CWE that is category-incompatible (an injection CWE on a non-injection finding)
+ * is rejected and resolution falls through to the mechanism map. Pure + deterministic.
+ */
+export function resolveCwe(raw: Record<string, unknown>, category: FindingCategory, defaultCwe: string): CweResolution {
   const explicit = explicitCwe(raw);
-  if (explicit) return { cwe: explicit, inferred: false };
+  const explicitTrustworthy =
+    !!explicit && !(INJECTION_CWES.has(explicit) && category !== 'injection' && category !== 'xss');
+  if (explicitTrustworthy) return { cwe: explicit, inferred: false };
 
   const text = mechanismText(raw);
   if (text) {

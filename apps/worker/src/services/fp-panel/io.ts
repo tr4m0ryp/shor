@@ -19,12 +19,14 @@ import type { ScreenVerdictEntry } from '../screen-panel/index.js';
 export const FP_REFUTE_FILE = 'fp_refute_verdicts.json';
 
 /**
- * Opt-in: requires `SHOR_FP_PANEL=1` AND CLI/API auth (mirrors the dedup judge).
- * Default off ⇒ the panel never runs and behavior is byte-identical to today.
+ * ON by default, gated on provider auth (mirrors the dedup judge): refuting false
+ * positives is a core part of refinement. Opt-OUT with `SHOR_FP_PANEL=0`. With no
+ * provider configured (tests, unconfigured runs) it stays off and behavior is
+ * byte-identical. The panel's voters run on DeepSeek, so DeepSeek auth alone enables it.
  */
 export function fpRefuteEnabled(): boolean {
-  if (process.env.SHOR_FP_PANEL !== '1') return false;
-  return Boolean(process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY);
+  if (process.env.SHOR_FP_PANEL === '0') return false;
+  return Boolean(process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY || process.env.DEEPSEEK_API_KEY);
 }
 
 /** Persist the panel's verdict entries. Best-effort; a write failure never throws. */

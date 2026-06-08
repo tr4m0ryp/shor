@@ -50,6 +50,9 @@ export async function judgeFinding(
 		sourceDir: ctx.deliverablesPath,
 		schema: judgmentSchema,
 		agentName: "dedup-judge",
+		// Same/different-root-cause is a simple adjudication — run it on the fast tier so
+		// the SERIAL per-finding pass stays minutes, not ~1h, now that it is ON by default.
+		modelTier: "small",
 		logger: ctx.logger,
 	});
 	return parseOr(result, FAIL_OPEN_NEW);

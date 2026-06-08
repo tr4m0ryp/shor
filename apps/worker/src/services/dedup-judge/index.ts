@@ -13,9 +13,11 @@
  * (same root cause → same id); nothing is dropped. `fingerprint` is left untouched
  * — `cluster_id` is purely additive grouping identity.
  *
- * DEFAULT: identity. The judge is opt-in (`SHOR_DEDUP_JUDGE=1` + CLI/API auth);
- * when disabled the emitted set is byte-for-byte unchanged and no LLM is called,
- * so the seam stays a no-op for every caller that has not enabled it.
+ * DEFAULT: ON whenever CLI/API auth is present — semantic, cross-file dedup is a
+ * core part of refinement (deterministic file:line collapse cannot catch the same
+ * root cause reported under different files/CWEs). Opt-OUT with `SHOR_DEDUP_JUDGE=0`.
+ * With no auth (tests, unconfigured runs) it stays identity: emitted set byte-for-byte
+ * unchanged, no LLM called.
  */
 
 import type { FindingRecord } from "../../job/findings/types.js";
@@ -36,11 +38,12 @@ export interface ClusterOptions {
 export const DEFAULT_MANIFEST_CAP = 60;
 
 /**
- * The judge is opt-in and requires CLI/API auth (mirrors `SHOR_CLI_FINALIZE`), so
- * test and unconfigured runs never spawn an agent and keep today's emitted set.
+ * ON by default, gated on CLI/API auth (mirrors `SHOR_CLI_FINALIZE`): test and
+ * unconfigured runs never spawn an agent and keep today's emitted set. Opt-OUT with
+ * `SHOR_DEDUP_JUDGE=0` (e.g. to skip the LLM pass on a cost/time budget).
  */
 function dedupEnabled(): boolean {
-	if (process.env.SHOR_DEDUP_JUDGE !== "1") return false;
+	if (process.env.SHOR_DEDUP_JUDGE === "0") return false;
 	return !!(process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY);
 }
 
