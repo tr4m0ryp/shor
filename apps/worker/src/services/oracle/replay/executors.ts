@@ -41,9 +41,10 @@ export const httpExecutor: Executor = async (poc, ctx): Promise<ExecOutcome> => 
 	}
 
 	const method = (req.method ?? "GET").toUpperCase();
+	const headers = resolveHeaders(req.headers, ctx.currentIdentity?.headers);
 	const init: RequestInit = {
 		method,
-		...(req.headers && { headers: req.headers }),
+		...(headers && { headers }),
 		...(req.body !== undefined && method !== "GET" && method !== "HEAD" && { body: req.body }),
 	};
 
