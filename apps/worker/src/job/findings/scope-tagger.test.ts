@@ -21,20 +21,28 @@ function vuln(raw: Record<string, unknown>, over: Partial<NormalizedVuln> = {}):
 
 describe('scope-tagger', () => {
   it('flags the harness mock OIDC on :8090 as out of scope', () => {
-    expect(isOutOfScopeTarget(vuln({ vulnerable_code_location: 'Port 8090 mock OIDC provider (BLACK-BOX)' }))).toBe(true);
+    expect(isOutOfScopeTarget(vuln({ vulnerable_code_location: 'Port 8090 mock OIDC provider (BLACK-BOX)' }))).toBe(
+      true,
+    );
   });
 
   it('flags a "no source in repository" location', () => {
-    expect(isOutOfScopeTarget(vuln({ vulnerable_code_location: 'BLACK-BOX service, no source in repository' }))).toBe(true);
+    expect(isOutOfScopeTarget(vuln({ vulnerable_code_location: 'BLACK-BOX service, no source in repository' }))).toBe(
+      true,
+    );
   });
 
   it('flags a HARNESS_ONLY reachability regardless of location', () => {
-    expect(isOutOfScopeTarget(vuln({ vulnerable_code_location: 'Real.cs:10', reachability: 'HARNESS_ONLY' }))).toBe(true);
+    expect(isOutOfScopeTarget(vuln({ vulnerable_code_location: 'Real.cs:10', reachability: 'HARNESS_ONLY' }))).toBe(
+      true,
+    );
   });
 
   it('does NOT flag a real target file that merely contains "Mock" in its name', () => {
     // MockUserService.cs is a genuine target file — bare "mock" must not match.
-    expect(isOutOfScopeTarget(vuln({ vulnerable_code_location: 'UvA.Workflow/Users/MockUserService.cs:15' }))).toBe(false);
+    expect(isOutOfScopeTarget(vuln({ vulnerable_code_location: 'UvA.Workflow/Users/MockUserService.cs:15' }))).toBe(
+      false,
+    );
   });
 
   it('demotes an exploited scaffolding finding to out_of_scope_target + in_scope=false', () => {

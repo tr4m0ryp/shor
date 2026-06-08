@@ -19,7 +19,9 @@ describe('remediation-guard', () => {
 
   it('flags the mapper "context-correct" template', () => {
     expect(
-      isBoilerplateRemediation('Apply the context-correct ssrf defense; see the attack-surface deliverable for the fix prompt.'),
+      isBoilerplateRemediation(
+        'Apply the context-correct ssrf defense; see the attack-surface deliverable for the fix prompt.',
+      ),
     ).toBe(true);
   });
 
@@ -31,13 +33,18 @@ describe('remediation-guard', () => {
 
   it('does NOT flag a real, line-specific remediation', () => {
     expect(
-      isBoilerplateRemediation('Remove [AllowAnonymous] on VersionsController.cs:8 and gate POST /Versions behind EnsureAuthorizedForAction(ViewAdminTools).'),
+      isBoilerplateRemediation(
+        'Remove [AllowAnonymous] on VersionsController.cs:8 and gate POST /Versions behind EnsureAuthorizedForAction(ViewAdminTools).',
+      ),
     ).toBe(false);
   });
 
   it('sets remediation_boilerplate=true and counts flagged records', () => {
     const records = [
-      { remediation: 'Apply the missing defense: x. See the attack-surface deliverable for the context-correct fix prompt.' },
+      {
+        remediation:
+          'Apply the missing defense: x. See the attack-surface deliverable for the context-correct fix prompt.',
+      },
       { remediation: 'Bind the artifact token to the requesting user and rotate the committed key.' },
     ] as FindingRecord[];
     const n = flagBoilerplateRemediation(records);

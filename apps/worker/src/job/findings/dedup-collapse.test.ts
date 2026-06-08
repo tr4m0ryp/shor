@@ -52,7 +52,10 @@ describe('dedup-collapse', () => {
 
   it('leaves a singleton (distinct location+CWE) untouched', () => {
     const a = rec('A', { partialFingerprints: { 'locationCwe/v1': 'K1' } });
-    const b = rec('B', { partialFingerprints: { 'locationCwe/v1': 'K2' }, vulnerable_code_location: { file: 'Other.cs', line: 9 } });
+    const b = rec('B', {
+      partialFingerprints: { 'locationCwe/v1': 'K2' },
+      vulnerable_code_location: { file: 'Other.cs', line: 9 },
+    });
     const out = dedupAndCollapse([a, b]);
     expect(out).toHaveLength(2);
     expect(out.every((r) => r.also_reported_as === undefined)).toBe(true);

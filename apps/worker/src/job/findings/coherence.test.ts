@@ -60,7 +60,12 @@ describe('coherence gate', () => {
   });
 
   it('caps a mislabelled "RequestSmuggling" forwarded-header finding', () => {
-    const r = rec({ severity: 'critical', title: 'RequestSmuggling', vulnerability_type: 'forwarded header trust', confidence: 'firm' });
+    const r = rec({
+      severity: 'critical',
+      title: 'RequestSmuggling',
+      vulnerability_type: 'forwarded header trust',
+      confidence: 'firm',
+    });
     applyCoherenceGate([r]);
     expect(r.severity).toBe('medium');
   });
