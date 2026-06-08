@@ -77,7 +77,7 @@ export function applyOracleDispositions(
 	let overridden = 0;
 	let premiseStamped = 0;
 	for (const vuln of vulns) {
-		const premiseValid = lookupDisposition(premise as never, vuln.id) as boolean | undefined;
+		const premiseValid = lookupByVulnId(premise, vuln.id);
 		if (premiseValid !== undefined) {
 			// Carry the premise on `raw` so the §6.1 mapper surfaces it; the premise
 			// GATE (not the oracle) demotes a privileged-only exploit to the appendix.
