@@ -108,3 +108,31 @@ export function decide(poc: Poc, outcome: ExecOutcome): Verdict {
 		rateLimited: false,
 	};
 }
+
+/** One lower-privilege replay of an authz PoC, for the differential premise check. */
+export interface DifferentialOutcome {
+	label: string;
+	/** false for the anonymous (no-auth) replay; true for a real lower-priv identity. */
+	authenticated: boolean;
+	outcome: ExecOutcome;
+}
+
+/**
+ * Decide the authz `premise_valid` (T1) from replays under lower-privilege identities:
+ *   - `true`      — a LOWER-privilege identity (authenticated OR anonymous) reproduced
+ *                   the success signal ⇒ a real privilege boundary was crossed.
+ *   - `false`     — a lower AUTHENTICATED identity was genuinely tried (observed) and
+ *                   NONE reproduced it ⇒ privileged-only (the scan-0007 false-positive
+ *                   class: admin doing an admin thing).
+ *   - `undefined` — inconclusive: only anonymous could be tried and it did not reproduce
+ *                   (anonymous failing never disproves an "any authenticated user" claim).
+ * Fail-open by design: uncertainty yields `undefined` and never demotes a finding.
+ */
+export function decidePremise(poc: Poc, lower: readonly DifferentialOutcome[]): boolean | undefined {
+	let triedAuthenticated = false;
+	for (const d of lower) {
+		if (d.outcome.observed && matchSignal(poc.expected_signal, d.outcome)) return true;
+		if (d.authenticated && d.outcome.observed) triedAuthenticated = true;
+	}
+	return triedAuthenticated ? false : undefined;
+}
