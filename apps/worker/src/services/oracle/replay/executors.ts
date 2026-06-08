@@ -22,6 +22,29 @@ import type { ExecOutcome, Executor, ExecutorSet } from "./types.js";
 /** Cap the body we read so a huge response cannot exhaust memory. */
 const MAX_BODY_CHARS = 64 * 1024;
 
+/** Auth-bearing request headers replaced wholesale during a differential replay. */
+const AUTH_HEADERS: ReadonlySet<string> = new Set(["authorization", "cookie"]);
+
+/**
+ * Resolve the headers for a replay. Baseline (no identity) ⇒ the PoC's own headers
+ * unchanged. Differential (identity present) ⇒ STRIP the PoC's captured auth and
+ * apply the identity's auth instead, so an anonymous identity (empty headers) truly
+ * fires unauthenticated and a low-privilege identity fires as itself, not as the
+ * privileged user the PoC was captured under.
+ */
+function resolveHeaders(
+	pocHeaders: Record<string, string> | undefined,
+	identityHeaders: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+	if (!identityHeaders) return pocHeaders;
+	const stripped: Record<string, string> = {};
+	for (const [k, v] of Object.entries(pocHeaders ?? {})) {
+		if (!AUTH_HEADERS.has(k.toLowerCase())) stripped[k] = v;
+	}
+	const merged = { ...stripped, ...identityHeaders };
+	return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
 /** Replay a read-only HTTP PoC and report the observed status + body. */
 export const httpExecutor: Executor = async (poc, ctx): Promise<ExecOutcome> => {
 	const req = poc.request;
