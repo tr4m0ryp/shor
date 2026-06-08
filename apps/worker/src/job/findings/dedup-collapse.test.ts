@@ -45,7 +45,8 @@ describe('dedup-collapse', () => {
   it('preserves every member (no loss): representative + also_reported_as == input', () => {
     const records = [rec('A'), rec('B'), rec('C')];
     const out = dedupAndCollapse(records);
-    const accountedFor = 1 + (out[0]!.also_reported_as?.length ?? 0);
+    const [rep] = out;
+    const accountedFor = 1 + (rep?.also_reported_as?.length ?? 0);
     expect(accountedFor).toBe(records.length);
   });
 
