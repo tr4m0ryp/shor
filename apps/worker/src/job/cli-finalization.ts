@@ -453,6 +453,27 @@ export async function finalizeFindings(
 		});
 	}
 
+	// T7: flag any remediation the improver left as the mapper's boilerplate template
+	// (never ship a confirmed finding with non-actionable boilerplate silently).
+	const boilerplateCount = flagBoilerplateRemediation(result.effective);
+	if (boilerplateCount > 0) {
+		logger.warn("Findings still carry boilerplate remediation after improve", {
+			count: boilerplateCount,
+		});
+	}
+
+	// T6: deterministically cluster + collapse duplicate findings so the attack
+	// surface, report, and severity counts reason over ONE canonical finding per root
+	// cause. Members are folded into `also_reported_as` — preserved, never dropped.
+	const beforeCollapse = result.effective.length;
+	result.effective = dedupAndCollapse(result.effective);
+	if (result.effective.length < beforeCollapse) {
+		logger.info("Collapsed duplicate findings for report", {
+			from: beforeCollapse,
+			to: result.effective.length,
+		});
+	}
+
 	// Stage 2: attack-surface synthesis. Fresh session, findings re-inlined.
 	try {
 		const prompt = AUTH_PREAMBLE + buildStage2Prompt(scanId, targetUrl, result.effective);
