@@ -118,6 +118,7 @@ function applyImprovedText(
 export async function collectFindings(
 	deliverablesPath: string,
 	logger: ActivityLogger,
+	opts?: { analyzedSourceRoot?: string },
 ): Promise<FindingRecord[]> {
 	const vulns = readQueues(deliverablesPath, logger);
 
