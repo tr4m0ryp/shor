@@ -69,10 +69,21 @@ export function applyOracleDispositions(
 	logger: ActivityLogger,
 ): NormalizedVuln[] {
 	const dispositions = readDispositions(deliverablesPath, logger);
-	if (dispositions.size === 0) return vulns;
+	// Differential-authz premise (T1): `{ id -> premise_valid }`. May be present even
+	// when no disposition was overridden, so read it independently of `dispositions`.
+	const premise = readPremise(deliverablesPath, logger);
+	if (dispositions.size === 0 && premise.size === 0) return vulns;
 
 	let overridden = 0;
+	let premiseStamped = 0;
 	for (const vuln of vulns) {
+		const premiseValid = lookupDisposition(premise as never, vuln.id) as boolean | undefined;
+		if (premiseValid !== undefined) {
+			// Carry the premise on `raw` so the §6.1 mapper surfaces it; the premise
+			// GATE (not the oracle) demotes a privileged-only exploit to the appendix.
+			vuln.raw.premise_valid = premiseValid;
+			premiseStamped += 1;
+		}
 		const verdict = lookupDisposition(dispositions, vuln.id);
 		if (!verdict) continue;
 		// Stamp the executable outcome on the record (carried via `raw` → mapper).
@@ -85,6 +96,9 @@ export function applyOracleDispositions(
 	}
 	if (overridden > 0) {
 		logger.info("Oracle verdicts overrode markdown-parsed dispositions", { overridden });
+	}
+	if (premiseStamped > 0) {
+		logger.info("Oracle stamped differential authz premise on findings", { premiseStamped });
 	}
 	return vulns;
 }
