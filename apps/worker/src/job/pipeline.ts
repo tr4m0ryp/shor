@@ -23,6 +23,7 @@ import {
 import type { Container } from "../services/container.js";
 import { getOrCreateContainer } from "../services/container.js";
 import { bootstrapIdentities } from "../services/identity/index.js";
+import { runFpRefutePanel } from "../services/fp-panel/index.js";
 import { runOraclePhase } from "../services/oracle/index.js";
 import { emitRunHealth } from "../services/run-health/index.js";
 import { runScreenPanel } from "../services/screen-panel/index.js";
