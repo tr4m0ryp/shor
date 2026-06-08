@@ -36,8 +36,8 @@ import { fpRefuteEnabled, writeFpVerdicts } from './io.js';
 import { selectFpCandidates } from './select.js';
 import { fpRefuteBasePrompt } from './voter.js';
 
-export { applyFpRefuteVerdicts } from './router.js';
 export { FP_REFUTE_FILE, fpRefuteEnabled } from './io.js';
+export { applyFpRefuteVerdicts } from './router.js';
 export { selectFpCandidates } from './select.js';
 
 /** Lease a session, run one voter, always release — mirrors the screen panel's private helper. */

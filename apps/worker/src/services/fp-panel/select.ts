@@ -14,7 +14,5 @@ import type { FindingRecord } from '../../job/findings/types.js';
 
 /** Confirmed + (critical|high) findings — the panel's candidate set. */
 export function selectFpCandidates(findings: readonly FindingRecord[]): FindingRecord[] {
-  return findings.filter(
-    (f) => f.confidence === 'confirmed' && (f.severity === 'critical' || f.severity === 'high'),
-  );
+  return findings.filter((f) => f.confidence === 'confirmed' && (f.severity === 'critical' || f.severity === 'high'));
 }
