@@ -27,7 +27,7 @@
 import type { NormalizedVuln, OracleDisposition } from "../../job/findings/types.js";
 import type { AgentContext } from "../../job/pipeline.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
-import { lookupDisposition, readDispositions, readPremise, runOracleReplay } from "./replay/index.js";
+import { lookupByVulnId, lookupDisposition, readDispositions, readPremise, runOracleReplay } from "./replay/index.js";
 
 /**
  * Run the post-exploitation oracle phase: replay every captured PoC and persist
