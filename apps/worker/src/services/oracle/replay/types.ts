@@ -88,6 +88,14 @@ export interface ExecCtx {
 	/** Per-request timeout in ms; `<= 0` disables the abort timer. */
 	timeoutMs: number;
 	logger: ActivityLogger;
+	/**
+	 * Identity whose auth REPLACES the PoC's captured auth on the replayed request
+	 * (differential authz, T1): the executor strips the PoC's own `Authorization`/
+	 * `Cookie` and applies these headers instead. Absent ⇒ the request fires with the
+	 * PoC's own headers (the privileged baseline). Header VALUES are USED to build the
+	 * request but are NEVER logged or surfaced (ADR-050).
+	 */
+	currentIdentity?: { label: string; headers: Record<string, string> };
 }
 
 /** Replays one PoC of a given {@link PocKind} and reports what it observed. */
