@@ -344,6 +344,18 @@ export async function runScanPipeline(
 		saveCheckpoint(params.scanId, "oracle", deliverablesPath, logger);
 	}
 
+	// 2c) Adversarial FP-refute panel (T2) — opt-in (`SHOR_FP_PANEL=1`). Refutes the
+	// confirmed + high/critical findings with the target SOURCE in context; a majority-
+	// refute is written for `collectFindings` to demote to `refuted_on_review`. No-op
+	// when disabled. Best-effort; never throws (a failure leaves findings untouched).
+	try {
+		await runFpRefutePanel(ctx);
+	} catch (err) {
+		logger.warn("fp-refute panel failed; findings unchanged", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+
 	// 3) Synthesis — best-effort; a failure here must not discard the findings.
 	for (const agentName of SYNTHESIS_AGENTS) {
 		try {
