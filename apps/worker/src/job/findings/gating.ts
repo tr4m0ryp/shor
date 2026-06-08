@@ -46,7 +46,12 @@ export const MANUAL_REVIEW_APPENDIX_FILE = "manual_review_appendix.json";
 function isGatedOut(disposition: VulnDisposition | undefined): boolean {
 	return (
 		disposition === "unverified_out_of_scope" ||
-		disposition === "unverified_screen_rejected"
+		disposition === "unverified_screen_rejected" ||
+		// T2/T3: scaffolding-target exploits, privileged-only "escalations", and
+		// review-refuted findings are terminal too — set aside to the appendix, not deleted.
+		disposition === "out_of_scope_target" ||
+		disposition === "exploited_privileged" ||
+		disposition === "refuted_on_review"
 	);
 }
 
