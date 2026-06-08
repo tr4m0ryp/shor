@@ -184,6 +184,7 @@ export { DEFAULT_EXECUTORS, httpExecutor } from "./executors.js";
 export {
 	ORACLE_DISPOSITIONS_FILE,
 	ORACLE_PREMISE_FILE,
+	lookupByVulnId,
 	lookupDisposition,
 	parsePoc,
 	readDispositions,
