@@ -46,16 +46,20 @@ export function clusterDeterministic(records: FindingRecord[]): FindingRecord[] 
   return records.map((r) => (r.cluster_id ? r : { ...r, cluster_id: clusterIdFor(groupKey(r)) }));
 }
 
-/** Canonical representative: highest severity, then confirmed-first, then richest evidence. */
+/** Prefer `a` over `b` as representative: higher severity, then confirmed, then richer evidence. */
+function better(a: FindingRecord, b: FindingRecord): FindingRecord {
+  const sa = SEV_RANK[a.severity] ?? 9;
+  const sb = SEV_RANK[b.severity] ?? 9;
+  if (sa !== sb) return sa < sb ? a : b;
+  const ca = a.confidence === 'confirmed' ? 0 : 1;
+  const cb = b.confidence === 'confirmed' ? 0 : 1;
+  if (ca !== cb) return ca < cb ? a : b;
+  return String(a.evidence ?? '').length >= String(b.evidence ?? '').length ? a : b;
+}
+
+/** Canonical representative of a non-empty member list (reduce ⇒ always defined). */
 function pickRepresentative(members: FindingRecord[]): FindingRecord {
-  return [...members].sort((a, b) => {
-    const s = (SEV_RANK[a.severity] ?? 9) - (SEV_RANK[b.severity] ?? 9);
-    if (s !== 0) return s;
-    const ax = a.confidence === 'confirmed' ? 0 : 1;
-    const bx = b.confidence === 'confirmed' ? 0 : 1;
-    if (ax !== bx) return ax - bx;
-    return String(b.evidence ?? '').length - String(a.evidence ?? '').length;
-  })[0];
+  return members.reduce((best, cur) => better(best, cur));
 }
 
 /**
