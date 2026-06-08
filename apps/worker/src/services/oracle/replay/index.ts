@@ -183,11 +183,14 @@ export async function runOracleReplay(
 export { DEFAULT_EXECUTORS, httpExecutor } from "./executors.js";
 export {
 	ORACLE_DISPOSITIONS_FILE,
+	ORACLE_PREMISE_FILE,
 	lookupDisposition,
 	parsePoc,
 	readDispositions,
 	readPocFiles,
+	readPremise,
 	writeDispositions,
+	writePremise,
 } from "./poc-io.js";
 export { decide, isReadOnly, matchSignal } from "./signal.js";
 export type {
