@@ -21,6 +21,7 @@ import { gradeFindings } from "../../services/grader/index.js";
 import { applyOracleDispositions } from "../../services/oracle/index.js";
 import { applyScreenVerdicts } from "../../services/screen-verdicts/index.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
+import { clusterDeterministic } from "./dedup-collapse.js";
 import { lookupEvidence, readEvidence } from "./evidence.js";
 import { gateAndMapFindings, readManualReviewAppendix } from "./gating.js";
 import { FINDING_CATEGORIES, readQueues } from "./queue.js";
