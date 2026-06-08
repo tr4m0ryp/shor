@@ -81,9 +81,66 @@ export async function runReplay(pocs: Poc[], options: ReplayOptions = {}): Promi
 	return results;
 }
 
+/** Replay one PoC AS a specific lower-privilege identity (differential authz, T1). */
+async function replayUnderIdentity(
+	poc: Poc,
+	identity: ReplayIdentity,
+	baseCtx: ExecCtx,
+	executors: ExecutorSet,
+): Promise<ExecOutcome> {
+	const ctx: ExecCtx = {
+		...baseCtx,
+		currentIdentity: { label: identity.label, headers: identity.headers },
+	};
+	try {
+		return await executors[poc.kind](poc, ctx);
+	} catch (err) {
+		return { observed: false, reason: "error", detail: err instanceof Error ? err.message : String(err) };
+	}
+}
+
+/**
+ * Differential-authz premise pass (T1): for each read-only authz/auth HTTP PoC,
+ * replay it under every lower-privilege identity and decide `premise_valid`. Only
+ * `auth*`-id PoCs are touched (premise_valid is an authz concept — never demote an
+ * XSS/SQLi by it). Returns `{ id -> premise_valid }` for the findings it could decide.
+ */
+async function computePremiseMap(
+	pocs: Poc[],
+	options: ReplayOptions,
+	identities: readonly ReplayIdentity[],
+): Promise<Map<string, boolean>> {
+	const map = new Map<string, boolean>();
+	if (identities.length === 0) return map;
+	const logger = options.logger ?? NOOP_LOGGER;
+	const executors = options.executors ?? DEFAULT_EXECUTORS;
+	const sleep = options.sleep ?? realSleep;
+	const baseCtx: ExecCtx = {
+		fetchImpl: options.fetchImpl ?? fetch,
+		assertAllowed: options.assertAllowed ?? assertNetworkAllowed,
+		timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+		logger,
+	};
+	const delay = options.delayMs ?? DEFAULT_DELAY_MS;
+	for (const poc of pocs) {
+		if (!/^auth/i.test(poc.id.trim())) continue; // authz/auth findings only
+		if (!isReadOnly(poc) || poc.kind !== "http") continue; // read-only HTTP only
+		const lower: DifferentialOutcome[] = [];
+		for (const identity of identities) {
+			const outcome = await replayUnderIdentity(poc, identity, baseCtx, executors);
+			lower.push({ label: identity.label, authenticated: identity.authenticated, outcome });
+			if (delay > 0) await sleep(delay);
+		}
+		const premise = decidePremise(poc, lower);
+		if (premise !== undefined) map.set(poc.id, premise);
+	}
+	return map;
+}
+
 /**
  * Read the PoC sidecars, replay them, and persist the authoritative verdict map
- * to `oracle_dispositions.json`. Returns the `{ id -> disposition }` map.
+ * to `oracle_dispositions.json`. Also runs the differential-authz premise pass (T1)
+ * and persists `oracle_premise.json`. Returns the `{ id -> disposition }` map.
  */
 export async function runOracleReplay(
 	deliverablesPath: string,
@@ -104,6 +161,22 @@ export async function runOracleReplay(
 	const tally = { exploited: 0, blocked: 0, not_replayable: 0 };
 	for (const d of map.values()) tally[d] += 1;
 	logger.info("Oracle replay complete", { file: ORACLE_DISPOSITIONS_FILE, total: map.size, ...tally });
+
+	// Differential-authz premise (T1): decide whether each authz exploit holds under
+	// a lower-privilege identity. Best-effort — a failure never blocks the disposition map.
+	try {
+		const identities = loadDifferentialIdentities(deliverablesPath, logger);
+		const premise = await computePremiseMap(pocs, { logger, ...options }, identities);
+		writePremise(deliverablesPath, premise, logger);
+		if (premise.size > 0) {
+			const invalid = [...premise.values()].filter((v) => v === false).length;
+			logger.info("Oracle differential premise computed", { decided: premise.size, premiseInvalid: invalid });
+		}
+	} catch (err) {
+		logger.warn("Oracle differential premise pass failed; premise_valid unset", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
 	return map;
 }
 
