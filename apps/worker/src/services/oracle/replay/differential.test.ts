@@ -61,7 +61,7 @@ describe('decidePremise', () => {
 });
 
 describe('httpExecutor — differential auth-header replacement', () => {
-  function ctxCapturing(captured: { headers?: Record<string, string> }, identity?: ExecCtx['currentIdentity']): ExecCtx {
+  function ctxCapturing(captured: { headers: Record<string, string> | undefined }, identity?: ExecCtx['currentIdentity']): ExecCtx {
     return {
       fetchImpl: (async (_url: string, init?: RequestInit) => {
         captured.headers = init?.headers as Record<string, string> | undefined;
@@ -75,7 +75,7 @@ describe('httpExecutor — differential auth-header replacement', () => {
   }
 
   it('strips the PoC captured auth and applies the identity Cookie', async () => {
-    const captured: { headers?: Record<string, string> } = {};
+    const captured: { headers: Record<string, string> | undefined } = { headers: undefined };
     const poc: Poc = { ...POC, request: { method: 'GET', url: 'http://t/admin', headers: { Cookie: 'admin=1', 'X-Trace': 'keep' } } };
     await httpExecutor(poc, ctxCapturing(captured, { label: 'member', headers: { Cookie: 'sess=low' } }));
     expect(captured.headers?.Cookie).toBe('sess=low'); // privileged cookie replaced
@@ -83,7 +83,7 @@ describe('httpExecutor — differential auth-header replacement', () => {
   });
 
   it('leaves the PoC headers unchanged without an identity (baseline)', async () => {
-    const captured: { headers?: Record<string, string> } = {};
+    const captured: { headers: Record<string, string> | undefined } = { headers: undefined };
     const poc: Poc = { ...POC, request: { method: 'GET', url: 'http://t/admin', headers: { Cookie: 'admin=1' } } };
     await httpExecutor(poc, ctxCapturing(captured));
     expect(captured.headers?.Cookie).toBe('admin=1');
