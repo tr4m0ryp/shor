@@ -85,8 +85,9 @@ export function collapseClusters(records: FindingRecord[]): FindingRecord[] {
   const out: FindingRecord[] = [];
   for (const key of order) {
     const members = byCluster.get(key) ?? [];
-    if (members.length === 1) {
-      out.push(members[0]);
+    const [single] = members;
+    if (members.length === 1 && single) {
+      out.push(single);
       continue;
     }
     const rep = pickRepresentative(members);
