@@ -41,10 +41,7 @@ export { FP_REFUTE_FILE, fpRefuteEnabled } from './io.js';
 export { selectFpCandidates } from './select.js';
 
 /** Lease a session, run one voter, always release — mirrors the screen panel's private helper. */
-async function runLeasedVoter(
-  pool: SessionPool,
-  args: Parameters<typeof runVoter>[0] extends infer A ? Omit<A & object, 'session'> : never,
-): Promise<ScreenVote> {
+async function runLeasedVoter(pool: SessionPool, args: Omit<VoterRunArgs, 'session'>): Promise<ScreenVote> {
   const lease = await pool.acquire();
   try {
     return await runVoter({ ...args, session: lease.session });
