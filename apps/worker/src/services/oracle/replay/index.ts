@@ -19,8 +19,9 @@ import { assertNetworkAllowed } from "../../../guardrails/index.js";
 import type { OracleDisposition } from "../../../job/findings/types.js";
 import type { ActivityLogger } from "../../../types/activity-logger.js";
 import { DEFAULT_EXECUTORS } from "./executors.js";
-import { ORACLE_DISPOSITIONS_FILE, readPocFiles, writeDispositions } from "./poc-io.js";
-import { decide, isReadOnly } from "./signal.js";
+import { loadDifferentialIdentities, type ReplayIdentity } from "./identity-auth.js";
+import { ORACLE_DISPOSITIONS_FILE, readPocFiles, writeDispositions, writePremise } from "./poc-io.js";
+import { decide, type DifferentialOutcome, decidePremise, isReadOnly } from "./signal.js";
 import type { ExecCtx, ExecOutcome, ExecutorSet, Poc } from "./types.js";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
