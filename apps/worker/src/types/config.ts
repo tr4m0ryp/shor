@@ -59,6 +59,13 @@ export interface Identity {
 	role?: string;
 	credentials: Credentials;
 	success_condition?: SuccessCondition;
+	/**
+	 * Optional privilege rank for the differential-authz oracle (T1): LOWER = less
+	 * privileged. When set, the oracle replays an authz PoC under the lowest-ranked
+	 * identity to decide `premise_valid`. Absent ⇒ declaration order is used (the
+	 * primary identity is treated as most privileged); anonymous is always the floor.
+	 */
+	privilege?: number;
 }
 
 export interface Authentication {
