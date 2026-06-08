@@ -17,6 +17,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { clusterFindings } from "../../services/dedup-judge/index.js";
+// Import the router LEAF (not the fp-panel index) so there is no import cycle:
+// fp-panel/index imports collectFindings, but the router imports neither.
+import { applyFpRefuteVerdicts } from "../../services/fp-panel/router.js";
 import { gradeFindings } from "../../services/grader/index.js";
 import { applyOracleDispositions } from "../../services/oracle/index.js";
 import { applyScreenVerdicts } from "../../services/screen-verdicts/index.js";
