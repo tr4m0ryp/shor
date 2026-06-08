@@ -151,7 +151,7 @@ export function toFindingRecord(vuln: NormalizedVuln, options?: ToFindingRecordO
   const evidenceSignature = `${locText}|${missingDefenseRaw}|${vulnerabilityType}`;
   const fingerprint = computeFingerprint(
     vuln.category,
-    cwe,
+    legacyCwe,
     location,
     // signature: source/sink + missing defense gives a stable identity even
     // before live evidence exists (raw value — the display fallback must not
