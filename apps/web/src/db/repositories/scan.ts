@@ -90,6 +90,30 @@ export const scanRepo = {
   },
 
   /**
+   * Persist the finalized executive report (cli-finalization stage 3), pushed by the
+   * worker findings sink. Stored as JSONB on the scan row; overwrites the prior one.
+   * Tenant-scoped. Replaces the decommissioned Sinas `<ns>/reports` store.
+   */
+  async setReport(tenantId: TenantId, id: ScanId, report: unknown): Promise<void> {
+    await query(
+      `UPDATE scan s SET report = $3::jsonb
+				 FROM project p
+				 WHERE p.id = s.project_id AND p.tenant_id = $1 AND s.id = $2`,
+      [tenantId, id, JSON.stringify(report)],
+    );
+  },
+
+  /** Read the finalized report JSONB for a scan, or null. Tenant-scoped. */
+  async getReport(tenantId: TenantId, id: ScanId): Promise<unknown | null> {
+    const { rows } = await query<{ report: unknown }>(
+      `SELECT s.report FROM scan s JOIN project p ON p.id = s.project_id
+				 WHERE p.tenant_id = $1 AND s.id = $2`,
+      [tenantId, id],
+    );
+    return rows[0]?.report ?? null;
+  },
+
+  /**
    * Transition scan status; stamps started_at/finished_at as the lifecycle
    * dictates (running → started_at; terminal → finished_at).
    */

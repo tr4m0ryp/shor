@@ -32,6 +32,7 @@ import { postFindings, readSinkConfig } from "./sink.js";
 import type { FindingRecord, FindingsSinkPayload } from "./types.js";
 
 const ATTACK_SURFACE_FILE = "attack_surface_scenarios.json";
+const REPORT_JSON_FILE = "report.json";
 
 /** Read + parse the attack-surface document, or undefined if absent/bad. */
 function readAttackSurface(
@@ -48,6 +49,32 @@ function readAttackSurface(
 		return undefined;
 	} catch (err) {
 		logger.warn("Failed to read/parse attack surface; skipping", {
+			filePath,
+			error: err instanceof Error ? err.message : String(err),
+		});
+		return undefined;
+	}
+}
+
+/**
+ * Read the structured finalized report (`report.json`, written by
+ * cli-finalization stage 3) so `emitFindings` can POST it through the sink — the
+ * dashboard serves it from the DB now that the Sinas report store is decommissioned.
+ */
+function readReport(
+	deliverablesPath: string,
+	logger: ActivityLogger,
+): Record<string, unknown> | undefined {
+	const filePath = path.join(deliverablesPath, REPORT_JSON_FILE);
+	try {
+		if (!fs.existsSync(filePath)) return undefined;
+		const parsed: unknown = JSON.parse(fs.readFileSync(filePath, "utf8"));
+		if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+			return parsed as Record<string, unknown>;
+		}
+		return undefined;
+	} catch (err) {
+		logger.warn("Failed to read/parse finalized report; skipping", {
 			filePath,
 			error: err instanceof Error ? err.message : String(err),
 		});
@@ -268,6 +295,7 @@ async function emitFindings(
 
 	let findings: FindingRecord[] = [];
 	let attackSurface: Record<string, unknown> | undefined;
+	let report: Record<string, unknown> | undefined;
 	try {
 		// Enable cite-line verification (T3) by handing the mapper the cloned-target
 		// source root (the same path the worker resolves it from, env.ts). Fail-open:
@@ -283,6 +311,7 @@ async function emitFindings(
 		const manualReview = readManualReviewAppendix(deliverablesPath, logger);
 		if (manualReview.length > 0) findings = [...findings, ...manualReview];
 		attackSurface = readAttackSurface(deliverablesPath, logger);
+		report = readReport(deliverablesPath, logger);
 	} catch (err) {
 		// Mapping should not throw, but never let it block the status POST.
 		logger.error("Findings collection failed; posting status only", {
@@ -296,6 +325,7 @@ async function emitFindings(
 		findings,
 		status,
 		...(attackSurface !== undefined && { attackSurface }),
+		...(report !== undefined && { report }),
 	};
 
 	logger.info("Emitting findings to dashboard sink", {
@@ -303,6 +333,7 @@ async function emitFindings(
 		status,
 		findingsCount: findings.length,
 		hasAttackSurface: attackSurface !== undefined,
+		hasReport: report !== undefined,
 	});
 
 	return postFindings(sink, payload, logger);

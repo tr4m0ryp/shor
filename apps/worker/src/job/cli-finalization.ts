@@ -23,10 +23,19 @@ import { flagBoilerplateRemediation } from "./findings/remediation-guard.js";
 import type { FindingRecord } from "./findings/types.js";
 
 const REPORT_FILENAME = "comprehensive_security_assessment_report.md";
+const REPORT_JSON_FILE = "report.json";
 const ATTACK_SURFACE_FILE = "attack_surface_scenarios.json";
 const ATTACK_SURFACE_MD = "attack_surface_scenarios.md";
 const IMPROVED_FINDINGS_FILE = "improved_findings.json";
 const STAGE_TIMEOUT_MS = 10 * 60 * 1000;
+// Stage 1 (findings improvement) inlines the FULL prose of each finding and asks the
+// model to rewrite every one. Sending many at once overran the model's max-tokens and
+// made `claude -p` exit 1 (so findings were never improved). Empirically 2 findings/call
+// succeeds while 8 overruns — so improve in SMALL batches, run several CONCURRENTLY (the
+// model is slow, ~90s/call), and retry a batch once. One bad batch leaves only its
+// findings raw.
+const STAGE1_BATCH_SIZE = 2;
+const STAGE1_CONCURRENCY = 4;
 
 // Full SINAS-era finalize prompts (recovered from infra/sinas/agents). Loaded
 // from prompts/finalize/*.txt rather than inlined — they carry fenced-code
@@ -228,8 +237,11 @@ function buildStage2Prompt(scanId: string, target: string, findings: FindingReco
 		`Severity counts over all findings: ${JSON.stringify(counts)}; total findings: ${findings.length}.\n\n` +
 		'Return ONLY a JSON object — no prose before or after — of the form ' +
 		'{"scenarios": [{"id", "title", "severity", "required_findings", "explanation", ' +
-		'"kill_chain", "how_to_reproduce", "business_impact", "remediation", "claude_code_prompt"}]}, ' +
-		"most-dangerous-first." +
+		'"kill_chain", "how_to_reproduce", "business_impact", "remediation", "claude_code_prompt"}]}. ' +
+		// Bound the output: synthesizing a scenario per finding overruns the model's
+		// max-tokens and makes the CLI exit non-zero (the attack surface is then lost).
+		"Synthesize ONLY the most significant attack scenarios, most-dangerous-first — at most 12 — " +
+		"each consolidating the related findings via `required_findings`." +
 		`\n\nFINDINGS JSON:\n${JSON.stringify(compactFindings(findings))}`
 	);
 }
@@ -423,6 +435,78 @@ export interface FinalizeResult {
  * pipeline's deliverable-file writes; an off-pipeline rerun can feed findings
  * straight from the DB and persist however it likes.
  */
+/**
+ * Stage 1 in bounded batches: improve `STAGE1_BATCH_SIZE` findings per `claude -p`
+ * call so neither the input nor the (rewrite-everything) output overruns the model's
+ * limits. Returns the merged improved-prose entries across all batches; a batch that
+ * throws contributes nothing (those findings stay raw) and never aborts the rest.
+ */
+/** Run one finalize stage with a single retry — guards a transient CLI exit / overrun. */
+async function runCliRetry<T>(config: CliConfig, prompt: string, logger: ActivityLogger): Promise<T> {
+	try {
+		return await runCli<T>(config, prompt, false, logger);
+	} catch (err) {
+		logger.warn("CLI stage failed; retrying once", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+		await new Promise((r) => setTimeout(r, 4000));
+		return runCli<T>(config, prompt, false, logger);
+	}
+}
+
+async function improveFindingsBatched(
+	findings: FindingRecord[],
+	config: CliConfig,
+	logger: ActivityLogger,
+): Promise<NonNullable<ImprovedDoc["findings"]>> {
+	const batches: FindingRecord[][] = [];
+	for (let i = 0; i < findings.length; i += STAGE1_BATCH_SIZE) {
+		batches.push(findings.slice(i, i + STAGE1_BATCH_SIZE));
+	}
+	const out: NonNullable<ImprovedDoc["findings"]> = [];
+	let next = 0;
+	const worker = async (): Promise<void> => {
+		while (next < batches.length) {
+			const mine = next++;
+			const batch = batches[mine];
+			if (!batch) continue;
+			for (let attempt = 1; attempt <= 2; attempt += 1) {
+				try {
+					const doc = await runCli<ImprovedDoc>(
+						config,
+						AUTH_PREAMBLE + buildStage1Prompt(batch),
+						false,
+						logger,
+					);
+					const improved = doc.findings ?? [];
+					out.push(...improved);
+					logger.info("CLI stage 1 batch improved", {
+						batch: mine + 1,
+						of: batches.length,
+						improved: improved.length,
+					});
+					break;
+				} catch (err) {
+					if (attempt === 2) {
+						logger.warn("CLI stage 1 batch failed after retry; its findings stay raw", {
+							batch: mine + 1,
+							of: batches.length,
+							size: batch.length,
+							error: err instanceof Error ? err.message : String(err),
+						});
+					} else {
+						await new Promise((r) => setTimeout(r, 4000));
+					}
+				}
+			}
+		}
+	};
+	await Promise.all(
+		Array.from({ length: Math.min(STAGE1_CONCURRENCY, batches.length) }, () => worker()),
+	);
+	return out;
+}
+
 export async function finalizeFindings(
 	findings: FindingRecord[],
 	scanId: string,
@@ -432,26 +516,18 @@ export async function finalizeFindings(
 ): Promise<FinalizeResult> {
 	const result: FinalizeResult = { improved: [], effective: findings };
 
-	// Stage 1: findings improvement. Stages 2-3 then reason over `effective`,
-	// the raw findings overlaid with whatever prose stage 1 cleaned up.
-	try {
-		const doc = await runCli<ImprovedDoc>(
-			config,
-			AUTH_PREAMBLE + buildStage1Prompt(findings),
-			false,
-			logger,
-		);
-		const improved = doc.findings ?? [];
-		if (improved.length > 0) {
-			result.improved = improved;
-			result.effective = overlayImproved(findings, improved);
-		}
-		logger.info("CLI stage 1 complete: findings improved", { count: improved.length });
-	} catch (err) {
-		logger.warn("CLI findings improvement failed; using raw findings", {
-			error: err instanceof Error ? err.message : String(err),
-		});
+	// Stage 1: findings improvement, in bounded BATCHES (STAGE1_BATCH_SIZE). Stages
+	// 2-3 then reason over `effective`, the raw findings overlaid with whatever prose
+	// stage 1 cleaned up. A failed batch leaves only its findings raw (fail-open).
+	const improved = await improveFindingsBatched(findings, config, logger);
+	if (improved.length > 0) {
+		result.improved = improved;
+		result.effective = overlayImproved(findings, improved);
 	}
+	logger.info("CLI stage 1 complete: findings improved", {
+		improved: improved.length,
+		of: findings.length,
+	});
 
 	// T7: flag any remediation the improver left as the mapper's boilerplate template
 	// (never ship a confirmed finding with non-actionable boilerplate silently).
@@ -474,10 +550,11 @@ export async function finalizeFindings(
 		});
 	}
 
-	// Stage 2: attack-surface synthesis. Fresh session, findings re-inlined.
+	// Stage 2: attack-surface synthesis. Fresh session, findings re-inlined. One retry
+	// (the synthesis output can transiently overrun max-tokens → CLI exit 1).
 	try {
 		const prompt = AUTH_PREAMBLE + buildStage2Prompt(scanId, targetUrl, result.effective);
-		const doc = await runCli<AttackSurfaceDoc>(config, prompt, false, logger);
+		const doc = await runCliRetry<AttackSurfaceDoc>(config, prompt, logger);
 		if (doc.scenarios && Array.isArray(doc.scenarios)) {
 			result.attackSurface = doc;
 			result.attackSurfaceMarkdown = renderAttackSurfaceMarkdown(doc);
@@ -491,10 +568,10 @@ export async function finalizeFindings(
 		});
 	}
 
-	// Stage 3: executive report. Fresh session, findings re-inlined.
+	// Stage 3: executive report. Fresh session, findings re-inlined. One retry.
 	try {
 		const prompt = AUTH_PREAMBLE + buildStage3Prompt(scanId, targetUrl, result.effective);
-		const report = await runCli<ReportDoc>(config, prompt, false, logger);
+		const report = await runCliRetry<ReportDoc>(config, prompt, logger);
 		result.report = report;
 		result.reportMarkdown = renderMarkdown(report);
 		logger.info("CLI stage 3 complete: report written");
@@ -552,4 +629,13 @@ export async function finalizeViaCli(
 	if (r.reportMarkdown) {
 		await fsp.writeFile(path.join(deliverablesPath, REPORT_FILENAME), r.reportMarkdown);
 	}
+	// Persist the STRUCTURED report doc too: `emitFindings` reads it and posts it
+	// through the findings sink so the dashboard's `/scans/:id/report` can serve it
+	// from the DB (the old Sinas report store is decommissioned).
+	if (r.report) {
+		await fsp.writeFile(path.join(deliverablesPath, REPORT_JSON_FILE), `${JSON.stringify(r.report)}\n`);
+	}
 }
+
+/** The structured-report deliverable filename, read by `emitFindings` (T-report). */
+export const REPORT_JSON_FILENAME = REPORT_JSON_FILE;

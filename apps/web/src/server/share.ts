@@ -114,7 +114,9 @@ async function routeShareScan(
   }
 
   if (sub === 'report') {
-    return ok({ report: await fetchSinasReport(scanId) });
+    // DB-served (worker sink posts it); Sinas fallback is null (decommissioned).
+    const report = (await scanRepo.getReport(tenantId, scanId)) ?? (await fetchSinasReport(scanId));
+    return ok({ report });
   }
 
   return notFound;

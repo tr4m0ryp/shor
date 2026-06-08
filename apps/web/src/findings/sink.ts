@@ -17,14 +17,7 @@ import { authenticate } from '../auth/middleware.js';
 import { scopedTenantId } from '../auth/tenant-scope.js';
 import { getConfig } from '../config.js';
 import { attackSurfaceRepo, findingRepo, scanRepo } from '../db/repositories/index.js';
-import type {
-  AttackSurfaceData,
-  Finding,
-  FindingRecord,
-  ScanId,
-  ScanStatus,
-  TenantId,
-} from '../domain/types.js';
+import type { AttackSurfaceData, Finding, FindingRecord, ScanId, ScanStatus, TenantId } from '../domain/types.js';
 import { mirrorFindings, mirrorScan } from '../sinas/mirror.js';
 import { withFingerprints } from './fingerprint.js';
 import { validateFinding } from './validate.js';
@@ -63,6 +56,7 @@ export async function ingestFindings(
   scanId: ScanId,
   findings: readonly unknown[],
   attackSurface?: AttackSurfaceData,
+  report?: Record<string, unknown>,
 ): Promise<IngestResult> {
   const scan = await scanRepo.findById(tenantId, scanId);
   if (!scan) {
@@ -95,6 +89,12 @@ export async function ingestFindings(
     // the engine doc (whose schema the dashboard does not render) and dropped the
     // Opus one; last-write-wins lets the final post replace it.
     await attackSurfaceRepo.upsert({ scanId, data: attackSurface });
+  }
+
+  // Persist the finalized executive report (cli-finalization stage 3) so the
+  // dashboard serves it from the DB. Last-write-wins, like the attack surface.
+  if (report !== undefined) {
+    await scanRepo.setReport(tenantId, scanId, report);
   }
 
   // Best-effort hub->Sinas mirror of the fingerprinted findings (keyed by the
@@ -146,9 +146,7 @@ function isAttackSurface(value: unknown): value is AttackSurfaceData {
 const SINK_STATUSES: ReadonlySet<ScanStatus> = new Set<ScanStatus>(['completed', 'failed']);
 
 function asSinkStatus(value: unknown): ScanStatus | undefined {
-  return typeof value === 'string' && SINK_STATUSES.has(value as ScanStatus)
-    ? (value as ScanStatus)
-    : undefined;
+  return typeof value === 'string' && SINK_STATUSES.has(value as ScanStatus) ? (value as ScanStatus) : undefined;
 }
 
 /** Parse a `Bearer <token>` Authorization header; returns the token or undefined. */
@@ -224,9 +222,13 @@ export async function handleIngestFindings(
   }
 
   const attackSurface = isAttackSurface(body.attackSurface) ? body.attackSurface : undefined;
+  const report =
+    body.report && typeof body.report === 'object' && !Array.isArray(body.report)
+      ? (body.report as Record<string, unknown>)
+      : undefined;
 
   try {
-    const result = await ingestFindings(tenantId, scanId, findings, attackSurface);
+    const result = await ingestFindings(tenantId, scanId, findings, attackSurface, report);
     const status = asSinkStatus(body.status);
     if (status) {
       const updated = await scanRepo.setStatus(tenantId, scanId, status);

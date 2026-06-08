@@ -50,3 +50,6 @@ research/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Throwaway off-pipeline recovery/diagnostic scripts (embed scan-specific infra ids)
+.finalize-tmp/

@@ -46,7 +46,10 @@ export async function getScanReport(scanId: ScanId, cookieHeader: string | undef
   try {
     const scan = await scanRepo.findById(g.tenantId, scanId);
     if (!scan) return notFound('scan not found');
-    return ok({ report: await fetchSinasReport(scanId) });
+    // Serve the finalized report from the DB (worker sink posts it). Fall back to the
+    // legacy Sinas store (decommissioned → null) for any pre-migration scan.
+    const report = (await scanRepo.getReport(g.tenantId, scanId)) ?? (await fetchSinasReport(scanId));
+    return ok({ report });
   } catch (err) {
     return serverError(err);
   }
@@ -98,4 +101,3 @@ export async function getScanAttackSurface(scanId: ScanId, cookieHeader: string 
     return serverError(err);
   }
 }
-

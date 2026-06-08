@@ -222,6 +222,12 @@ export interface FindingRecord {
 export interface FindingsSinkPayload {
   findings: FindingRecord[];
   attackSurface?: Record<string, unknown>;
+  /**
+   * The structured finalized executive report (cli-finalization stage 3). Posted so
+   * the dashboard serves `/scans/:id/report` from the DB (the Sinas report store is
+   * decommissioned). Optional — absent when finalize did not produce one.
+   */
+  report?: Record<string, unknown>;
   // `running` is used for incremental mid-run posts (findings accrue in the DB
   // as agents finish); the sink only transitions the scan on completed/failed.
   status: 'completed' | 'failed' | 'running';
