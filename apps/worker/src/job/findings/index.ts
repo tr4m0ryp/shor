@@ -187,7 +187,12 @@ export async function collectFindings(
 
 	// Apply the coverage gate, map to §6.1, and keep only the EMITTED set (gated-
 	// out findings are routed to the manual-review appendix inside this call).
-	const emitted = gateAndMapFindings(deliverablesPath, vulns, logger);
+	const emitted = gateAndMapFindings(
+		deliverablesPath,
+		vulns,
+		logger,
+		opts?.analyzedSourceRoot,
+	);
 	const improved = applyImprovedText(deliverablesPath, emitted, logger);
 
 	// Final emitted-set passes (ordered): cluster near-duplicates by root cause
@@ -197,7 +202,13 @@ export async function collectFindings(
 		deliverablesPath,
 		logger,
 	});
-	return gradeFindings(clustered, { deliverablesPath, logger });
+	// T4: the LLM judge is opt-in. When it did NOT run (no `cluster_id` on any
+	// record), stamp a deterministic `cluster_id` so the dashboard's group-by-cluster
+	// always collapses duplicates. Pure, never drops; the judge's ids win when present.
+	const grouped = clustered.some((f) => f.cluster_id)
+		? clustered
+		: clusterDeterministic(clustered);
+	return gradeFindings(grouped, { deliverablesPath, logger });
 }
 
 /**
