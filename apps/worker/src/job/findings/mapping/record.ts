@@ -196,6 +196,10 @@ export function toFindingRecord(vuln: NormalizedVuln, options?: ToFindingRecordO
     ...(vuln.premise_valid !== undefined && { premise_valid: vuln.premise_valid }),
     ...(cweResolution.inferred && { cwe_inferred: true }),
     ...(locationVerified !== undefined && { location_verified: locationVerified }),
+    // T3: the cited line genuinely contains the construct ⇒ the finding is
+    // confirmed-in-code. Only ever stamp `true`; a false/unknown must not assert
+    // "not in code" (it may just be an unreadable source root — fail open).
+    ...(locationVerified === true && { code_confirmed: true }),
     vulnerability_type: vulnerabilityType,
     externally_exploitable: raw.externally_exploitable === true,
   };
