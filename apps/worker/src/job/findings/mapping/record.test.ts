@@ -137,3 +137,36 @@ describe('toFindingRecord — cite-line verification (T5)', () => {
     expect(r.location_verified).toBe(true);
   });
 });
+
+describe('toFindingRecord — code_confirmed (T3, derived from cite-line verify)', () => {
+  it('stamps code_confirmed=true when the cited line verifies', async () => {
+    const root = await mkRoot();
+    await fs.writeFile(
+      path.join(root, 'view.ts'),
+      `${['function h(req){', '  return renderTemplate(req.q);', '}'].join('\n')}\n`,
+    );
+    const r = toFindingRecord(
+      vuln({ category: 'xss', raw: { sink_function: 'view.ts:2', vulnerability_type: 'renderTemplate reflected' } }),
+      { analyzedSourceRoot: root },
+    );
+    expect(r.code_confirmed).toBe(true);
+  });
+
+  it('does NOT stamp code_confirmed without a source root (fail-open)', () => {
+    const r = toFindingRecord(
+      vuln({ category: 'xss', raw: { sink_function: 'view.ts:2', vulnerability_type: 'renderTemplate xss' } }),
+    );
+    expect('code_confirmed' in r).toBe(false);
+  });
+
+  it('does NOT stamp code_confirmed on a mis-cite (location_verified=false)', async () => {
+    const root = await mkRoot();
+    await fs.writeFile(path.join(root, 'boot.ts'), `${['const v = 1;', 'export const X = 2;'].join('\n')}\n`);
+    const r = toFindingRecord(
+      vuln({ category: 'injection', raw: { sink_call: 'boot.ts:2', vulnerability_type: 'executeRawQuery sqli' } }),
+      { analyzedSourceRoot: root },
+    );
+    expect(r.location_verified).toBe(false);
+    expect('code_confirmed' in r).toBe(false);
+  });
+});
