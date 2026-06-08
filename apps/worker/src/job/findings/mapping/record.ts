@@ -183,7 +183,7 @@ export function toFindingRecord(vuln: NormalizedVuln, options?: ToFindingRecordO
     status: statusFor(),
     fingerprint,
     partialFingerprints: {
-      'locationCwe/v1': computeFingerprint(vuln.category, cwe, location, ''),
+      'locationCwe/v1': computeFingerprint(vuln.category, legacyCwe, location, ''),
     },
     validation_note,
     // Forward-compatible: keep raw queue fields + disposition for the sink.
