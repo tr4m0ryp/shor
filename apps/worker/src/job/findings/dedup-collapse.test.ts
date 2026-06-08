@@ -37,8 +37,9 @@ describe('dedup-collapse', () => {
     const records = sevs.map((s, i) => rec(`V${i}`, { severity: s, title: `SSRF framing ${i}` }));
     const out = dedupAndCollapse(records);
     expect(out).toHaveLength(1);
-    expect(out[0]!.severity).toBe('critical'); // representative = highest severity
-    expect(out[0]!.also_reported_as).toHaveLength(4);
+    const [rep] = out;
+    expect(rep?.severity).toBe('critical'); // representative = highest severity
+    expect(rep?.also_reported_as).toHaveLength(4);
   });
 
   it('preserves every member (no loss): representative + also_reported_as == input', () => {
