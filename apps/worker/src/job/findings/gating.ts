@@ -235,20 +235,42 @@ function applyFailedLaneGate(
 }
 
 /**
- * Apply the coverage gate + the failed-lane gate, then map to `FindingRecord`s
- * and return ONLY the EMITTED set (gated-out records are written to the manual-
- * review appendix). The returned type stays `FindingRecord[]` so
- * `collectFindings`'s synchronous callers are untouched.
+ * Premise gate (T2): an `exploited` finding whose escalation premise is invalid
+ * (`premise_valid === false` — e.g. an authz "escalation" only ever performed by a
+ * privileged identity) is not a proven exploit. Demote it to the terminal
+ * `exploited_privileged` (→ appendix). A finding with `premise_valid` unset/true
+ * keeps its exploited gate-bypass unchanged. Mutates in place. The signal is set
+ * upstream (multi-identity, T9, deferred); until then this is a no-op hook.
+ */
+function applyPremiseGate(vulns: NormalizedVuln[]): void {
+	for (const vuln of vulns) {
+		if (vuln.disposition === "exploited" && vuln.premise_valid === false) {
+			vuln.disposition = "exploited_privileged";
+		}
+	}
+}
+
+/**
+ * Tag scaffolding scope (T2), apply the coverage + failed-lane + premise gates, map
+ * to `FindingRecord`s, run the coherence gate (T8), then return ONLY the EMITTED set
+ * (gated-out records are written to the manual-review appendix). The returned type
+ * stays `FindingRecord[]` so `collectFindings`'s synchronous callers are untouched.
  */
 export function gateAndMapFindings(
 	deliverablesPath: string,
 	vulns: NormalizedVuln[],
 	logger: ActivityLogger,
 ): FindingRecord[] {
+	tagScope(vulns);
 	applyCoverageGate(deliverablesPath, vulns, logger);
 	applyFailedLaneGate(deliverablesPath, vulns, logger);
+	applyPremiseGate(vulns);
 
 	const records = toFindingRecords(vulns);
+	const demoted = applyCoherenceGate(records);
+	if (demoted > 0) {
+		logger.info("Coherence gate demoted incoherent findings", { demoted });
+	}
 	const appendix = records.filter((r) => isGatedOut(r.disposition));
 	const emitted = records.filter((r) => !isGatedOut(r.disposition));
 	writeManualReviewAppendix(deliverablesPath, appendix, logger);
