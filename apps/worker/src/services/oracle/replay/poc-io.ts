@@ -28,6 +28,8 @@ import type {
 const POC_SUFFIX = "_poc.json";
 /** The authoritative, machine-readable replay verdict map. */
 export const ORACLE_DISPOSITIONS_FILE = "oracle_dispositions.json";
+/** Differential-authz premise map (`{ id -> boolean }`), written by T1. */
+export const ORACLE_PREMISE_FILE = "oracle_premise.json";
 
 const POC_KINDS: ReadonlySet<string> = new Set<PocKind>(["http", "browser", "oob"]);
 const SIGNAL_TYPES: ReadonlySet<string> = new Set<SignalType>(["status", "reflection", "oob", "data"]);
