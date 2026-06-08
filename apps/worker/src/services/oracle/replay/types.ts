@@ -55,6 +55,14 @@ export interface Poc {
 	 * it, only idempotent GET/HEAD are auto-replayed.
 	 */
 	safe?: boolean;
+	/**
+	 * Forward-compat identity hints for differential authz confirmation (T1): the
+	 * identity the exploit ran AS, and (for IDOR) the victim whose resource it
+	 * touched. The differential oracle decides `premise_valid` by replaying under
+	 * LOWER-privilege identities regardless of these hints.
+	 */
+	attacker_identity?: string;
+	victim_identity?: string;
 }
 
 /**
