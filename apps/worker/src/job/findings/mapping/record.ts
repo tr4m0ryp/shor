@@ -102,10 +102,14 @@ export function toFindingRecord(vuln: NormalizedVuln, options?: ToFindingRecordO
   const raw = vuln.raw;
   const oracleDisp = raw.oracle_disposition;
 
-  // Per-finding CWE (T4): explicit → mechanism map → category default. The
-  // fingerprint formula is unchanged; it simply consumes this more accurate CWE.
+  // Per-finding CWE (T4): explicit → mechanism map → category default, EMITTED on
+  // the record. The fingerprint, however, keeps consuming the LEGACY CWE
+  // (`explicitCwe || defaultCwe`) so the ADR-031 diff key stays byte-stable across
+  // this CWE enrichment — otherwise every reclassified finding would diff as
+  // fixed+new instead of carrying over. Display gets the richer CWE; identity does not.
   const cweResolution = resolveCwe(raw, vuln.category, meta.defaultCwe);
   const cwe = cweResolution.cwe;
+  const legacyCwe = explicitCwe(raw) || meta.defaultCwe;
   const locText = firstString(raw, meta.locationKeys) || firstString(raw, meta.endpointKeys);
   const location = parseLocation(locText);
   // Raw value drives the fingerprint (stable identity); the OUTPUT field gets a
