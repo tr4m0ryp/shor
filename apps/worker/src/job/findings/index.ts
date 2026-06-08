@@ -149,6 +149,10 @@ export async function collectFindings(
 	// identity no-op until task 013 fills it. Both mutate `vulns` in place.
 	applyScreenVerdicts(vulns, deliverablesPath, logger);
 	applyOracleDispositions(vulns, deliverablesPath, logger);
+	// Adversarial FP-refute panel (T2, opt-in): demote any confirmed finding a
+	// source-aware skeptic panel majority-refuted to `refuted_on_review` → appendix.
+	// No-op when the panel did not run (no verdicts file).
+	applyFpRefuteVerdicts(vulns, deliverablesPath, logger);
 
 	// Observability: a category whose evidence file HAS entries but matched NONE of
 	// its queue IDs is the exact silent-failure signature behind the "nothing ever
