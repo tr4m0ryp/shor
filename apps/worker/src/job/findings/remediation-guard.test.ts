@@ -42,7 +42,7 @@ describe('remediation-guard', () => {
     ] as FindingRecord[];
     const n = flagBoilerplateRemediation(records);
     expect(n).toBe(1);
-    expect(records[0].remediation_boilerplate).toBe(true);
-    expect(records[1].remediation_boilerplate).toBeUndefined();
+    expect(records[0]!.remediation_boilerplate).toBe(true);
+    expect(records[1]!.remediation_boilerplate).toBeUndefined();
   });
 });
