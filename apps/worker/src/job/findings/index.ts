@@ -262,7 +262,13 @@ async function emitFindings(
 	let findings: FindingRecord[] = [];
 	let attackSurface: Record<string, unknown> | undefined;
 	try {
-		findings = await collectFindings(deliverablesPath, logger);
+		// Enable cite-line verification (T3) by handing the mapper the cloned-target
+		// source root (the same path the worker resolves it from, env.ts). Fail-open:
+		// if the path is unset/unreadable, the verifier simply skips (behavior unchanged).
+		const analyzedSourceRoot = process.env.SHOR_REPO_PATH ?? "/work/repo";
+		findings = await collectFindings(deliverablesPath, logger, {
+			analyzedSourceRoot,
+		});
 		// Surface the gated-out manual-review findings to the DASHBOARD as well —
 		// they carry the `unverified_out_of_scope` disposition, so the UI segregates
 		// them behind a "manual review" filter and they never enter the attack
