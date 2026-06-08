@@ -30,6 +30,7 @@ import {
   type ScreenVerdictEntry,
   type ScreenVote,
   type SessionPool,
+  type VoterRunArgs,
 } from '../screen-panel/index.js';
 import { fpRefuteEnabled, writeFpVerdicts } from './io.js';
 import { selectFpCandidates } from './select.js';
