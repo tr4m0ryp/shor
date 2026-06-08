@@ -25,8 +25,10 @@ import {
 	normalizeManifest,
 } from "../coverage/index.js";
 import type { CoverageManifest, CoverageTier } from "../coverage/index.js";
+import { applyCoherenceGate } from "./coherence.js";
 import { readLaneStatus } from "./lane-status.js";
 import { toFindingRecords } from "./mapping.js";
+import { tagScope } from "./scope-tagger.js";
 import type {
 	FindingCategory,
 	FindingRecord,
