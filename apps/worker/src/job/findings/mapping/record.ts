@@ -20,7 +20,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { CATEGORY_META, firstString } from '../category-meta.js';
+import { CATEGORY_META, explicitCwe, firstString } from '../category-meta.js';
 import type {
   FindingRecord,
   FindingSeverity,
