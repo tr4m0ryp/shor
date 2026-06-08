@@ -260,13 +260,17 @@ export function gateAndMapFindings(
 	deliverablesPath: string,
 	vulns: NormalizedVuln[],
 	logger: ActivityLogger,
+	analyzedSourceRoot?: string,
 ): FindingRecord[] {
 	tagScope(vulns);
 	applyCoverageGate(deliverablesPath, vulns, logger);
 	applyFailedLaneGate(deliverablesPath, vulns, logger);
 	applyPremiseGate(vulns);
 
-	const records = toFindingRecords(vulns);
+	const records = toFindingRecords(
+		vulns,
+		analyzedSourceRoot !== undefined ? { analyzedSourceRoot } : undefined,
+	);
 	const demoted = applyCoherenceGate(records);
 	if (demoted > 0) {
 		logger.info("Coherence gate demoted incoherent findings", { demoted });
