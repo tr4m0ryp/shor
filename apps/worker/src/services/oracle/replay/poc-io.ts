@@ -160,6 +160,43 @@ export function readDispositions(
 	return out;
 }
 
+/** Persist the differential-authz `{ id -> premise_valid }` map (T1). Best-effort. */
+export function writePremise(
+	deliverablesPath: string,
+	map: Map<string, boolean>,
+	logger: ActivityLogger,
+): void {
+	if (map.size === 0) return;
+	const obj: Record<string, boolean> = {};
+	for (const [id, valid] of map) obj[id] = valid;
+	try {
+		fs.writeFileSync(path.join(deliverablesPath, ORACLE_PREMISE_FILE), `${JSON.stringify(obj, null, 2)}\n`);
+	} catch (err) {
+		logger.warn("Failed to write oracle premise map; premise_valid not persisted", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+}
+
+/** Read `oracle_premise.json` into a canonical-id-keyed `{ id -> premise_valid }` map. */
+export function readPremise(deliverablesPath: string, logger: ActivityLogger): Map<string, boolean> {
+	const out = new Map<string, boolean>();
+	const full = path.join(deliverablesPath, ORACLE_PREMISE_FILE);
+	try {
+		if (!fs.existsSync(full)) return out;
+		const r = asRecord(JSON.parse(fs.readFileSync(full, "utf8")));
+		if (!r) return out;
+		for (const [id, valid] of Object.entries(r)) {
+			if (typeof valid === "boolean") out.set(canonicalVulnId(id), valid);
+		}
+	} catch (err) {
+		logger.warn("Failed to read oracle premise map; premise_valid unset", {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+	return out;
+}
+
 /**
  * Look up a verdict for a queue VULN-ID, tolerating ID drift: exact canonical
  * match first, then a trailing-number fallback (each map is per-scan, so the
