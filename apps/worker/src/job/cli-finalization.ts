@@ -17,7 +17,9 @@ import { promises as fsp, readFileSync } from "node:fs";
 import path from "node:path";
 import { PROMPTS_DIR } from "../paths.js";
 import type { ActivityLogger } from "../types/activity-logger.js";
+import { dedupAndCollapse } from "./findings/dedup-collapse.js";
 import { collectFindings } from "./findings/index.js";
+import { flagBoilerplateRemediation } from "./findings/remediation-guard.js";
 import type { FindingRecord } from "./findings/types.js";
 
 const REPORT_FILENAME = "comprehensive_security_assessment_report.md";
