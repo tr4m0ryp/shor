@@ -25,8 +25,8 @@ import type { Principal } from '../../auth/index.js';
 import { launchTokenRepo, projectRepo, scanRepo } from '../../db/repositories/index.js';
 import type { NewProject } from '../../domain/types.js';
 import { getAuditTee } from '../../guardrails/audit.js';
-import { hashRoe } from '../../guardrails/roe-hash.js';
 import { type Roe, validateRoe } from '../../guardrails/roe.js';
+import { hashRoe } from '../../guardrails/roe-hash.js';
 import { ingestForScan } from '../../ingest/index.js';
 import { startScan } from '../../orchestration/index.js';
 import { buildInjectionManifest } from '../../secrets/index.js';
@@ -50,7 +50,8 @@ export async function launchExternalScan(principal: Principal, body: Record<stri
 
   // Validate the RoE shape BEFORE touching the token, so a malformed scope never
   // consumes a token. `validateRoe` also rejects an empty allowlist (default-deny).
-  const rawRoe = typeof body.roe === 'object' && body.roe !== null && !Array.isArray(body.roe) ? (body.roe as Roe) : null;
+  const rawRoe =
+    typeof body.roe === 'object' && body.roe !== null && !Array.isArray(body.roe) ? (body.roe as Roe) : null;
   if (!rawRoe) return badRequest('roe is required');
   const validated = validateRoe(rawRoe);
   if (!validated.ok) {

@@ -18,7 +18,10 @@ import { ShorApiError, shorClient } from './shor-client.js';
 
 /** Shape a successful tool result: human text + machine-readable structuredContent. */
 function ok(structured: Record<string, unknown>) {
-  return { content: [{ type: 'text' as const, text: JSON.stringify(structured, null, 2) }], structuredContent: structured };
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(structured, null, 2) }],
+    structuredContent: structured,
+  };
 }
 
 /** Shape an error result. Engine messages are already secret-scrubbed; never echo inputs. */

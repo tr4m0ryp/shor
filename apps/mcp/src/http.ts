@@ -23,7 +23,12 @@ function sendJson(res: ServerResponse, status: number, body: unknown, headers: R
   res.end(JSON.stringify(body));
 }
 
-function jsonRpcError(res: ServerResponse, status: number, message: string, headers: Record<string, string> = {}): void {
+function jsonRpcError(
+  res: ServerResponse,
+  status: number,
+  message: string,
+  headers: Record<string, string> = {},
+): void {
   // JSON-RPC-shaped error so MCP clients surface it cleanly (id null, no request context).
   sendJson(res, status, { jsonrpc: '2.0', error: { code: -32000, message }, id: null }, headers);
 }
@@ -79,7 +84,12 @@ export function createMcpHttpServer(): ReturnType<typeof createServer> {
       // Auth gate — runs before any MCP handling.
       const auth = getAuthenticator().authenticate(req.headers.authorization);
       if (!auth.ok) {
-        jsonRpcError(res, auth.status ?? 401, auth.message ?? 'unauthorized', auth.wwwAuthenticate ? { 'www-authenticate': auth.wwwAuthenticate } : {});
+        jsonRpcError(
+          res,
+          auth.status ?? 401,
+          auth.message ?? 'unauthorized',
+          auth.wwwAuthenticate ? { 'www-authenticate': auth.wwwAuthenticate } : {},
+        );
         return;
       }
 

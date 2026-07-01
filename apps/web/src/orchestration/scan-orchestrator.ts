@@ -10,8 +10,8 @@
  * switch. Clients are lazy; importing this needs no live GCP credentials.
  */
 
-import { getConfig } from '../config.js';
 import { gsUri } from '../cloud/storage.js';
+import { getConfig } from '../config.js';
 import { scanRepo } from '../db/repositories/index.js';
 import type { CodebaseVersion, Project, Scan } from '../domain/types.js';
 import type { Roe, RoeHostRule } from '../guardrails/roe.js';
@@ -133,9 +133,7 @@ export async function startScan(
 
   await scanRepo.setStatus(manifest.tenantId, scan.id, 'running');
   const executionName = launch.executionName ?? '';
-  const updated = executionName
-    ? await scanRepo.setWorkflowId(manifest.tenantId, scan.id, executionName)
-    : null;
+  const updated = executionName ? await scanRepo.setWorkflowId(manifest.tenantId, scan.id, executionName) : null;
   return updated ?? { ...scan, status: 'running', temporalWorkflowId: executionName || null };
 }
 

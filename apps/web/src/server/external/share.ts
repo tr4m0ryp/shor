@@ -14,9 +14,9 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import type { Principal } from '../../auth/index.js';
 import { getConfig } from '../../config.js';
 import { projectRepo } from '../../db/repositories/index.js';
-import type { Principal } from '../../auth/index.js';
 import type { ProjectId } from '../../domain/types.js';
 import { notFound, ok, serverError } from '../dashboard/auth-util.js';
 import type { ApiResponse } from '../router.js';
