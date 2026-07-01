@@ -117,6 +117,7 @@ export function toProject(r: ProjectRow): Project {
     mode: r.mode === 'whitebox' ? 'whitebox' : 'blackbox',
     schedule: r.schedule,
     authConfig: r.auth_config,
+    roe: r.roe ?? null,
     shareSlug: r.share_slug ?? null,
     createdAt: ts(r.created_at),
   };
