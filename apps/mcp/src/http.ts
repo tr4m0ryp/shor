@@ -48,7 +48,9 @@ async function handleMcpPost(req: IncomingMessage, res: ServerResponse): Promise
 
   // Fresh server + transport per request (stateless mode: no session id generator).
   const server = buildServer();
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+  // Omitting sessionIdGenerator selects stateless mode; JSON responses (not SSE)
+  // keep simple request/response tools robust for both Claude Code and claude.ai.
+  const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
   res.on('close', () => {
     void transport.close();
     void server.close();
