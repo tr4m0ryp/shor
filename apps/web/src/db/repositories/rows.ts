@@ -101,6 +101,7 @@ export interface ProjectRow {
   mode: string;
   schedule: string | null;
   auth_config: Record<string, unknown> | null;
+  roe: Record<string, unknown> | null;
   share_slug: string | null;
   created_at: unknown;
 }
