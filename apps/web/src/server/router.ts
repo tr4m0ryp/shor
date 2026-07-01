@@ -16,6 +16,7 @@ import { handleIngestProgress } from '../scan-progress/index.js';
 import { routeDashboard } from './dashboard/index.js';
 import { getGithubConfig, githubOauthCallback, startGithubOauth } from './dashboard/settings.js';
 import { routeExternal } from './external/index.js';
+import { routeLaunchTokens } from './launch-tokens.js';
 import { routeShare } from './share.js';
 
 /** Standard response envelope: HTTP status, JSON body, optional `Set-Cookie`. */
