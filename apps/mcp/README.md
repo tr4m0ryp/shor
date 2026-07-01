@@ -11,7 +11,8 @@ an MCP server. It **re-implements no scanning** — it orchestrates Shor's exist
 | Tool | Wraps | Purpose |
 |---|---|---|
 | `start_blackbox_run` | `POST /external/launch` | Start a black-box scan. **Requires** a single-use launch token bound to the engagement + the signed RoE. Returns `{ projectId, scanId, status }`. |
-| `get_run_progress` | `GET /external/scans/:id` | Read-only status: `{ status, progress, findingCount, startedAt, finishedAt }`. |
+| `list_active_runs` | `GET /external/scans` | Read-only list of in-flight scans (running + pending): `{ runs: [{ scanId, projectId, status, progress, startedAt }] }`. |
+| `get_run_progress` | `GET /external/scans/:id` | Read-only status for one scan: `{ status, progress, findingCount, startedAt, finishedAt }`. |
 | `get_share_url` | `POST /external/projects/:id/share` | Mint/read the read-only guest link. Returns `{ shareUrl }` — the only client-facing output. |
 
 There is **no** un-gated start tool, **no** white-box/repo tool, and **no**
