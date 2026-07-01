@@ -121,9 +121,11 @@ export async function routeExternal(
     return method === 'POST' ? shareExternalProject(principal, id) : METHOD_NOT_ALLOWED;
   }
 
-  // POST /external/scans — rerun/start a scan for an existing project.
+  // /external/scans (no id): POST starts a scan; GET lists the tenant's ACTIVE runs.
   if (resource === 'scans' && !id) {
-    return method === 'POST' ? startExternalScan(principal, body) : METHOD_NOT_ALLOWED;
+    if (method === 'POST') return startExternalScan(principal, body);
+    if (method === 'GET') return listActiveExternalScans(principal);
+    return METHOD_NOT_ALLOWED;
   }
 
   // GET /external/scans/:id — scan status + progress.
