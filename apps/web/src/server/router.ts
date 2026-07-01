@@ -118,6 +118,15 @@ export async function apiRouter(
     }
   }
 
+  // Operator-only launch-token mint: POST /launch-tokens — authed by the
+  // SHOR_LAUNCH_MINT_TOKEN operator secret (NOT the engine trigger token). This is
+  // the human-approval boundary: only the Telegram approval backend can reach it,
+  // so the MCP connector can consume a token but never mint one. Bearer-authed, so
+  // the passcode gate already exempts it.
+  if (resource === 'launch-tokens') {
+    return routeLaunchTokens(method, body, authHeader);
+  }
+
   // External Sinas->engine ingress: /external/... — bearer-authed (NO session),
   // guarded by SHOR_ENGINE_TRIGGER_TOKEN. Lets Sinas start/create/read; the
   // engine mints all ids. Returns null when the path is not an external route.
