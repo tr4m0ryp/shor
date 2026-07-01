@@ -106,6 +106,19 @@ export async function routeExternal(
   const principal = await resolveExternalPrincipal();
   const resource = segments[1];
   const id = segments[2];
+  const sub = segments[3];
+
+  // POST /external/launch — the token-GATED black-box launch (MCP connector).
+  // Requires a valid single-use launch token in the body ON TOP of the bearer;
+  // this is the only start path that enforces human approval.
+  if (resource === 'launch' && !id) {
+    return method === 'POST' ? launchExternalScan(principal, body) : METHOD_NOT_ALLOWED;
+  }
+
+  // POST /external/projects/:id/share — mint/read the read-only guest link.
+  if (resource === 'projects' && id && sub === 'share') {
+    return method === 'POST' ? shareExternalProject(principal, id) : METHOD_NOT_ALLOWED;
+  }
 
   // POST /external/scans — rerun/start a scan for an existing project.
   if (resource === 'scans' && !id) {
