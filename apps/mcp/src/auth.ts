@@ -55,10 +55,16 @@ function safeEqual(a: string, b: string): boolean {
 export const bearerAuthenticator: Authenticator = {
   authenticate(authHeader) {
     const { bearerToken } = getConfig();
-    if (bearerToken === '') return Promise.resolve({ ok: false, status: 401, message: 'connector auth not configured' });
+    if (bearerToken === '')
+      return Promise.resolve({ ok: false, status: 401, message: 'connector auth not configured' });
     const presented = parseBearer(authHeader);
     if (presented !== undefined && safeEqual(presented, bearerToken)) return Promise.resolve({ ok: true });
-    return Promise.resolve({ ok: false, status: 401, wwwAuthenticate: 'Bearer', message: 'invalid or missing bearer token' });
+    return Promise.resolve({
+      ok: false,
+      status: 401,
+      wwwAuthenticate: 'Bearer',
+      message: 'invalid or missing bearer token',
+    });
   },
 };
 
@@ -107,7 +113,11 @@ export const workosAuthenticator: Authenticator = {
     const { workosAuthkitDomain, baseUrl } = getConfig();
     const challenge = `Bearer resource_metadata="${resourceMetadataUrl()}"`;
     if (!workosAuthkitDomain || !baseUrl) {
-      return { ok: false, status: 500, message: 'oauth mode misconfigured: WORKOS_AUTHKIT_DOMAIN + MCP_BASE_URL required' };
+      return {
+        ok: false,
+        status: 500,
+        message: 'oauth mode misconfigured: WORKOS_AUTHKIT_DOMAIN + MCP_BASE_URL required',
+      };
     }
     const token = parseBearer(authHeader);
     if (!token) return { ok: false, status: 401, wwwAuthenticate: challenge, message: 'missing bearer token' };
