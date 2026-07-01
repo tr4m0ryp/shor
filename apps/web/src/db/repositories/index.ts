@@ -9,6 +9,7 @@
 export { attackSurfaceRepo } from './attack-surface.js';
 export { codebaseVersionRepo } from './codebase-version.js';
 export { findingRepo } from './finding.js';
+export { launchTokenRepo } from './launch-token.js';
 export { projectRepo } from './project.js';
 export { providerKeyRepo } from './provider-key.js';
 export type {
