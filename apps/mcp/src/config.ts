@@ -68,6 +68,8 @@ export function getConfig(): McpConfig {
     engineTriggerToken: env('SHOR_ENGINE_TRIGGER_TOKEN'),
     bearerToken: env('MCP_BEARER_TOKEN'),
     authMode,
+    baseUrl: env('MCP_BASE_URL').replace(/\/+$/, ''),
+    workosAuthkitDomain: env('WORKOS_AUTHKIT_DOMAIN').replace(/\/+$/, ''),
   };
   return cached;
 }
