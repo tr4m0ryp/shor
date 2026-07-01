@@ -70,8 +70,10 @@ export function createMcpHttpServer(): ReturnType<typeof createServer> {
       const url = new URL(req.url ?? '/', 'http://localhost');
       const method = req.method ?? 'GET';
 
-      // Unauthenticated health probe (Cloud Run startup/liveness).
-      if (method === 'GET' && (url.pathname === '/' || url.pathname === '/healthz')) {
+      // Unauthenticated health probe (Cloud Run startup/liveness). Served at `/`
+      // and `/health`; NOT `/healthz` — Google's frontend reserves that exact path
+      // and answers it before the request reaches the container.
+      if (method === 'GET' && (url.pathname === '/' || url.pathname === '/health')) {
         sendJson(res, 200, { ok: true, service: 'shor-mcp' });
         return;
       }
