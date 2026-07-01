@@ -17,8 +17,8 @@ export const projectRepo = {
     const mode = input.mode ?? (repoFullName ? 'whitebox' : 'blackbox');
     const { rows } = await query<ProjectRow>(
       `INSERT INTO project
-			   (tenant_id, name, target_url, repo_installation_id, repo_full_name, mode, schedule, auth_config)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			   (tenant_id, name, target_url, repo_installation_id, repo_full_name, mode, schedule, auth_config, roe)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			 RETURNING *`,
       [
         input.tenantId,
@@ -29,6 +29,7 @@ export const projectRepo = {
         mode,
         input.schedule,
         input.authConfig,
+        input.roe ?? null,
       ],
     );
     return toProject(rows[0] as ProjectRow);
