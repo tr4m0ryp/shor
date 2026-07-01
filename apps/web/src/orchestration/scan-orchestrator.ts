@@ -45,6 +45,22 @@ function buildRoe(targetUrl: string): Roe {
 }
 
 /**
+ * Resolve the RoE a scan enforces. Prefer the project's PERSISTED signed RoE (the
+ * allowlist attached at MCP-connector launch) so the worker enforces the exact
+ * document the human approved; fall back to the target-URL derived single-host
+ * RoE for projects created without one. Either way the result is default-deny —
+ * an unparseable/invalid persisted RoE degrades to the safe derived allowlist,
+ * never to "allow everything".
+ */
+function resolveRoe(project: Project): Roe {
+  if (project.roe) {
+    const validated = validateRoe(project.roe as unknown as Roe);
+    if (validated.ok) return validated.roe;
+  }
+  return buildRoe(project.targetUrl);
+}
+
+/**
  * Pick the worker Job for a target. Hosts matching a `highMemTargets` substring
  * (e.g. datanose) run on the 8Gi Job; everything else on the default 4Gi Job.
  * Memory can't be overridden per execution, so the lever is which Job we launch.
