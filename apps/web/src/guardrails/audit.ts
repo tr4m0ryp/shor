@@ -20,7 +20,11 @@ export type AuditEventType =
   | 'rate_limit.throttled'
   | 'kill_switch.triggered'
   | 'scan.teardown'
-  | 'blast_radius.exceeded';
+  | 'blast_radius.exceeded'
+  // A scan started via the MCP connector after a launch token was consumed. Its
+  // detail links engagementId -> roeHash -> launch-grant id -> scanId -> hosts, so
+  // "what authorized this scan?" is answerable in one query (never the token value).
+  | 'launch.authorized';
 
 export type AuditOutcome = 'allow' | 'deny' | 'info';
 
