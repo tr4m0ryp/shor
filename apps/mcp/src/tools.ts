@@ -4,7 +4,8 @@
  * un-gated start, no white-box/repo surface, no delete/mutate-findings tool.
  *
  *   start_blackbox_run  — the ONLY start path; structurally requires a launch token.
- *   get_run_progress    — read-only status snapshot.
+ *   list_active_runs    — read-only list of the tenant's in-flight scans.
+ *   get_run_progress    — read-only status snapshot for one scan.
  *   get_share_url       — read-only guest link (the sole client-facing output).
  *
  * A launch token can only be minted by the operator's approval backend, so a
