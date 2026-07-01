@@ -277,8 +277,8 @@ export interface AttackSurface {
 export type NewTenant = Omit<Tenant, 'id' | 'createdAt'> & Partial<Pick<Tenant, 'plan'>>;
 export type NewUser = Omit<User, 'id' | 'createdAt'>;
 export type NewProviderKey = Omit<ProviderKey, 'id' | 'createdAt'>;
-export type NewProject = Omit<Project, 'id' | 'createdAt' | 'shareSlug' | 'repoFullName' | 'mode'> &
-  Partial<Pick<Project, 'repoFullName' | 'mode'>>;
+export type NewProject = Omit<Project, 'id' | 'createdAt' | 'shareSlug' | 'repoFullName' | 'mode' | 'roe'> &
+  Partial<Pick<Project, 'repoFullName' | 'mode' | 'roe'>>;
 export type NewCodebaseVersion = Omit<CodebaseVersion, 'id' | 'createdAt'>;
 export type NewScan = Omit<Scan, 'id' | 'startedAt' | 'finishedAt' | 'progress'> &
   Partial<Pick<Scan, 'startedAt' | 'finishedAt'>>;
