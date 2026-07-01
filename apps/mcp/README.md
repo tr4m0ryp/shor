@@ -99,7 +99,7 @@ answered by an `Authenticator` chosen by `MCP_AUTH_MODE` (`src/auth.ts`).
 ## Deployment reachability
 
 The connector serves stateless Streamable-HTTP at `POST /mcp` (JSON responses),
-plus an unauthenticated health probe at `GET /healthz`. Build with
+plus an unauthenticated health probe at `GET /` (and `GET /health`). Build with
 `infra/docker/Dockerfile.mcp` and deploy as a Cloud Run **service**. For claude.ai
 to reach it, ingress must be **public** (allow unauthenticated at the Cloud Run
 layer — the connector does its own bearer/OAuth check) and not VPN-walled, so
