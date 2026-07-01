@@ -12,11 +12,13 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { getAuthenticator } from './auth.js';
+import { getAuthenticator, isOAuthMode, protectedResourceMetadata } from './auth.js';
 import { getConfig } from './config.js';
 import { buildServer } from './server.js';
 
 const MCP_PATH = '/mcp';
+// RFC 9728 well-known path (and the resource-suffixed form some clients request).
+const PRM_PATH = '/.well-known/oauth-protected-resource';
 
 function sendJson(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
   res.writeHead(status, { 'content-type': 'application/json', ...headers });
