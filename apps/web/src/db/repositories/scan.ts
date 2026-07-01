@@ -62,6 +62,20 @@ export const scanRepo = {
     return rows.map(toScan);
   },
 
+  /**
+   * List the tenant's IN-FLIGHT scans (status `pending` or `running`), newest
+   * first. Tenant-scoped like every other read; backs the external "which runs
+   * are running?" list. `pending` is included because a just-launched scan is
+   * momentarily pending before the worker execution flips it to running.
+   */
+  async listActive(tenantId: TenantId): Promise<Scan[]> {
+    const { rows } = await query<ScanRow>(
+      `${SELECT_SCOPED} AND s.status IN ('pending', 'running') ORDER BY s.started_at DESC NULLS LAST`,
+      [tenantId],
+    );
+    return rows.map(toScan);
+  },
+
   /** Set the Temporal workflow id once the workflow has been started. */
   async setWorkflowId(tenantId: TenantId, id: ScanId, workflowId: string): Promise<Scan | null> {
     const { rows } = await query<ScanRow>(
