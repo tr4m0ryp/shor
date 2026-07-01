@@ -6,7 +6,11 @@ an MCP server. It **re-implements no scanning** — it orchestrates Shor's exist
 
 > A routine can *ask* to start a scan, but only a **human** can *authorize* one.
 
-## The three tools
+A thin **Python [FastMCP](https://gofastmcp.com) server** (mirrors the sibling
+`enrichment-mcp`): Streamable HTTP at `/mcp`, four tools, and a pluggable auth
+layer. It owns no database and no scanning — it forwards to Shor's `/external/*`.
+
+## The four tools
 
 | Tool | Wraps | Purpose |
 |---|---|---|
