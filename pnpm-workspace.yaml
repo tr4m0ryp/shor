@@ -1,6 +1,7 @@
 packages:
   - "apps/worker"
   - "apps/web"
+  - "apps/mcp"
   - "packages/shor-skill"
 
 catalog:
