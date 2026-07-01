@@ -15,6 +15,7 @@ import { gsUri } from '../cloud/storage.js';
 import { scanRepo } from '../db/repositories/index.js';
 import type { CodebaseVersion, Project, Scan } from '../domain/types.js';
 import type { Roe, RoeHostRule } from '../guardrails/roe.js';
+import { validateRoe } from '../guardrails/roe.js';
 import type { InjectionManifest } from '../secrets/injection.js';
 import { cancelExecution, launchScanExecution } from './cloud-run-jobs.js';
 import type { JobEnvVar } from './job-spec.js';
