@@ -94,7 +94,7 @@ export async function startScan(
   const runEnv: JobEnvVar[] = [
     { name: 'SHOR_SCAN_ID', value: scan.id },
     { name: 'SHOR_TARGET_URL', value: project.targetUrl },
-    { name: 'SHOR_ROE', value: JSON.stringify(buildRoe(project.targetUrl)) },
+    { name: 'SHOR_ROE', value: JSON.stringify(resolveRoe(project)) },
     { name: 'SHOR_REPO_PATH', value: REPO_PATH },
     { name: 'SHOR_FINDINGS_SINK_URL', value: cfg.publicUrl },
     { name: 'SHOR_SINK_TOKEN', value: cfg.sinkToken },
