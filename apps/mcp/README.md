@@ -77,8 +77,10 @@ MCP server (`apps/mcp`):
 |---|---|
 | `SHOR_BASE_URL` | Base URL of the Shor control plane (`/external/*`). |
 | `SHOR_ENGINE_TRIGGER_TOKEN` | Bearer presented to `/external/*`. **Not** the mint secret. |
-| `MCP_BEARER_TOKEN` | Static bearer Claude clients present (empty ⇒ reject all). |
-| `MCP_AUTH_MODE` | `bearer` (default) or `oauth` (see below). |
+| `MCP_BEARER_TOKEN` | Static bearer for Claude Code (used only when `MCP_OAUTH_PROVIDER` is empty). |
+| `MCP_OAUTH_PROVIDER` | Empty ⇒ static bearer; `workos` ⇒ WorkOS AuthKit OAuth (below). |
+| `MCP_BASE_URL` | Public HTTPS URL of this connector (no `/mcp`); required for OAuth. |
+| `WORKOS_AUTHKIT_DOMAIN` / `WORKOS_CLIENT_ID` / `WORKOS_CLIENT_SECRET` | WorkOS AuthKit app used in `workos` mode. |
 | `PORT` / `MCP_PORT` | Listen port (Cloud Run injects `PORT`). |
 
 Control plane (`apps/web`), new:
@@ -89,52 +91,61 @@ Control plane (`apps/web`), new:
 
 Run migration `0007_launch_token.sql` (adds `launch_token` + `project.roe`).
 
-## Auth: bearer now, OAuth-ready
+## Auth — bearer (Claude Code) or WorkOS OAuth (claude.ai)
 
-The transport asks one question per request — "is this caller allowed?" —
-answered by an `Authenticator` chosen by `MCP_AUTH_MODE` (`src/auth.ts`).
+Auth is isolated in `auth.py` (`build_auth`); switching modes is pure config.
 
-- **Claude Code / header-bearer clients:** `bearer` mode. Add the connector with
-  `Authorization: Bearer <MCP_BEARER_TOKEN>`.
-- **claude.ai web connector:** expects OAuth. `oauth` mode is a fail-closed seam:
-  implement `oauthAuthenticator` (verify the access token) and serve
-  `/.well-known/oauth-protected-resource`. **Nothing else changes** — tools, the
-  Shor client, and the HTTP plumbing are auth-agnostic.
+- **Claude Code** — leave `MCP_OAUTH_PROVIDER` empty and set `MCP_BEARER_TOKEN`.
+  The client sends it as an `Authorization: Bearer` header.
+- **claude.ai web connector** — the web app can't send a bearer, so it uses OAuth.
+  Set `MCP_OAUTH_PROVIDER=workos` with the four `WORKOS_*`/`MCP_BASE_URL` values.
+  FastMCP's `WorkOSProvider` runs the **OAuth proxy**: it serves the OAuth + DCR
+  endpoints to claude.ai itself and proxies the login to WorkOS AuthKit with one
+  pre-registered client — **so it works even though AuthKit advertises no
+  registration endpoint** (it doesn't). Switching to `workos` means the static
+  bearer stops being accepted (one auth layer at a time).
+
+**One manual WorkOS step:** add `<MCP_BASE_URL>/auth/callback` to the WorkOS
+application's allowed **redirect URIs** (dashboard). Without it, the login fails
+with a redirect-URI mismatch.
+
+## Set up in claude.ai (OAuth)
+
+1. Ensure `<MCP_BASE_URL>/auth/callback` is on the WorkOS app's redirect URIs.
+2. claude.ai → **Settings → Connectors → Add custom connector** (needs a plan
+   with custom connectors; org admins may need to enable them).
+3. Paste the MCP URL: `<MCP_BASE_URL>/mcp`.
+4. Complete the WorkOS login when prompted. The four tools then appear in chat.
+
+## Set up in Claude Code (bearer)
+
+Deploy with `MCP_OAUTH_PROVIDER` empty + `MCP_BEARER_TOKEN` set, then:
+
+```
+claude mcp add --transport http shor <MCP_BASE_URL>/mcp \
+  --header "Authorization: Bearer <MCP_BEARER_TOKEN>"
+```
 
 ## Deployment reachability
 
-The connector serves stateless Streamable-HTTP at `POST /mcp` (JSON responses),
-plus an unauthenticated health probe at `GET /` (and `GET /health`). Build with
-`infra/docker/Dockerfile.mcp` and deploy as a Cloud Run **service**. For claude.ai
-to reach it, ingress must be **public** (allow unauthenticated at the Cloud Run
-layer — the connector does its own bearer/OAuth check) and not VPN-walled, so
-Anthropic's egress can connect.
+Serves Streamable HTTP at `/mcp`. Build with `infra/docker/Dockerfile.mcp`
+(Python 3.12) and deploy as a Cloud Run **service** with `--allow-unauthenticated`
+(the connector does its own auth; claude.ai carries no Google identity) and
+`--max-instances 1` (the WorkOS proxy keeps OAuth state in memory). Ingress must
+be public so Anthropic's egress can reach it.
 
-## Example (Claude Code)
+## Calling `start_blackbox_run`
 
-```jsonc
-// .mcp.json
+Once a human has approved and produced a token:
+
+```json
 {
-  "mcpServers": {
-    "shor": {
-      "type": "http",
-      "url": "https://shor-mcp-<hash>-uc.a.run.app/mcp",
-      "headers": { "Authorization": "Bearer ${MCP_BEARER_TOKEN}" }
-    }
+  "engagement_id": "eng-2026-014",
+  "authorization_token": "<minted-by-approval-step>",
+  "roe": {
+    "version": 1,
+    "targetUrl": "https://app.example.com",
+    "allowedHosts": [{ "host": "app.example.com", "schemes": ["https"] }]
   }
 }
-```
-
-Then, once a human has approved and produced a token:
-
-```
-start_blackbox_run({
-  engagementId: "eng-2026-014",
-  authorizationToken: "<minted-by-approval-step>",
-  roe: {
-    version: 1,
-    targetUrl: "https://app.example.com",
-    allowedHosts: [{ host: "app.example.com", schemes: ["https"] }]
-  }
-})
 ```
