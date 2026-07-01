@@ -5,6 +5,13 @@
  * two secrets: the engine trigger token it presents to Shor's `/external/*` plane
  * (server-to-server), and the bearer it requires from Claude clients. It never
  * holds `SHOR_LAUNCH_MINT_TOKEN` — by construction it cannot mint launch tokens.
+ *
+ * Auth is one of two modes (`MCP_AUTH_MODE`):
+ *   - `bearer` — a static bearer for Claude Code (the connector holds the token).
+ *   - `oauth`  — WorkOS AuthKit as the authorization server, this connector as a
+ *     pure OAuth 2.0 RESOURCE server (RFC 9728). It holds NO WorkOS client secret:
+ *     claude.ai registers with AuthKit directly (DCR) and the connector only
+ *     VERIFIES AuthKit-issued JWTs. Needs `WORKOS_AUTHKIT_DOMAIN` + `MCP_BASE_URL`.
  */
 
 function env(name: string, fallback = ''): string {
