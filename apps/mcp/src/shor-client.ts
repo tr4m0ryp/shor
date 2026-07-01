@@ -79,6 +79,12 @@ export const shorClient = {
     return call<RunProgress>('GET', `/external/scans/${encodeURIComponent(scanId)}`);
   },
 
+  /** List the tenant's in-flight runs (pending + running). */
+  async listActiveRuns(): Promise<ActiveRun[]> {
+    const { runs } = await call<{ runs: ActiveRun[] }>('GET', '/external/scans');
+    return runs;
+  },
+
   /** Mint/read the project's read-only guest link. */
   share(projectId: string): Promise<ShareResult> {
     return call<ShareResult>('POST', `/external/projects/${encodeURIComponent(projectId)}/share`);
