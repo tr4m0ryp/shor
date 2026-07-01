@@ -379,6 +379,9 @@ export function getConfig(): ShorConfig {
     sinas: {
       // Bearer for the Sinas->engine ingress (empty = ingress disabled, all 401).
       engineTriggerToken: env('SHOR_ENGINE_TRIGGER_TOKEN'),
+      // Operator-only mint secret for launch tokens (empty = minting disabled).
+      // MUST differ from engineTriggerToken so the MCP cannot mint its own tokens.
+      launchMintToken: env('SHOR_LAUNCH_MINT_TOKEN'),
       // Outbound mirror connection (consumed by the sibling mirror task).
       sinasUrl: env('SINAS_URL'),
       sinasApiKey: env('SINAS_API_KEY'),
