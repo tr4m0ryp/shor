@@ -1,26 +1,20 @@
 # Shor MCP connector (apps/mcp) — Cloud Run service image.
-# A thin translator over Shor's /external/* plane, exposed to Claude routines as
-# an MCP server. No database, no offensive toolkit — just Node. Mirrors the
-# proven build/runtime split of Dockerfile.web.
-FROM node:22-slim AS build
-RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
-WORKDIR /app
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
-COPY infra/config ./infra/config
-COPY apps/mcp/package.json ./apps/mcp/package.json
-COPY apps/web/package.json ./apps/web/package.json
-COPY apps/worker/package.json ./apps/worker/package.json
-COPY packages/shor-skill/package.json ./packages/shor-skill/package.json
-RUN pnpm install --frozen-lockfile
-COPY apps/mcp ./apps/mcp
-RUN pnpm --filter @shor/mcp build
+# A thin FastMCP translator over Shor's /external/* plane, exposed to Claude
+# routines. No database, no offensive toolkit — just Python. Mirrors the
+# enrichment-mcp image. Build context is the repo root; only apps/mcp is copied.
+FROM python:3.12-slim
 
-FROM node:22-slim AS runtime
 WORKDIR /app
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/apps/mcp ./apps/mcp
-COPY --from=build /app/package.json /app/pnpm-workspace.yaml ./
-# Cloud Run sends traffic to $PORT (default 8080); the connector reads PORT then MCP_PORT.
-ENV NODE_ENV=production
-EXPOSE 8080
-CMD ["node", "apps/mcp/dist/index.js"]
+
+# Dependencies first for layer caching.
+COPY apps/mcp/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Application code.
+COPY apps/mcp/src ./src
+
+ENV MCP_HOST=0.0.0.0 \
+    PYTHONUNBUFFERED=1
+
+# Cloud Run injects $PORT (default 8080); config.py honors it. Serves /mcp.
+CMD ["python", "-m", "src.shor_mcp"]
