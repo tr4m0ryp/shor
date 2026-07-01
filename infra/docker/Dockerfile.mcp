@@ -1,6 +1,7 @@
 # Shor MCP connector (apps/mcp) — Cloud Run service image.
 # A thin translator over Shor's /external/* plane, exposed to Claude routines as
-# an MCP server. No database, no offensive toolkit — just Node.
+# an MCP server. No database, no offensive toolkit — just Node. Mirrors the
+# proven build/runtime split of Dockerfile.web.
 FROM node:22-slim AS build
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
@@ -10,17 +11,16 @@ COPY apps/mcp/package.json ./apps/mcp/package.json
 COPY apps/web/package.json ./apps/web/package.json
 COPY apps/worker/package.json ./apps/worker/package.json
 COPY packages/shor-skill/package.json ./packages/shor-skill/package.json
-RUN pnpm install --frozen-lockfile --filter @shor/mcp...
+RUN pnpm install --frozen-lockfile
 COPY apps/mcp ./apps/mcp
 RUN pnpm --filter @shor/mcp build
-# Prune to production deps for a lean runtime layer.
-RUN pnpm --filter @shor/mcp deploy --prod --legacy /app/pruned
 
 FROM node:22-slim AS runtime
 WORKDIR /app
-COPY --from=build /app/pruned/node_modules ./node_modules
-COPY --from=build /app/apps/mcp/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/mcp ./apps/mcp
+COPY --from=build /app/package.json /app/pnpm-workspace.yaml ./
 # Cloud Run sends traffic to $PORT (default 8080); the connector reads PORT then MCP_PORT.
 ENV NODE_ENV=production
 EXPOSE 8080
-CMD ["node", "dist/index.js"]
+CMD ["node", "apps/mcp/dist/index.js"]
