@@ -35,12 +35,25 @@ export interface McpConfig {
   readonly engineTriggerToken: string;
   /**
    * Static bearer Claude clients must present to the MCP transport
-   * (`MCP_BEARER_TOKEN`). This is the auth swap-point: the OAuth verifier plugs in
-   * here without touching tool code. Empty = the transport rejects every request.
+   * (`MCP_BEARER_TOKEN`). Used in `bearer` mode. Empty = bearer mode rejects all.
    */
   readonly bearerToken: string;
-  /** Auth mode: `bearer` today; `oauth` selects the (stubbed) OAuth verifier. */
+  /** Auth mode: `bearer` (static token) or `oauth` (WorkOS AuthKit resource server). */
   readonly authMode: 'bearer' | 'oauth';
+  /**
+   * This connector's own public base URL (`MCP_BASE_URL`, e.g.
+   * `https://shor-mcp-….run.app`), no trailing slash and no `/mcp`. Used to build
+   * the OAuth protected-resource metadata (`resource` = `${base}/mcp`). Required
+   * in oauth mode.
+   */
+  readonly baseUrl: string;
+  /**
+   * WorkOS AuthKit domain that acts as the authorization server in oauth mode
+   * (`WORKOS_AUTHKIT_DOMAIN`, e.g. `https://<name>.authkit.app`). Its JWKS verifies
+   * access tokens; it is advertised to clients as the `authorization_servers`
+   * entry. No client id/secret is needed — the connector is a resource server only.
+   */
+  readonly workosAuthkitDomain: string;
 }
 
 let cached: McpConfig | undefined;
