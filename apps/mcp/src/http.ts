@@ -80,13 +80,21 @@ export function createMcpHttpServer(): ReturnType<typeof createServer> {
         return;
       }
 
+      // OAuth 2.0 Protected Resource Metadata (RFC 9728) — unauthenticated
+      // discovery so claude.ai finds the WorkOS authorization server. Served on
+      // the bare path and the resource-suffixed `…/mcp` form. Only in oauth mode.
+      if (method === 'GET' && isOAuthMode() && (url.pathname === PRM_PATH || url.pathname === `${PRM_PATH}/mcp`)) {
+        sendJson(res, 200, protectedResourceMetadata());
+        return;
+      }
+
       if (url.pathname !== MCP_PATH) {
         jsonRpcError(res, 404, 'not found');
         return;
       }
 
       // Auth gate — runs before any MCP handling.
-      const auth = getAuthenticator().authenticate(req.headers.authorization);
+      const auth = await getAuthenticator().authenticate(req.headers.authorization);
       if (!auth.ok) {
         jsonRpcError(
           res,
