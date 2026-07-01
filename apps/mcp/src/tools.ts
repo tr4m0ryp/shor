@@ -66,6 +66,22 @@ export function registerTools(server: McpServer): void {
   );
 
   server.registerTool(
+    'list_active_runs',
+    {
+      title: 'List active scans',
+      description:
+        'Read-only list of the in-flight scans (status running or pending), newest first. ' +
+        'Returns { runs: [{ scanId, projectId, status, progress, startedAt }] }. Use it to see which runs are running.',
+      inputSchema: {},
+    },
+    async () =>
+      guard(async () => {
+        const runs = await shorClient.listActiveRuns();
+        return { runs };
+      }),
+  );
+
+  server.registerTool(
     'get_run_progress',
     {
       title: 'Get scan progress',
