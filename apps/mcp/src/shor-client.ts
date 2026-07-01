@@ -40,6 +40,14 @@ export interface ShareResult {
   readonly shareUrl: string;
 }
 
+export interface ActiveRun {
+  readonly scanId: string;
+  readonly projectId: string;
+  readonly status: string;
+  readonly progress: unknown;
+  readonly startedAt: string | null;
+}
+
 /** POST/GET a JSON endpoint on the control plane with the trigger bearer. */
 async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
   const { shorBaseUrl, engineTriggerToken } = getConfig();
