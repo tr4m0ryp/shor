@@ -88,6 +88,14 @@ export interface Project {
   /** Target auth config (login flow, headers, ROE) — opaque JSON blob. */
   readonly authConfig: Record<string, unknown> | null;
   /**
+   * The signed Rules-of-Engagement allowlist attached at launch (MCP connector),
+   * or null for projects created without one. When present it is the exact
+   * default-deny allowlist the worker enforces; when null the orchestrator
+   * derives a single-host RoE from `targetUrl`. Stored as opaque JSON (validated
+   * against the `Roe` shape at read time).
+   */
+  readonly roe: Record<string, unknown> | null;
+  /**
    * Opaque read-only guest-link slug, or null when not shared. When set, anyone
    * holding the slug can READ this one project's data with no auth (ADR-share).
    * Globally unique; the slug is the access key.
