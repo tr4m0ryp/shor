@@ -198,6 +198,15 @@ export interface GithubOauthConfig {
 export interface SinasConfig {
   /** Bearer Sinas presents to the `/external/*` ingress (`SHOR_ENGINE_TRIGGER_TOKEN`). */
   readonly engineTriggerToken: string;
+  /**
+   * Operator-only secret guarding the launch-token MINT endpoint
+   * (`POST /launch-tokens`, `SHOR_LAUNCH_MINT_TOKEN`). This is DELIBERATELY a
+   * DIFFERENT secret from `engineTriggerToken`: the MCP connector holds the
+   * trigger token (to call `/external/*`) but NOT this one, so it can consume a
+   * launch token yet never mint one. Only the human-approval backend (the
+   * Telegram Approve button) holds this value. Empty = minting disabled (all 401).
+   */
+  readonly launchMintToken: string;
   /** Base URL of the user's Sinas instance the engine mirrors to (`SINAS_URL`). */
   readonly sinasUrl: string;
   /** API key the engine presents to Sinas (`SINAS_API_KEY`). */
