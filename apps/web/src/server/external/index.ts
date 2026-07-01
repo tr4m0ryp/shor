@@ -33,6 +33,7 @@ import type { ApiResponse } from '../router.js';
 import { createExternalProject } from './create-project.js';
 import { getExternalScan } from './get-scan.js';
 import { launchExternalScan } from './launch.js';
+import { listActiveExternalScans } from './list-active-scans.js';
 import { listExternalRepos } from './list-repos.js';
 import { shareExternalProject } from './share.js';
 import { startExternalScan } from './start-scan.js';
