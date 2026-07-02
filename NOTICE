@@ -1,0 +1,53 @@
+Shor — NOTICE
+
+Copyright (c) 2025-2026 Keygraph, Inc.
+Licensed under the PolyForm Noncommercial License 1.0.0 — see LICENSE.
+
+--------------------------------------------------------------------------------
+Required Notice (must be preserved in ALL copies and derivative works)
+--------------------------------------------------------------------------------
+
+  Required Notice: Copyright (c) 2025-2026 Keygraph, Inc.
+  Required Notice: Shor — https://github.com/tr4m0ryp/shor
+
+The PolyForm Noncommercial License requires that anyone who receives this
+software, in whole or in part, also receives the two lines above. Do not
+remove them from source files, distributions, or derivative works.
+
+--------------------------------------------------------------------------------
+Attribution
+--------------------------------------------------------------------------------
+
+Any use, fork, or derivative work must retain the copyright notice above, this
+NOTICE file, and the LICENSE file, and must give visible credit:
+
+  "Based on Shor by Keygraph, Inc. — https://github.com/tr4m0ryp/shor"
+
+in its README or equivalent user-facing documentation.
+
+--------------------------------------------------------------------------------
+Commercial licensing
+--------------------------------------------------------------------------------
+
+This software may NOT be sold, offered for a fee, or run as a paid or hosted
+service under the PolyForm Noncommercial License. A separate commercial license
+is required for any commercial use.
+
+  Commercial license enquiries: <TODO: add your contact email or URL here>
+
+--------------------------------------------------------------------------------
+Trademarks
+--------------------------------------------------------------------------------
+
+"Shor", "Keygraph", and associated names and logos are marks of Keygraph, Inc.
+The PolyForm Noncommercial License grants NO trademark rights (see its
+"No Other Rights" section). A permitted noncommercial fork may not use these
+names in a way that suggests endorsement by, or affiliation with, Keygraph, Inc.
+
+--------------------------------------------------------------------------------
+Third-party components
+--------------------------------------------------------------------------------
+
+This project depends on third-party open-source software, each under its own
+license (see the dependency manifests). Those licenses are unaffected by, and
+take precedence for their respective components over, this NOTICE.
