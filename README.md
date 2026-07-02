@@ -22,3 +22,12 @@ Shor's discovery-and-verification pipeline ports ideas from Anthropic's defendin
 - **[PentestGPT](https://github.com/GreyDGL/PentestGPT)** — LLM-driven specialist-sub-agent pentest orchestration.
 - **[Shannon](https://github.com/KeygraphHQ/shannon)** — open-source autonomous web-pentest agent.
 - **Strix** and **HexStrike AI** — additional prior art in agentic penetration testing.
+
+## License
+
+Shor is **source-available**, licensed under the [PolyForm Noncommercial License 1.0.0](./LICENSE) — **not** an OSI open-source license.
+
+- **You may** use, modify, fork, and share Shor freely for any **noncommercial** purpose, as long as you keep the copyright and `Required Notice:` lines (see [`NOTICE`](./NOTICE)) and credit *"Based on Shor by Keygraph, Inc."*
+- **You may not** sell it, bundle it into a paid product, or run it as a paid/hosted service **without a commercial license**.
+
+Copyright (c) 2025-2026 Keygraph, Inc. Commercial licensing enquiries: see [`NOTICE`](./NOTICE).
