@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+// Copyright (c) 2025-2026 Keygraph, Inc.
+// Required Notice: Shor — https://github.com/tr4m0ryp/shor
+// Noncommercial use only. Selling this software or offering it as a paid or
+// hosted service requires a separate commercial license. See LICENSE & NOTICE.
+
 /**
  * Guardrails / safety layer — public surface (LAUNCH-SPEC §5.6, §3.3; Phase 6,
  * ADR-008 / ADR-022 / ADR-049; OWASP-APTS aligned).
