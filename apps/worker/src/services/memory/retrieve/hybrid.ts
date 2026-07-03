@@ -18,6 +18,7 @@
 import { bm25Rank, toLexicalDoc } from "./bm25.js";
 import type {
 	ExemplarCandidate,
+	GlobalKind,
 	GlobalTierMatch,
 	GlobalTierPort,
 	LocalTierMatch,
@@ -73,7 +74,14 @@ function pickStr(
 	return null;
 }
 
-/** Map a local-tier hit onto the shared candidate shape. */
+/** Narrow the repo's free-form `kind` string to a known {@link GlobalKind}. */
+function coerceKind(kind: string): GlobalKind | null {
+	return kind === "abstraction" || kind === "exemplar" || kind === "finding"
+		? kind
+		: null;
+}
+
+/** Map a local-tier hit onto the shared candidate shape (never seeded). */
 export function localToCandidate(m: LocalTierMatch): ExemplarCandidate {
 	return {
 		key: `local:${m.id}`,
@@ -89,12 +97,20 @@ export function localToCandidate(m: LocalTierMatch): ExemplarCandidate {
 		componentVer: m.componentVer,
 		confidence: m.confidence,
 		text: null,
+		kind: null,
+		seeded: false,
 	};
 }
 
-/** Project a global-tier hit's JSONB payload onto the shared candidate shape. */
+/**
+ * Project a global-tier hit's JSONB payload onto the shared candidate shape.
+ * A global exemplar (or a payload flagged `seeded`) is a SEEDED known-pattern
+ * technique — flagged here so the guardrail can down-weight/cap it downstream.
+ */
 export function globalToCandidate(m: GlobalTierMatch): ExemplarCandidate {
 	const p = m.payload ?? {};
+	const kind = coerceKind(m.kind);
+	const seeded = kind === "exemplar" || p.seeded === true;
 	return {
 		key: `global:${m.id}`,
 		tier: "global",
@@ -109,6 +125,8 @@ export function globalToCandidate(m: GlobalTierMatch): ExemplarCandidate {
 		componentVer: pickStr(p, ["component_ver", "componentVer", "component"]),
 		confidence: pickStr(p, ["confidence"]),
 		text: pickStr(p, ["text", "doc", "summary", "abstraction"]),
+		kind,
+		seeded,
 	};
 }
 

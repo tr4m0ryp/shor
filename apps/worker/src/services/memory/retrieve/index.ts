@@ -147,4 +147,6 @@ export type {
 	VecColumn,
 } from "./types.js";
 export { renderInclude, weightedCrossTierRrf } from "./fuse.js";
+export { applyGuardrail, readGuardrailConfig } from "./guardrail.js";
+export type { GuardrailConfig } from "./guardrail.js";
 export { fuseTier, recallGlobal, recallLocal, rrf } from "./hybrid.js";
