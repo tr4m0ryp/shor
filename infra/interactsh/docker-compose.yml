@@ -1,0 +1,88 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+# Copyright (c) 2025-2026 Keygraph, Inc.
+# Required Notice: Shor -- https://github.com/tr4m0ryp/shor
+#
+# ============================================================================
+# Self-hosted interactsh OAST server (spec T8 / F14 / R6).
+#
+# The OOB proof path (apps/worker/src/services/oracle/replay/oob) is DNS-first
+# and MUST run against a server WE control. Do NOT point it at the public
+# oast.pro / oast.site / oast.live / oast.fun / oast.me pools -- callbacks there
+# are visible to third parties and the witness rejects nothing you can trust.
+#
+# interactsh is MIT-licensed (projectdiscovery/interactsh). We run the official
+# server image and consume its official `interactsh-client -json` binary as a
+# JSONL sidecar from the worker -- we never reimplement its RSA/AES crypto.
+# ============================================================================
+#
+# ----------------------------------------------------------------------------
+# 1. DNS / NS delegation (do this ONCE at your registrar / DNS host)
+# ----------------------------------------------------------------------------
+# Pick a dedicated zone for OAST, e.g.  oast.shor.example  (NEVER a production
+# apex). The interactsh server must be authoritative for that zone so it sees
+# every DNS query for *.<zone>.
+#
+#   a) Give the host a public A/AAAA record:
+#        ns1.oast.shor.example.  A     <SERVER_PUBLIC_IP>
+#
+#   b) Delegate the zone to that host with an NS record + matching glue:
+#        oast.shor.example.      NS    ns1.oast.shor.example.
+#        ns1.oast.shor.example.  A     <SERVER_PUBLIC_IP>   ; glue record
+#
+#   c) Open inbound 53/udp + 53/tcp (DNS), 80, 443, 389 on the host firewall.
+#
+# After propagation, `dig NS oast.shor.example` must return ns1.oast.shor.example
+# and `dig anything.oast.shor.example` must hit THIS server. That authoritative
+# delegation is what makes DNS-first correlation work through target egress
+# filtering (a blocked-HTTP target still leaks a DNS lookup).
+#
+# ----------------------------------------------------------------------------
+# 2. Run the server:   docker compose up -d   (from this directory)
+# ----------------------------------------------------------------------------
+services:
+  interactsh-server:
+    image: projectdiscovery/interactsh-server:latest
+    restart: unless-stopped
+    network_mode: host # needs raw :53 (DNS) + :80/:443 on the public interface
+    command:
+      - -domain
+      - ${INTERACTSH_DOMAIN:?set INTERACTSH_DOMAIN, e.g. oast.shor.example}
+      # Shared auth token: clients MUST present the same value. Keep it secret;
+      # the worker passes it via SHOR_INTERACTSH_TOKEN (header/arg only, never
+      # logged -- ADR-050). Generate with `openssl rand -hex 24`.
+      - -token
+      - ${INTERACTSH_TOKEN:?set INTERACTSH_TOKEN}
+      # Let the server request/serve its own Let's Encrypt cert for HTTPS OOB.
+      - -auto-tls
+      # Skip registering the public wildcard fallback -- self-hosted only.
+      - -skip-acme
+    # For a lab without host networking, publish the ports explicitly instead:
+    # ports:
+    #   - "53:53/udp"
+    #   - "53:53/tcp"
+    #   - "80:80"
+    #   - "443:443"
+
+# ----------------------------------------------------------------------------
+# 3. Worker wiring (apps/worker env -- see interactsh.env.example)
+# ----------------------------------------------------------------------------
+#   SHOR_OOB=1
+#   SHOR_INTERACTSH_SERVER=oast.shor.example
+#   SHOR_INTERACTSH_TOKEN=<same value as INTERACTSH_TOKEN above>
+#   SHOR_INTERACTSH_CLIENT=interactsh-client   # binary on the worker image PATH
+#   SHOR_OOB_WINDOW_MS=45000                    # long window; second-order late hits
+#   SHOR_OOB_POLL_MS=1000
+#
+# The worker starts `interactsh-client -json -server <SERVER> -token <TOKEN>`,
+# reads the base payload domain it prints, then mints one witnessed callback host
+# per payload:  <nonce>.<witness>.<corr-id><rand>.<SERVER>. Exploit PoCs place the
+# `{{OOB_CALLBACK}}` placeholder where the host belongs; the executor substitutes
+# the minted host, fires through the network guard, and correlates the JSONL
+# callbacks boundary-safe (whole-label nonce + witness + correlation id).
+#
+# ----------------------------------------------------------------------------
+# 4. Smoke test
+# ----------------------------------------------------------------------------
+#   interactsh-client -server oast.shor.example -token "$INTERACTSH_TOKEN"
+#   # copy the printed <id>.oast.shor.example, then from another host:
+#   dig probe123.<id>.oast.shor.example   # a [DNS] interaction should print
