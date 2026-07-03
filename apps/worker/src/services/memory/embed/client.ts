@@ -59,6 +59,14 @@ export function readEmbedConfig(): EmbedClientConfig | undefined {
 	const token = process.env.SHOR_EMBED_TOKEN?.trim();
 	const cfg: EmbedClientConfig = { baseUrl: baseUrl.replace(/\/+$/, "") };
 	if (token) cfg.token = token;
+	// Slow, CPU-only or self-hosted embedders (e.g. a one-off local seeding run
+	// whose first request downloads multi-GB weights) need a longer timeout and
+	// smaller batches than the fast-GPU defaults. Env-tunable, opt-in — defaults
+	// (30s / 64) are unchanged when unset.
+	const timeoutMs = Number(process.env.SHOR_EMBED_TIMEOUT_MS);
+	if (Number.isFinite(timeoutMs) && timeoutMs > 0) cfg.timeoutMs = timeoutMs;
+	const batchSize = Number(process.env.SHOR_EMBED_BATCH);
+	if (Number.isFinite(batchSize) && batchSize > 0) cfg.batchSize = batchSize;
 	return cfg;
 }
 
