@@ -5,22 +5,30 @@
 // hosted service requires a separate commercial license. See LICENSE & NOTICE.
 
 /**
- * Identity → replay-auth bridge for the differential oracle (T1).
+ * Identity → replay-auth bridge for the differential oracle (T1/T9).
  *
- * Reads each scan identity's persisted Playwright storage-state cookies and builds
- * the auth headers used to replay an authz PoC AS that LOWER-privilege identity. The
- * PRIMARY identity (the privileged user the PoC was already captured under) is
- * excluded — it is the baseline, not a differential. An anonymous (no-auth) identity
- * is ALWAYS included as the privilege floor.
+ * This is the seam between the target-agnostic {@link AuthProvider} and the
+ * executable-replay runner. It acquires each scan identity through the selected
+ * provider (default: generic session-cookie) and flattens it to the runner's
+ * {@link ReplayIdentity} shape, using the identity's MOST-DURABLE auth candidate.
+ * The PRIMARY (privileged) identity is excluded by the provider — it is the PoC's
+ * own baseline, not a differential. An anonymous (no-auth) floor is ALWAYS
+ * prepended here (an oracle construct, not an identity a provider owns).
  *
- * ADR-050: cookie VALUES are read only to construct the replay request; they are
- * NEVER logged or surfaced. Fail-open everywhere: a missing/malformed state file
- * contributes no identity, never throws.
+ * De-WordPress (T9): the WordPress-specific whoami / candidate-ordering now lives
+ * inside `WordPressAuthProvider`; this bridge is provider-agnostic. Running the
+ * per-identity whoami/identity-echo before a replay is trusted is the integration
+ * step OWNED BY 008 — see {@link acquireProviderIdentities}, which exposes the
+ * provider + identities so 008 can echo without this file touching the runner.
+ *
+ * ADR-050: candidate header VALUES are read only to construct the replay request;
+ * they are NEVER logged or surfaced. Fail-open everywhere: a missing/malformed
+ * state file contributes no identity, never throws.
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
 import type { ActivityLogger } from '../../../types/activity-logger.js';
+import { selectAuthProvider } from '../auth-provider/index.js';
+import type { AuthProvider, ProviderIdentity, TargetAuthMeta } from '../auth-provider/index.js';
 
 /** A lower-privilege identity to replay an authz PoC under. */
 export interface ReplayIdentity {
@@ -30,63 +38,55 @@ export interface ReplayIdentity {
   headers: Record<string, string>;
 }
 
-/** The privileged baseline session dir — its cookies are already in the PoC. */
-const PRIMARY_SESSION_DIR = 'identity-primary';
-
 /** Anonymous floor: strip all auth (the executor removes the PoC's captured auth). */
 const ANONYMOUS: ReplayIdentity = { label: 'anonymous', authenticated: false, headers: {} };
 
-interface StorageCookie {
-  name?: unknown;
-  value?: unknown;
-}
-
-/** Build a `Cookie:` header from a Playwright storage-state file; "" on any failure. */
-function cookieHeaderFrom(statePath: string): string {
+/**
+ * Acquire the authenticated identities through the selected provider, returning
+ * both the provider and its identities. This is the T9-clean seam 008 consumes to
+ * run `provider.whoamiEcho(...)` for EVERY authenticated identity before trusting a
+ * differential replay — kept here so the runner (`replay/index.ts`, owned by 008)
+ * need not change to gain the provider abstraction.
+ */
+export function acquireProviderIdentities(
+  deliverablesPath: string,
+  logger: ActivityLogger,
+  meta: TargetAuthMeta = {},
+): { provider: AuthProvider; identities: ProviderIdentity[] } {
+  const provider = selectAuthProvider(meta);
+  let identities: ProviderIdentity[] = [];
   try {
-    const doc = JSON.parse(fs.readFileSync(statePath, 'utf8')) as { cookies?: StorageCookie[] };
-    const cookies = Array.isArray(doc.cookies) ? doc.cookies : [];
-    const pairs = cookies
-      .filter((c): c is { name: string; value: string } => typeof c.name === 'string' && typeof c.value === 'string')
-      .map((c) => `${c.name}=${c.value}`);
-    return pairs.join('; ');
-  } catch {
-    return '';
+    identities = provider.acquireIdentities({ deliverablesPath, logger });
+  } catch (err) {
+    // Fail-open: acquisition problems degrade coverage, never abort the phase.
+    logger.warn('Oracle auth-provider acquisition failed; no authenticated identities', {
+      provider: provider.name,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
-}
-
-/** Candidate locations of the per-identity session dirs, relative to deliverables. */
-function identityDirCandidates(deliverablesPath: string): string[] {
-  return [
-    path.join(path.dirname(deliverablesPath), '.playwright-cli', 'identities'),
-    path.join(deliverablesPath, '.playwright-cli', 'identities'),
-  ];
+  return { provider, identities };
 }
 
 /**
- * Load the differential replay identities: anonymous (always) + every NON-primary
- * identity session dir that has cookies. Directory-driven (no manifest/slug
- * coupling); the primary dir is excluded as the privileged baseline.
+ * Load the differential replay identities: anonymous (always) + every authenticated
+ * identity the provider acquired, each flattened to its most-durable auth candidate.
+ * Directory-driven and provider-selected; the primary identity is excluded upstream.
  */
-export function loadDifferentialIdentities(deliverablesPath: string, logger: ActivityLogger): ReplayIdentity[] {
+export function loadDifferentialIdentities(
+  deliverablesPath: string,
+  logger: ActivityLogger,
+  meta: TargetAuthMeta = {},
+): ReplayIdentity[] {
+  const { provider, identities } = acquireProviderIdentities(deliverablesPath, logger, meta);
   const out: ReplayIdentity[] = [ANONYMOUS];
-  for (const root of identityDirCandidates(deliverablesPath)) {
-    let dirs: string[];
-    try {
-      dirs = fs.readdirSync(root);
-    } catch {
-      continue;
-    }
-    for (const dir of dirs) {
-      if (dir === PRIMARY_SESSION_DIR) continue;
-      const cookie = cookieHeaderFrom(path.join(root, dir, 'storage-state.json'));
-      if (cookie === '') continue;
-      out.push({ label: dir, authenticated: true, headers: { Cookie: cookie } });
-    }
-    if (out.length > 1) break;
+  for (const identity of identities) {
+    const best = provider.authCandidates(identity)[0];
+    if (!best) continue;
+    out.push({ label: identity.label, authenticated: true, headers: { ...best.headers } });
   }
-  // Log labels only — never the cookie values (ADR-050).
+  // Log labels only — never the cookie/token values (ADR-050).
   logger.info('Oracle differential: loaded lower-privilege identities', {
+    provider: provider.name,
     count: out.length,
     labels: out.map((i) => i.label),
   });
