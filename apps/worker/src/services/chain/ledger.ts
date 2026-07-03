@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+// Copyright (c) 2025-2026 Keygraph, Inc.
+// Required Notice: Shor — https://github.com/tr4m0ryp/shor
+// Noncommercial use only. Selling this software or offering it as a paid or
+// hosted service requires a separate commercial license. See LICENSE & NOTICE.
+
+/**
+ * The primitive ledger (spec T11, F8): an IMMUTABLE store of sub-threshold
+ * findings typed by privilege × side-effect.
+ *
+ * Sub-threshold primitives are findings below the severity gate that are useless
+ * alone but are chain fuel. The ledger indexes them by their lattice position and
+ * side-effect so the goal hunt can greedily fetch "the state_write a low-priv user
+ * can do" without rescanning. It is append-only and immutable: every `add`
+ * returns a NEW ledger, and the backing arrays are frozen, so a hunt can never
+ * mutate the corpus it reasons over (auditability, F7). De-duplication is by
+ * primitive `id`.
+ */
+
+import type { Primitive, Privilege, SideEffect } from "./types.js";
+
+/** Composite index key for the privilege × side-effect bucket. */
+function bucketKey(priv: Privilege, se: SideEffect): string {
+	return `${priv} ${se}`;
+}
+
+/**
+ * Immutable, append-only store of primitives. Construct via {@link PrimitiveLedger.create};
+ * grow via {@link PrimitiveLedger.add} / {@link PrimitiveLedger.addAll} (each returns a
+ * fresh ledger). All query methods return plain arrays that are safe to iterate.
+ */
+export class PrimitiveLedger {
+	private readonly primitives: readonly Primitive[];
+	private readonly byId: ReadonlyMap<string, Primitive>;
+	private readonly buckets: ReadonlyMap<string, readonly Primitive[]>;
+
+	private constructor(primitives: readonly Primitive[]) {
+		const byId = new Map<string, Primitive>();
+		for (const p of primitives) byId.set(p.id, p); // last write wins on id collision
+		const deduped = [...byId.values()];
+		const buckets = new Map<string, Primitive[]>();
+		for (const p of deduped) {
+			const key = bucketKey(p.privilege, p.sideEffect);
+			const list = buckets.get(key);
+			if (list) list.push(p);
+			else buckets.set(key, [p]);
+		}
+		this.primitives = Object.freeze(deduped);
+		this.byId = byId;
+		this.buckets = new Map([...buckets].map(([k, v]) => [k, Object.freeze(v)]));
+	}
+
+	/** Build a ledger from an initial set (de-duplicated by id). */
+	static create(primitives: readonly Primitive[] = []): PrimitiveLedger {
+		return new PrimitiveLedger(primitives);
+	}
+
+	/** Return a NEW ledger with `primitive` appended (immutability preserved). */
+	add(primitive: Primitive): PrimitiveLedger {
+		return new PrimitiveLedger([...this.primitives, primitive]);
+	}
+
+	/** Return a NEW ledger with all of `primitives` appended. */
+	addAll(primitives: readonly Primitive[]): PrimitiveLedger {
+		if (primitives.length === 0) return this;
+		return new PrimitiveLedger([...this.primitives, ...primitives]);
+	}
+
+	/** Every stored primitive (de-duplicated, frozen order). */
+	all(): readonly Primitive[] {
+		return this.primitives;
+	}
+
+	get size(): number {
+		return this.primitives.length;
+	}
+
+	/** Look up a primitive by its stable id. */
+	get(id: string): Primitive | undefined {
+		return this.byId.get(id);
+	}
+
+	/** Primitives whose side-effect matches (across all privileges). */
+	bySideEffect(se: SideEffect): Primitive[] {
+		return this.primitives.filter((p) => p.sideEffect === se);
+	}
+
+	/** Primitives at a given privilege (across all side-effects). */
+	byPrivilege(priv: Privilege): Primitive[] {
+		return this.primitives.filter((p) => p.privilege === priv);
+	}
+
+	/** Primitives in the exact privilege × side-effect bucket. */
+	by(priv: Privilege, se: SideEffect): Primitive[] {
+		return [...(this.buckets.get(bucketKey(priv, se)) ?? [])];
+	}
+
+	/** Primitives matching an arbitrary predicate. */
+	find(pred: (p: Primitive) => boolean): Primitive[] {
+		return this.primitives.filter(pred);
+	}
+}
