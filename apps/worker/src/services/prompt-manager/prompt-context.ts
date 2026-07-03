@@ -20,6 +20,14 @@ export interface PromptContext {
 	threatModel?: string;
 	/** `{{HISTORICAL_SEED}}` — prior-exploit hot-spots (task 006). */
 	historicalSeed?: string;
+	/**
+	 * `{{RAG_EXEMPLARS}}` — top 5-8 past-vulnerability exemplars retrieved from
+	 * the two-tier learning memory (task 012). Pre-rendered bullet lines, ALREADY
+	 * secret-scrubbed at write time (task 003) — an abstraction of a prior
+	 * finding, never raw client code/credentials. Absent (retrieval disabled or
+	 * empty store) -> the "(none)" sentinel, leaving the prompt unchanged.
+	 */
+	ragExemplars?: string;
 	/** `{{PARTITION}}` — attack-surface slice assigned this round (task 007). */
 	partition?: string;
 	/** `{{LENS}}` — discovery/verification lens label (task 007/011). */
@@ -65,6 +73,7 @@ export function applyPromptContext(
 	return template
 		.replace(/{{THREAT_MODEL}}/g, context.threatModel ?? NONE)
 		.replace(/{{HISTORICAL_SEED}}/g, context.historicalSeed ?? NONE)
+		.replace(/{{RAG_EXEMPLARS}}/g, context.ragExemplars ?? NONE)
 		.replace(/{{PARTITION}}/g, context.partition ?? NONE)
 		.replace(/{{LENS}}/g, context.lens ?? NONE)
 		.replace(
