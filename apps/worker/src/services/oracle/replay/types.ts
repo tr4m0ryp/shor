@@ -19,11 +19,31 @@ import type { ActivityLogger } from "../../../types/activity-logger.js";
 
 export type { OracleDisposition };
 
+/**
+ * The WIDENED replay disposition (T7). The persisted/web {@link OracleDisposition}
+ * stays a strict subset (`exploited | blocked | not_replayable`) for the sink; the
+ * integration layer (task 008) adds two first-class outcomes ON TOP of it:
+ *   - `inconclusive_infra` — a guard-reject / timeout / 5xx / failed-whoami /
+ *     unwired-executor outcome. NEVER counts as a refutation (fail-open on
+ *     demotion) and is carried distinctly so it is auditable, not silently folded
+ *     into a `blocked` verdict (Ali's collapse loses exactly this).
+ *   - `needs_review` — a positive proof whose CALIBRATED confidence gated below
+ *     threshold: held for manual review, never a silent `exploited` (fail-closed
+ *     on promotion).
+ * Only the two subset values are ever written to `oracle_dispositions.json`; the
+ * wider two are stamped on the finding record for audit + routing.
+ */
+export type ReplayDisposition = OracleDisposition | "inconclusive_infra" | "needs_review";
+
 /** How a PoC is replayed. */
 export type PocKind = "http" | "browser" | "oob";
 
-/** The observable that proves the exploit reproduced. */
-export type SignalType = "status" | "reflection" | "oob" | "data";
+/**
+ * The observable that proves the exploit reproduced.
+ *   - `sql_log` — the white-box SQL query-log oracle (007): the payload landed
+ *     inline in an executed statement (injected) vs only as a bound parameter.
+ */
+export type SignalType = "status" | "reflection" | "oob" | "data" | "sql_log";
 
 export interface ExpectedSignal {
 	type: SignalType;
@@ -72,7 +92,18 @@ export interface Poc {
  * parse without asserting a `blocked` verdict.
  */
 export type ExecOutcome =
-	| { observed: true; status?: number; body?: string; oobObserved?: boolean }
+	| {
+			observed: true;
+			status?: number;
+			body?: string;
+			oobObserved?: boolean;
+			/**
+			 * White-box SQL query-log verdict (007), when the query-log oracle was
+			 * correlated to this replay. OPTIONAL / back-compat: absent on every
+			 * executor that does not consult the DB log.
+			 */
+			sqlLogVerdict?: "injected" | "parameterized" | "not_found" | "unavailable";
+	  }
 	| {
 			observed: false;
 			reason: "rate_limited" | "not_replayable" | "error";

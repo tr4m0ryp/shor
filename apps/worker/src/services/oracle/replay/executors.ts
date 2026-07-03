@@ -9,14 +9,17 @@
  *
  * `httpExecutor` is the in-process deterministic path: every outbound request is
  * wrapped by the network guard FIRST (default-deny egress, metadata/internal
- * blocked, RoE scope) and only then issued via the worker's `fetch`. The browser
- * and OOB executors are SEAMS: the worker process has no in-process browser /
- * interactsh harness (and no new deps may be added), so they default to
- * `not_replayable` — leaving the markdown-parse fallback authoritative for those
- * findings. A later session can inject real runners via {@link ExecutorSet}
- * without touching the runner or the read-only gate.
+ * blocked, RoE scope) and only then issued via the worker's `fetch`.
+ *
+ * The OOB executor is wired to the self-hosted-interactsh path (006): the default
+ * set binds it to NO listener, so — exactly like the old unwired seam — every OOB
+ * PoC is `not_replayable` until a live listener is injected. `buildExecutorSet`
+ * lets the oracle phase (008) inject a live {@link OobListener} without touching
+ * the runner or the read-only gate. The browser executor remains an unwired seam.
  */
 
+import { createOobExecutor } from "./oob/index.js";
+import type { OobListener } from "./oob/types.js";
 import type { ExecOutcome, Executor, ExecutorSet } from "./types.js";
 
 /** Cap the body we read so a huge response cannot exhaust memory. */
@@ -103,9 +106,19 @@ function unwired(kind: string): Executor {
 	});
 }
 
-/** Default executor set: real HTTP replay; browser / OOB are not-yet-wired seams. */
-export const DEFAULT_EXECUTORS: ExecutorSet = {
-	http: httpExecutor,
-	browser: unwired("browser"),
-	oob: unwired("oob"),
-};
+/**
+ * Build the executor set, binding the OOB executor (006) to `oobListener`. With no
+ * listener (the default) the OOB path degrades to `not_replayable` — BYTE-identical
+ * to the old unwired seam, so a stock scan is unchanged. Passing a live listener
+ * (008, gated by `SHOR_OOB`) turns on real witnessed-callback proof.
+ */
+export function buildExecutorSet(oobListener?: OobListener): ExecutorSet {
+	return {
+		http: httpExecutor,
+		browser: unwired("browser"),
+		oob: createOobExecutor(oobListener),
+	};
+}
+
+/** Default executor set: real HTTP replay; OOB via 006 (no listener ⇒ inconclusive). */
+export const DEFAULT_EXECUTORS: ExecutorSet = buildExecutorSet();
