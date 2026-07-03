@@ -106,6 +106,18 @@ export interface ExemplarCandidate {
 	readonly confidence: string | null;
 	/** Optional richer text (a global payload doc/summary), for rerank + render. */
 	readonly text: string | null;
+	/**
+	 * The `global_pool` row's `kind` for global hits (`abstraction`/`exemplar`/
+	 * `finding`), or `null` for local hits (the local tier has no kind).
+	 */
+	readonly kind: GlobalKind | null;
+	/**
+	 * True for a SEEDED known-pattern technique exemplar: a global hit whose kind
+	 * is `exemplar` (or whose payload marks `seeded === true`). Local hits and
+	 * non-exemplar globals are always `false`. Drives the novelty/diversity
+	 * guardrail — seeds inform, real findings lead.
+	 */
+	readonly seeded: boolean;
 }
 
 /** The semantic + structured query that seeds retrieval. */
