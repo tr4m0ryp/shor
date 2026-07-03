@@ -1,0 +1,13 @@
+# Shor embed/rerank model server -- pinned deps.
+# All model weights pulled at runtime are Apache-2.0 / MIT (see README).
+# torch is pinned to match the Docker base image (pytorch/pytorch:2.5.1-cuda12.1);
+# it is listed so `pip install -r` also works for a local (bare-metal) run.
+torch==2.5.1
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+numpy==1.26.4
+transformers==4.47.1
+sentence-transformers==3.3.1
+FlagEmbedding==1.3.4
+einops==0.8.0
