@@ -102,6 +102,9 @@ importers:
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.1
+      jsonrepair:
+        specifier: ^3.14.1
+        version: 3.14.1
       zod:
         specifier: ^4.3.6
         version: 4.4.3
@@ -1669,6 +1672,10 @@ packages:
 
   json-with-bigint@3.5.8:
     resolution: {integrity: sha512-eq/4KP6K34kwa7TcFdtvnftvHCD9KvHOGGICWwMFc4dOOKF5t4iYqnfLK8otCRCRv06FXOzGGyqE8h8ElMvvdw==}
+
+  jsonrepair@3.14.1:
+    resolution: {integrity: sha512-NpGgMhmzG/fajkBEFlS9jZvMSGDvc2xN/9wNCHZ+Nx32GZfLRELU6UE6dQkebvrQUct9S+7bvnpX29NB36Qbdw==}
+    hasBin: true
 
   jwa@2.0.1:
     resolution: {integrity: sha512-hRF04fqJIP8Abbkq5NKGN0Bbr3JxlQ+qhZufXVr0DvujKy93ZCbXZMHDL4EOtodSbCWxOqR8MS1tXA5hwqCXDg==}
@@ -3979,6 +3986,8 @@ snapshots:
   json-schema-typed@8.0.2: {}
 
   json-with-bigint@3.5.8: {}
+
+  jsonrepair@3.14.1: {}
 
   jwa@2.0.1:
     dependencies:
