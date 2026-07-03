@@ -40,7 +40,11 @@ export function isReadOnly(poc: Poc): boolean {
  *   - `status`     — the response status equals the expected code.
  *   - `reflection` — the expected payload appears (reflected) in the body.
  *   - `data`       — the expected sensitive-data marker appears in the body.
- *   - `oob`        — an out-of-band callback was observed for the token.
+ *   - `oob`        — an out-of-band callback was observed for the token (006).
+ *   - `sql_log`    — the white-box query-log oracle saw the marker land INLINE in
+ *                    an executed statement (`injected`). `parameterized`/`not_found`/
+ *                    `unavailable` never satisfy the signal (fail-open: absence of a
+ *                    DB-log hit is not a positive proof).
  * A non-observed outcome never matches.
  */
 export function matchSignal(expected: ExpectedSignal, obs: ExecOutcome): boolean {
@@ -53,9 +57,24 @@ export function matchSignal(expected: ExpectedSignal, obs: ExecOutcome): boolean
 			return typeof obs.body === "string" && obs.body.includes(String(expected.match));
 		case "oob":
 			return obs.oobObserved === true;
+		case "sql_log":
+			return obs.sqlLogVerdict === "injected";
 		default:
 			return false;
 	}
+}
+
+/**
+ * Classify a non-observed outcome as an INFRASTRUCTURE failure (T7): a rate-limit,
+ * transport error, guard-reject, timeout, unwired executor, or missing target — an
+ * outcome that proves NOTHING and must never count as a refutation. The integration
+ * layer maps these to `inconclusive_infra` (fail-open on demotion). Pure + total.
+ */
+export function isInfraOutcome(obs: ExecOutcome): boolean {
+	if (obs.observed) return false;
+	// Every non-observed reason (rate_limited / error / not_replayable) is inconclusive:
+	// we could not get a clean read, so it can never refute a claimed finding.
+	return true;
 }
 
 /** A replay verdict for one PoC. */

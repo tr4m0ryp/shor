@@ -21,6 +21,7 @@
  * OR `premise_valid === false`).
  */
 
+import { NEEDS_REVIEW_THRESHOLD } from '../../../services/oracle/confidence.js';
 import type { FindingCategory, FindingConfidence, FindingSeverity, VulnDisposition } from '../types.js';
 
 /**
@@ -32,18 +33,27 @@ export interface ScoringAxes {
   in_scope?: boolean;
   /** The finding's premise holds (a real privilege boundary was crossed, etc.). */
   premise_valid?: boolean;
+  /**
+   * Calibrated P(true-positive) from the proof oracle (T7, `services/oracle/confidence`).
+   * When present AND below {@link NEEDS_REVIEW_THRESHOLD}, it GATES an `exploited`
+   * claim out of `confirmed` — the finding is held for review, not read as
+   * authoritative. Absent (today's callers / the confidence flag off) ⇒ unchanged.
+   */
+  confidence_score?: number;
 }
 
 /**
- * True when an axis explicitly FALSIFIES an `exploited` claim: the target was
- * out of scope (`in_scope === false`) or the premise was invalid
- * (`premise_valid === false`). Only a literal `false` falsifies — `undefined`
- * (axis not assessed) preserves today's behavior. An empty / absent `axes`
- * object is never falsifying.
+ * True when an axis explicitly FALSIFIES / gates an `exploited` claim: the target
+ * was out of scope (`in_scope === false`), the premise was invalid
+ * (`premise_valid === false`), or the CALIBRATED confidence score gated below
+ * threshold (`confidence_score < NEEDS_REVIEW_THRESHOLD`). Only a literal `false`
+ * (or an explicit low score) falsifies — `undefined` (axis not assessed) preserves
+ * today's behavior. An empty / absent `axes` object is never falsifying.
  */
 function exploitPremiseFalsified(axes: ScoringAxes | undefined): boolean {
   if (!axes) return false;
-  return axes.in_scope === false || axes.premise_valid === false;
+  if (axes.in_scope === false || axes.premise_valid === false) return true;
+  return typeof axes.confidence_score === 'number' && axes.confidence_score < NEEDS_REVIEW_THRESHOLD;
 }
 
 /**
