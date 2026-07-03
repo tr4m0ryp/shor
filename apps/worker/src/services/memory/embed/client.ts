@@ -136,6 +136,12 @@ async function embed(
 	opts: EmbedOptions | undefined,
 ): Promise<EmbedResult> {
 	if (texts.length === 0) return emptyResult();
+	// Low-RAM / text-only self-host: skip the code embedder (a second large model)
+	// entirely when SHOR_EMBED_SKIP_CODE is set — rows then carry a text vector
+	// only (vec_code stays null). Lets an 8GB box seed with just the text model.
+	if (path === CODE_PATH && process.env.SHOR_EMBED_SKIP_CODE?.trim() === "1") {
+		return emptyResult();
+	}
 	const batchSize = cfg.batchSize ?? DEFAULT_BATCH;
 	const normalize = opts?.normalize ?? true;
 	const merged = emptyResult();
