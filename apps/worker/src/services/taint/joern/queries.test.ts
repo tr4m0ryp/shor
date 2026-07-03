@@ -74,6 +74,11 @@ describe("buildTaintScript", () => {
 	});
 
 	it("applies the sanitizer filter to dropped paths", () => {
-		expect(script).toContain("filterNot(sanitized)");
+		expect(script).toContain("filterNot(");
+		expect(script).toContain("sanitizers.exists");
+	});
+
+	it("matches sources by NAME or CODE (the validated JS/TS frontend fix)", () => {
+		expect(script).toContain("cpg.call.name(pats: _*) ++ cpg.call.code(pats: _*)");
 	});
 });

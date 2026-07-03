@@ -26,7 +26,7 @@ import type {
 	ThroughStepSpec,
 } from "../types.js";
 
-/** File extensions → CPG language, used for the dominant-language vote. */
+/** File extensions -> CPG language, used for the dominant-language vote. */
 const EXT_LANGUAGE: Record<string, TaintLanguage> = {
 	".ts": "typescript",
 	".tsx": "typescript",
@@ -74,21 +74,24 @@ export function detectLanguageFromFiles(files: readonly string[]): TaintLanguage
 	return best;
 }
 
-/** JS/TS frontends (jssrc2cpg) are weaker → every flow they yield is tentative. */
+/** JS/TS frontends (jssrc2cpg) are weaker -> every flow they yield is tentative. */
 export function confidenceForLanguage(lang: TaintLanguage): TaintConfidence {
 	return lang === "javascript" || lang === "typescript" ? "tentative" : "firm";
 }
 
 // --- Framework-agnostic catalogues (broad name matchers) ---------------------
 
+// Joern matches `.code(pat)` as a FULL-STRING regex, so JS field-access chains
+// like `req.body.bio` need surrounding wildcards to match (validated on a real
+// TS target — without them the write-side/second-order flows are silently
+// missed). Java-style named accessors (`getParameter`) match by call name.
 const BASE_SOURCES: readonly string[] = [
 	"(?i).*getParameter.*",
 	"(?i).*getHeader.*",
 	"(?i).*getQueryString.*",
-	"(?i)get(Query|Body|Params|Cookies?|Input).*",
+	"(?i).*get(Query|Body|Params|Cookies?|Input).*",
 	"(?i).*readLine.*",
-	"(?i)(query|body|params|headers|cookies|args|form|files)",
-	"(?i)(req|request)\\.(query|body|params|headers|cookies)",
+	"(?i).*(req|request|ctx|event)\\.(query|body|params|headers|cookies|form|files).*",
 ];
 
 const BASE_SANITIZERS: readonly string[] = [
@@ -116,11 +119,15 @@ const BASE_SINKS: readonly SinkSpec[] = [
 const BASE_THROUGH_STEPS: readonly ThroughStepSpec[] = [
 	{
 		store: "db",
+		// DB-oriented verbs only. Generic English tokens (get/all/first/query)
+		// are deliberately EXCLUDED: they collide with request-input sources and
+		// inflate spurious second-order pairs. The LLM spec inference names the
+		// repo's CONCRETE data-layer methods to tighten this per target.
 		writeMethods: [
-			"(?i).*(insert|create|save|update|set|put|persist|add|write).*",
+			"(?i).*(insert|create|save|update|upsert|persist|store|write).*",
 		],
 		readMethods: [
-			"(?i).*(find|findOne|findAll|get|select|query|read|load|fetch|scan|all|first).*",
+			"(?i).*(findOne|findAll|findBy|find|select|load|fetch|scan|readRow).*",
 		],
 	},
 ];
