@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+# Copyright (c) 2025-2026 Keygraph, Inc.
+# Required Notice: Shor -- https://github.com/tr4m0ryp/shor
+# Local run for the embed/rerank server. `docker compose up` from this dir.
+# The worker points at it via SHOR_EMBED_URL=http://localhost:8080 (+ optional
+# SHOR_EMBED_TOKEN matching EMBED_... token here).
+services:
+  embedder:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      # Uncomment to require bearer auth (must match the worker's SHOR_EMBED_TOKEN):
+      # SHOR_EMBED_TOKEN: "change-me"
+      EMBED_DEVICE: "cuda" # set to "cpu" for a GPU-less dev box (slow)
+    volumes:
+      - hf-cache:/models # persist downloaded weights (~4.5 GB) across restarts
+    # Requires the NVIDIA container runtime for GPU. Drop this block for CPU.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+volumes:
+  hf-cache:
