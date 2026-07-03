@@ -96,6 +96,8 @@ function candidate(key: string, tier: "local" | "global"): ExemplarCandidate {
 		componentVer: null,
 		confidence: null,
 		text: null,
+		kind: tier === "global" ? "finding" : null,
+		seeded: false,
 	};
 }
 
@@ -249,6 +251,23 @@ describe("retrieveExemplars — retrieval", () => {
 		expect(small.exemplars).toHaveLength(5);
 		const big = await retrieveExemplars(QUERY, SCOPE, deps({ local, config: { topK: 20 } }));
 		expect(big.exemplars).toHaveLength(8);
+	});
+
+	it("caps seeded exemplars and keeps the list full via backfill", async () => {
+		// 5 seeded exemplars + 4 real findings; default cap = floor(topK/2) = 3.
+		const local = localPortReturning(Array.from({ length: 4 }, (_, i) => localMatch(`l${i}`)));
+		const global = globalPortReturning(
+			Array.from({ length: 5 }, (_, i) => ({
+				id: `s${i}`,
+				distance: 0.1,
+				kind: "exemplar", // seeded technique
+				payload: { cwe: `CWE-2${i}`, vuln_class: `T${i}` },
+			})),
+		);
+		const res = await retrieveExemplars(QUERY, SCOPE, deps({ local, global }));
+		expect(res.exemplars).toHaveLength(6); // stays full (5-8 band)
+		expect(res.exemplars.filter((e) => e.candidate.seeded).length).toBeLessThanOrEqual(3);
+		expect(res.exemplars[0]?.candidate.seeded).toBe(false); // real findings lead
 	});
 
 	it("fails open (returns empty) when a port throws", async () => {

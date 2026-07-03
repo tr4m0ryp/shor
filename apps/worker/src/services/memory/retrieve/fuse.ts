@@ -23,6 +23,7 @@
 import type { ActivityLogger } from "../../../types/activity-logger.js";
 import { MAX_RERANK } from "../embed/index.js";
 import type { EmbedClient } from "../embed/index.js";
+import { applyGuardrail, readGuardrailConfig } from "./guardrail.js";
 import { accumulateRrf, DEFAULT_RRF_K, sortByScore } from "./hybrid.js";
 import type { ExemplarCandidate, RagExemplar } from "./types.js";
 
@@ -127,9 +128,48 @@ function toExemplar(fc: FusedCandidate, score: number): RagExemplar {
 }
 
 /**
- * Rerank the weighted-RRF shortlist with the cross-encoder and return the top
- * `topK` exemplars. Falls back to the RRF order when the reranker is disabled,
- * returns nothing, or throws.
+ * Rank the weighted-RRF shortlist best-first: cross-encoder order when the
+ * reranker is live, else the RRF order. Returns the FULL ranked list (not yet
+ * capped to `topK`) so the guardrail has a non-seeded remainder to backfill
+ * from. Falls back to the RRF order when the reranker is disabled, returns
+ * nothing, or throws.
+ */
+async function rankShortlist(
+	shortlist: readonly FusedCandidate[],
+	deps: {
+		embed: EmbedClient;
+		queryText: string;
+		logger?: ActivityLogger | undefined;
+	},
+): Promise<RagExemplar[]> {
+	if (deps.embed.enabled) {
+		try {
+			const passages = shortlist.map((fc) => rerankPassage(fc.candidate));
+			const hits = await deps.embed.rerank(deps.queryText, passages, {
+				topK: shortlist.length,
+			});
+			if (hits.length > 0) {
+				return hits
+					.map((h) => {
+						const fc = shortlist[h.index];
+						return fc ? toExemplar(fc, h.score) : null;
+					})
+					.filter((e): e is RagExemplar => e !== null);
+			}
+		} catch (err) {
+			deps.logger?.warn("rag-retrieve: rerank failed, using RRF order", {
+				reason: err instanceof Error ? err.message : String(err),
+			});
+		}
+	}
+	return shortlist.map((fc) => toExemplar(fc, fc.score));
+}
+
+/**
+ * Fuse both tiers, rerank the shortlist, then apply the novelty/diversity
+ * guardrail (down-weight + cap + MMR-lite over seeded exemplars) and return the
+ * top `topK`. With zero seeded candidates the guardrail is a pass-through, so
+ * this is byte-identical to the pre-guardrail rerank-or-RRF top-k.
  */
 export async function fuseAndRerank(
 	local: readonly ExemplarCandidate[],
@@ -141,6 +181,8 @@ export async function fuseAndRerank(
 		k?: number;
 		topK?: number;
 		logger?: ActivityLogger | undefined;
+		/** Override the guardrail env (mainly for tests). */
+		env?: NodeJS.ProcessEnv | undefined;
 	},
 ): Promise<RagExemplar[]> {
 	const topK = clampTopK(deps.topK);
@@ -151,26 +193,13 @@ export async function fuseAndRerank(
 	if (fused.length === 0) return [];
 
 	const shortlist = fused.slice(0, MAX_RERANK);
-	if (deps.embed.enabled) {
-		try {
-			const passages = shortlist.map((fc) => rerankPassage(fc.candidate));
-			const hits = await deps.embed.rerank(deps.queryText, passages, { topK });
-			if (hits.length > 0) {
-				return hits
-					.map((h) => {
-						const fc = shortlist[h.index];
-						return fc ? toExemplar(fc, h.score) : null;
-					})
-					.filter((e): e is RagExemplar => e !== null)
-					.slice(0, topK);
-			}
-		} catch (err) {
-			deps.logger?.warn("rag-retrieve: rerank failed, using RRF order", {
-				reason: err instanceof Error ? err.message : String(err),
-			});
-		}
-	}
-	return shortlist.slice(0, topK).map((fc) => toExemplar(fc, fc.score));
+	const ranked = await rankShortlist(shortlist, {
+		embed: deps.embed,
+		queryText: deps.queryText,
+		logger: deps.logger,
+	});
+	const cfg = readGuardrailConfig(topK, deps.env);
+	return applyGuardrail(ranked, topK, cfg);
 }
 
 /**
