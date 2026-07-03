@@ -68,9 +68,10 @@ export async function interpolateVariables(
 			);
 
 		// Resolve the per-round prompt-context placeholders ({{THREAT_MODEL}},
-		// {{HISTORICAL_SEED}}, {{PARTITION}}, {{LENS}}, {{VOTER_INDEX}},
-		// {{IDENTITIES}}, {{FP_RULES}}). Absent values collapse to a neutral
-		// sentinel so none ever survives as a literal placeholder downstream.
+		// {{HISTORICAL_SEED}}, {{RAG_EXEMPLARS}}, {{PARTITION}}, {{LENS}},
+		// {{VOTER_INDEX}}, {{IDENTITIES}}, {{FP_RULES}}). Absent values collapse to
+		// a neutral sentinel so none ever survives as a literal placeholder
+		// downstream.
 		result = applyPromptContext(result, context);
 
 		if (config) {
