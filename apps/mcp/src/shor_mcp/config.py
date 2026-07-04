@@ -7,14 +7,16 @@ token it presents to ``/external/*`` (server-to-server), and — in bearer mode 
 the token Claude Code presents to it. It NEVER holds ``SHOR_LAUNCH_MINT_TOKEN``,
 so by construction it cannot mint launch tokens.
 
-Auth is one of two modes (``MCP_OAUTH_PROVIDER``):
-  - empty  -> static bearer (Claude Code) via ``MCP_BEARER_TOKEN``.
-  - workos -> OAuth via WorkOS AuthKit using FastMCP's ``WorkOSProvider`` proxy:
-    FastMCP does Dynamic Client Registration for the claude.ai connector and
-    proxies login to AuthKit with one pre-registered WorkOS client. Needs
-    ``WORKOS_AUTHKIT_DOMAIN`` + ``WORKOS_CLIENT_ID`` + ``WORKOS_CLIENT_SECRET`` +
-    ``MCP_BASE_URL``; ``<MCP_BASE_URL>/auth/callback`` must be an allowed WorkOS
-    redirect URI.
+Auth modes (``MCP_OAUTH_PROVIDER``):
+  - empty   -> static bearer (Claude Code) via ``MCP_BEARER_TOKEN``.
+  - authkit -> STATELESS OAuth via WorkOS AuthKit: the connector only verifies
+    AuthKit JWTs; claude.ai registers (DCR) and refreshes directly with AuthKit,
+    so restarts never force re-authentication. Needs ``WORKOS_AUTHKIT_DOMAIN`` +
+    ``MCP_BASE_URL`` and DCR enabled in the WorkOS dashboard.
+  - workos  -> OAuth via WorkOS AuthKit using FastMCP's ``WorkOSProvider`` proxy
+    (STATEFUL — avoid on ephemeral hosts). Needs ``WORKOS_AUTHKIT_DOMAIN`` +
+    ``WORKOS_CLIENT_ID`` + ``WORKOS_CLIENT_SECRET`` + ``MCP_BASE_URL``;
+    ``<MCP_BASE_URL>/auth/callback`` must be an allowed WorkOS redirect URI.
 """
 
 from __future__ import annotations
@@ -39,7 +41,8 @@ class Config:
     mcp_host: str = "0.0.0.0"
     mcp_port: int = 8080
 
-    # Auth mode. Empty -> static bearer / authless. "workos" -> WorkOS AuthKit.
+    # Auth mode. Empty -> static bearer / authless. "authkit" -> stateless
+    # AuthKit resource server (recommended). "workos" -> stateful OAuth proxy.
     mcp_oauth_provider: str = ""
     # Public HTTPS base URL of THIS connector (no /mcp) — what OAuth metadata
     # advertises and what the claude.ai connector URL resolves to.
