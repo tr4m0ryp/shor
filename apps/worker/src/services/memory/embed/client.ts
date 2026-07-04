@@ -87,24 +87,45 @@ async function postJson<T>(
 	signal?: AbortSignal,
 ): Promise<T> {
 	const url = `${cfg.baseUrl}${path}`;
-	const controllerSignal =
-		signal ?? AbortSignal.timeout(cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-	let res: Response;
-	try {
-		res = await fetch(url, {
-			method: "POST",
-			headers: buildHeaders(cfg),
-			body: JSON.stringify(body),
-			signal: controllerSignal,
-		});
-	} catch (err) {
-		const detail = err instanceof Error ? err.message : String(err);
-		throw new EmbedError(`embed request to ${path} failed: ${detail}`);
+	// Bounded retries for TRANSIENT failures (connection reset / "fetch failed"
+	// under CPU/memory pressure on a self-hosted embedder, or a 5xx). Respects a
+	// caller-supplied abort signal. Default 3 retries; env-tunable via
+	// SHOR_EMBED_RETRIES. 4xx and a caller abort are terminal (no retry).
+	const retriesEnv = Number(process.env.SHOR_EMBED_RETRIES);
+	const maxAttempts =
+		1 + (Number.isFinite(retriesEnv) && retriesEnv >= 0 ? retriesEnv : 3);
+	let lastDetail = "unknown";
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		const controllerSignal =
+			signal ?? AbortSignal.timeout(cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+		let res: Response;
+		try {
+			res = await fetch(url, {
+				method: "POST",
+				headers: buildHeaders(cfg),
+				body: JSON.stringify(body),
+				signal: controllerSignal,
+			});
+		} catch (err) {
+			lastDetail = err instanceof Error ? err.message : String(err);
+			if (attempt < maxAttempts && !signal?.aborted) {
+				await new Promise((r) => setTimeout(r, 750 * attempt));
+				continue;
+			}
+			throw new EmbedError(`embed request to ${path} failed: ${lastDetail}`);
+		}
+		if (!res.ok) {
+			if (res.status >= 500 && attempt < maxAttempts) {
+				await new Promise((r) => setTimeout(r, 750 * attempt));
+				continue;
+			}
+			throw new EmbedError(`embed ${path} returned HTTP ${res.status}`, res.status);
+		}
+		return (await res.json()) as T;
 	}
-	if (!res.ok) {
-		throw new EmbedError(`embed ${path} returned HTTP ${res.status}`, res.status);
-	}
-	return (await res.json()) as T;
+	throw new EmbedError(
+		`embed request to ${path} failed after ${maxAttempts} attempts: ${lastDetail}`,
+	);
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
