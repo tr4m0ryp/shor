@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+# Copyright (c) 2025-2026 Keygraph, Inc.
+# Required Notice: Shor -- https://github.com/tr4m0ryp/shor
+# Noncommercial use only. Selling this software or offering it as a paid or
+# hosted service requires a separate commercial license. See LICENSE & NOTICE.
+#
+# CPU-only embed/rerank server image (lean, ~3GB) for a persistent GCE VM — no
+# CUDA. Linux x86_64 HAS torch 2.5.1 cpu wheels (the macOS-Intel gap does not
+# apply here). Models are pulled at runtime into HF_HOME (persist via a mounted
+# volume / the VM boot disk so a restart does not re-download).
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    HF_HOME=/models \
+    EMBED_DEVICE=cpu \
+    EMBED_FP16=0
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu \
+ && pip install --no-cache-dir \
+      fastapi==0.115.6 "uvicorn[standard]==0.34.0" pydantic==2.10.4 numpy==1.26.4 \
+      transformers==4.47.1 sentence-transformers==3.3.1 FlagEmbedding==1.3.4 einops==0.8.0
+
+COPY server ./server
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz').status==200 else 1)"
+CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
