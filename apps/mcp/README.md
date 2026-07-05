@@ -7,20 +7,30 @@ an MCP server. It **re-implements no scanning** — it orchestrates Shor's exist
 > A routine can *ask* to start a scan, but only a **human** can *authorize* one.
 
 A thin **Python [FastMCP](https://gofastmcp.com) server** (mirrors the sibling
-`enrichment-mcp`): Streamable HTTP at `/mcp`, four tools, and a pluggable auth
+`enrichment-mcp`): Streamable HTTP at `/mcp`, ten tools, and a pluggable auth
 layer. It owns no database and no scanning — it forwards to Shor's `/external/*`.
 
-## The four tools
+## The tools
+
+Exactly one tool mutates by *starting* activity (`start_blackbox_run`, launch-token
+gated); one *reduces* activity (`cancel_run`); the rest are read-only.
 
 | Tool | Wraps | Purpose |
 |---|---|---|
 | `start_blackbox_run` | `POST /external/launch` | Start a black-box scan. **Requires** a single-use launch token bound to the engagement + the signed RoE. Returns `{ projectId, scanId, status }`. |
+| `cancel_run` | `POST /external/scans/:id/cancel` | Stop a running scan (operator kill switch). Activity-reducing and idempotent → **no launch token needed**. Returns `{ scanId, status }`. |
 | `list_active_runs` | `GET /external/scans` | Read-only list of in-flight scans (running + pending): `{ runs: [{ scanId, projectId, status, progress, startedAt }] }`. |
 | `get_run_progress` | `GET /external/scans/:id` | Read-only status for one scan: `{ status, progress, findingCount, startedAt, finishedAt }`. |
-| `get_share_url` | `POST /external/projects/:id/share` | Mint/read the read-only guest link. Returns `{ shareUrl }` — the only client-facing output. |
+| `get_findings` | `GET /external/scans/:id/findings` | Read-only finding records for one scan: `{ findings: [...] }`. |
+| `get_report` | `GET /external/scans/:id/report` | Read-only finalized executive report: `{ report }` (`null` until finalized). |
+| `get_attack_surface` | `GET /external/scans/:id/attack-surface` | Read-only attack-surface document (scenarios + kill chains): `{ attackSurface }`. |
+| `list_projects` | `GET /external/projects` | Read-only list of the tenant's projects: `{ projects: [...] }`. |
+| `get_scan_history` | `GET /external/projects/:id/scans` | Read-only list of one project's scans, newest first: `{ scans: [...] }`. |
+| `get_share_url` | `POST /external/projects/:id/share` | Mint/read the read-only guest link. Returns `{ shareUrl }` — a client-facing output. |
 
 There is **no** un-gated start tool, **no** white-box/repo tool, and **no**
-delete/mutate-findings tool. That is deliberate.
+delete/mutate-findings tool. Cancel is the sole non-start mutation, and it can
+only ever *reduce* a run's blast radius, never widen scope. That is deliberate.
 
 ## The one human gate — and why a routine can't bypass it
 

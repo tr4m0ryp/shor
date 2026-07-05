@@ -9,14 +9,27 @@
  *
  * Bearer-authed HTTP surface that lets a Sinas instance drive the engine without
  * a browser session: rerun/start a scan, create a project (black-box or white-box
- * via a connected GitHub repo), read a scan's status, and list the tenant's
- * connected repos. The engine stays the single source of truth — it MINTS every
- * id (scanId/projectId) and never accepts a client-supplied one.
+ * via a connected GitHub repo), read a scan's status/results, list projects and
+ * their scan history, cancel a running scan, and list the tenant's connected
+ * repos. The engine stays the single source of truth — it MINTS every id
+ * (scanId/projectId) and never accepts a client-supplied one.
  *
- *   POST /external/scans       { projectId, ref?, provider? } -> { scanId, status }
- *   POST /external/projects    { name, targetUrl, mode, repoRef? } -> { projectId }
- *   GET  /external/scans/:id   -> { status, progress, ... }
- *   GET  /external/github/repos -> { repos: [...] }
+ *   POST /external/scans                    { projectId, ref?, provider? } -> { scanId, status }
+ *   POST /external/scans/:id/cancel         -> { scanId, status }  (operator kill switch)
+ *   POST /external/projects                 { name, targetUrl, mode, repoRef? } -> { projectId }
+ *   GET  /external/scans                    -> { runs: [...] }  (active runs)
+ *   GET  /external/scans/:id                -> { status, progress, ... }
+ *   GET  /external/scans/:id/findings       -> { findings: [...] }
+ *   GET  /external/scans/:id/report         -> { report: <obj>|null }
+ *   GET  /external/scans/:id/attack-surface -> { attackSurface: {...} }
+ *   GET  /external/projects                 -> { projects: [...] }
+ *   GET  /external/projects/:id/scans       -> { scans: [...] }
+ *   GET  /external/github/repos             -> { repos: [...] }
+ *
+ * The read + cancel routes are the token-authed counterparts of the dashboard
+ * run-detail / Targets reads. Cancel only REDUCES activity, so — like the reads —
+ * the engine bearer alone authorizes it; only the START path additionally demands
+ * the single-use human launch token.
  *
  * Auth: a single `Authorization: Bearer <SHOR_ENGINE_TRIGGER_TOKEN>` guards the
  * whole `/external/*` plane, validated EXACTLY like the findings/progress sink
@@ -36,11 +49,18 @@ import type { Principal } from '../../auth/index.js';
 import { ensureDevSession } from '../../auth/index.js';
 import { getConfig } from '../../config.js';
 import type { ApiResponse } from '../router.js';
+import { cancelExternalScan } from './cancel-scan.js';
 import { createExternalProject } from './create-project.js';
 import { getExternalScan } from './get-scan.js';
 import { launchExternalScan } from './launch.js';
 import { listActiveExternalScans } from './list-active-scans.js';
 import { listExternalRepos } from './list-repos.js';
+import { listExternalProjects, listExternalProjectScans } from './projects-read.js';
+import {
+  getExternalScanAttackSurface,
+  getExternalScanFindings,
+  getExternalScanReport,
+} from './scan-results.js';
 import { shareExternalProject } from './share.js';
 import { startExternalScan } from './start-scan.js';
 
@@ -127,6 +147,11 @@ export async function routeExternal(
     return method === 'POST' ? shareExternalProject(principal, id) : METHOD_NOT_ALLOWED;
   }
 
+  // GET /external/projects/:id/scans — the project's scan history, newest first.
+  if (resource === 'projects' && id && sub === 'scans') {
+    return method === 'GET' ? listExternalProjectScans(principal, id) : METHOD_NOT_ALLOWED;
+  }
+
   // /external/scans (no id): POST starts a scan; GET lists the tenant's ACTIVE runs.
   if (resource === 'scans' && !id) {
     if (method === 'POST') return startExternalScan(principal, body);
@@ -134,14 +159,32 @@ export async function routeExternal(
     return METHOD_NOT_ALLOWED;
   }
 
-  // GET /external/scans/:id — scan status + progress.
+  // /external/scans/:id — bare GET is the status snapshot; the sub-routes cancel
+  // the run or read its results (findings / report / attack-surface).
   if (resource === 'scans' && id) {
-    return method === 'GET' ? getExternalScan(principal, id) : METHOD_NOT_ALLOWED;
+    if (sub === 'cancel') {
+      return method === 'POST' ? cancelExternalScan(principal, id) : METHOD_NOT_ALLOWED;
+    }
+    if (sub === 'findings') {
+      return method === 'GET' ? getExternalScanFindings(principal, id) : METHOD_NOT_ALLOWED;
+    }
+    if (sub === 'report') {
+      return method === 'GET' ? getExternalScanReport(principal, id) : METHOD_NOT_ALLOWED;
+    }
+    if (sub === 'attack-surface') {
+      return method === 'GET' ? getExternalScanAttackSurface(principal, id) : METHOD_NOT_ALLOWED;
+    }
+    if (!sub) {
+      return method === 'GET' ? getExternalScan(principal, id) : METHOD_NOT_ALLOWED;
+    }
+    return NOT_FOUND;
   }
 
-  // POST /external/projects — create a black-box or white-box project.
+  // /external/projects (no id): POST creates a project; GET lists them.
   if (resource === 'projects' && !id) {
-    return method === 'POST' ? createExternalProject(principal, body) : METHOD_NOT_ALLOWED;
+    if (method === 'POST') return createExternalProject(principal, body);
+    if (method === 'GET') return listExternalProjects(principal);
+    return METHOD_NOT_ALLOWED;
   }
 
   // GET /external/github/repos — the tenant's connected repos.

@@ -1,23 +1,16 @@
-"""The four Shor MCP tools. Each is a thin wrapper over ``/external/*``; none
-re-implements scanning. The connector deliberately exposes NOTHING else — no
-un-gated start, no white-box/repo tool, no delete/mutate-findings tool.
+"""Run-lifecycle tools: start, list, poll, cancel.
 
-    start_blackbox_run  — the ONLY start path; structurally requires a launch token.
-    list_active_runs    — read-only list of the tenant's in-flight scans.
-    get_run_progress    — read-only status snapshot for one scan.
-    get_share_url       — read-only guest link (the sole client-facing output).
-
-A launch token can only be minted by the operator's approval backend, so a
-routine holding these tools still cannot start an unauthorized scan.
+``start_blackbox_run`` is the ONLY start path and structurally requires a
+human-minted launch token, so a routine holding these tools still cannot start
+an unauthorized scan. ``cancel_run`` only ever REDUCES activity (it stops a run),
+so it needs no launch token — the connector's engine bearer authorizes it.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from fastmcp import FastMCP
-
-from . import shor_client
+from .. import shor_client
 
 
 async def start_blackbox_run(
@@ -76,32 +69,22 @@ async def get_run_progress(scan_id: str) -> dict[str, Any]:
     }
 
 
-async def get_share_url(project_id: str) -> dict[str, Any]:
-    """Mint (or read) the project's read-only guest link — the only client-facing
-    output of a run. Read-only with respect to scanning.
+async def cancel_run(scan_id: str) -> dict[str, Any]:
+    """Stop a running scan (the operator kill switch).
+
+    Cancels the run's underlying job execution and marks the scan ``cancelled``.
+    Activity-reducing and idempotent: a scan that already finished is returned
+    unchanged. Needs no authorization token — stopping a run can never widen
+    scope.
 
     Args:
-        project_id: The projectId returned by start_blackbox_run.
+        scan_id: The scanId returned by start_blackbox_run.
 
     Returns:
-        {"shareUrl": ...}
+        {"scanId": ..., "status": ...}
     """
-    r = await shor_client.share(project_id)
-    return {"shareUrl": r.get("shareUrl")}
+    r = await shor_client.cancel_scan(scan_id)
+    return {"scanId": r.get("scanId"), "status": r.get("status")}
 
 
-def register_tools(mcp: FastMCP) -> None:
-    """Register the four tools on ``mcp``."""
-    mcp.tool(start_blackbox_run)
-    mcp.tool(list_active_runs)
-    mcp.tool(get_run_progress)
-    mcp.tool(get_share_url)
-
-
-__all__ = [
-    "start_blackbox_run",
-    "list_active_runs",
-    "get_run_progress",
-    "get_share_url",
-    "register_tools",
-]
+__all__ = ["start_blackbox_run", "list_active_runs", "get_run_progress", "cancel_run"]

@@ -71,6 +71,44 @@ async def get_scan(scan_id: str) -> dict[str, Any]:
     return await _call("GET", f"/external/scans/{scan_id}")
 
 
+async def cancel_scan(scan_id: str) -> dict[str, Any]:
+    """Stop a running scan (operator kill switch). Activity-reducing, ungated."""
+    return await _call("POST", f"/external/scans/{scan_id}/cancel")
+
+
+async def get_findings(scan_id: str) -> list[dict[str, Any]]:
+    """Read-only list of a scan's finding records."""
+    body = await _call("GET", f"/external/scans/{scan_id}/findings")
+    findings = body.get("findings", [])
+    return findings if isinstance(findings, list) else []
+
+
+async def get_report(scan_id: str) -> Any:
+    """Read-only finalized executive report for a scan (None until finalized)."""
+    body = await _call("GET", f"/external/scans/{scan_id}/report")
+    return body.get("report")
+
+
+async def get_attack_surface(scan_id: str) -> Any:
+    """Read-only attack-surface document (scenarios + kill chains) for a scan."""
+    body = await _call("GET", f"/external/scans/{scan_id}/attack-surface")
+    return body.get("attackSurface")
+
+
+async def list_projects() -> list[dict[str, Any]]:
+    """Read-only list of the tenant's projects (targets)."""
+    body = await _call("GET", "/external/projects")
+    projects = body.get("projects", [])
+    return projects if isinstance(projects, list) else []
+
+
+async def get_scan_history(project_id: str) -> list[dict[str, Any]]:
+    """Read-only list of a project's scans, newest first."""
+    body = await _call("GET", f"/external/projects/{project_id}/scans")
+    scans = body.get("scans", [])
+    return scans if isinstance(scans, list) else []
+
+
 async def share(project_id: str) -> dict[str, Any]:
     """Mint/read the project's read-only guest link."""
     return await _call("POST", f"/external/projects/{project_id}/share")
