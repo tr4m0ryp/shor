@@ -25,11 +25,11 @@ RUN pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch
 COPY server ./server
 
 # Bake weights into the image (download at BUILD time -> /models). Cold-start
-# then loads from local disk instead of pulling ~5GB from HuggingFace.
-RUN python -c "from sentence_transformers import SentenceTransformer as S; \
-S('codesage/codesage-large-v2', trust_remote_code=True); \
-S('Alibaba-NLP/gte-large-en-v1.5', trust_remote_code=True)" \
- && python -c "from FlagEmbedding import FlagReranker; FlagReranker('BAAI/bge-reranker-v2-m3')"
+# then loads from local disk instead of pulling ~5GB from HuggingFace. Use
+# snapshot_download (writes files to disk) NOT SentenceTransformer(...) — the
+# latter LOADS the models into RAM and OOM-kills an 8GB build machine.
+RUN python -c "from huggingface_hub import snapshot_download as d; \
+[d(r) for r in ('codesage/codesage-large-v2', 'Alibaba-NLP/gte-large-en-v1.5', 'BAAI/bge-reranker-v2-m3')]"
 
 EXPOSE 8080
 CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
