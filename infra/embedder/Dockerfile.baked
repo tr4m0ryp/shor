@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+# Copyright (c) 2025-2026 Keygraph, Inc.
+# Required Notice: Shor -- https://github.com/tr4m0ryp/shor
+# Noncommercial use only. Selling this software or offering it as a paid or
+# hosted service requires a separate commercial license. See LICENSE & NOTICE.
+#
+# CPU embed/rerank image with the 3 models BAKED IN, for a scale-to-zero Cloud
+# Run service: cold start loads weights from the image (no 5GB runtime download),
+# so pay-per-use serving stays fast. All models Apache-2.0 / MIT.
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    HF_HOME=/models \
+    HF_HUB_OFFLINE=0 \
+    EMBED_DEVICE=cpu \
+    EMBED_FP16=0
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu \
+ && pip install --no-cache-dir \
+      fastapi==0.115.6 "uvicorn[standard]==0.34.0" pydantic==2.10.4 numpy==1.26.4 \
+      transformers==4.47.1 sentence-transformers==3.3.1 FlagEmbedding==1.3.4 einops==0.8.0
+
+COPY server ./server
+
+# Bake weights into the image (download at BUILD time -> /models). Cold-start
+# then loads from local disk instead of pulling ~5GB from HuggingFace. Use
+# snapshot_download (writes files to disk) NOT SentenceTransformer(...) — the
+# latter LOADS the models into RAM and OOM-kills an 8GB build machine.
+RUN python -c "from huggingface_hub import snapshot_download as d; \
+[d(r) for r in ('codesage/codesage-large-v2', 'Alibaba-NLP/gte-large-en-v1.5', 'BAAI/bge-reranker-v2-m3')]"
+
+EXPOSE 8080
+CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
