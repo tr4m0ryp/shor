@@ -39,11 +39,13 @@ class Settings:
             "EMBED_CODE_MODEL", "codesage/codesage-large-v2"
         )
     )
-    # text = gte-large-en-v1.5 (Apache-2.0) by default; swap to BAAI/bge-m3 (MIT).
+    # text = BAAI/bge-m3 (MIT), 1024-dim. Default is bge-m3 rather than
+    # gte-large-en-v1.5 because gte loads its architecture via trust_remote_code
+    # from a separate hub repo (Alibaba-NLP/new-impl) on every cold start, which
+    # 429-rate-limits into a 500 on a scale-to-zero host. bge-m3 has no remote
+    # code, so the server can run fully offline. Overridable via env.
     text_model: str = field(
-        default_factory=lambda: os.getenv(
-            "EMBED_TEXT_MODEL", "Alibaba-NLP/gte-large-en-v1.5"
-        )
+        default_factory=lambda: os.getenv("EMBED_TEXT_MODEL", "BAAI/bge-m3")
     )
     # reranker = bge-reranker-v2-m3 (Apache-2.0). NEVER jina-reranker (CC-BY-NC).
     rerank_model: str = field(
