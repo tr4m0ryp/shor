@@ -95,9 +95,11 @@ back to your code.
 Shor is built to fight false positives, because an autonomous scanner that cries wolf
 is worse than useless. Three mechanisms keep the final list honest:
 
-- **Proof-of-concept replay.** A finding only counts as confirmed if Shor can
-  reproduce it by running a harmless, repeatable proof-of-concept against the target,
-  inside a code-enforced safety layer that blocks destructive actions.
+- **Proof-of-concept replay.** After exploitation, a deterministic oracle
+  re-executes each captured proof-of-concept against the target — inside a
+  code-enforced safety layer that blocks destructive actions — and the outcome it
+  *observes* overrides whatever the agent claimed. A finding only counts as confirmed
+  if its PoC actually reproduces.
 - **Adversarial screening.** Before any exploitation effort, an independent jury of
   agents tries to *refute* each candidate; only majority-approved candidates advance.
 - **A refinement gate at the end.** Findings carry independent evidence axes (is the
