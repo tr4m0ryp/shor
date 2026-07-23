@@ -81,8 +81,9 @@ black-box scan can't have:
   exact file and line where the bug lives.
 - **Actionable fixes.** Because every finding maps back to a place in your repo, the
   dashboard can hand you a ready-made "fix prompt" for that code.
-- **Scan-over-scan diffs.** Findings are keyed to a stable fingerprint and to the
-  code snapshot, so you can see what a new scan introduced, fixed, or left unchanged.
+- **Tracking across scans.** Findings are keyed to a stable fingerprint and to the
+  code snapshot, so across a project's scan history you can tell which findings are
+  new, recurring, or resolved.
 
 Both modes run the **same agent pipeline and the same prove-it verification** — the
 difference is how much context the agents start with and how precisely findings tie
