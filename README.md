@@ -152,7 +152,9 @@ analysis run on the same industry tooling a human pentester reaches for:
 - **A written report** — a readable summary of what was found and how it was proven.
 - **A read-only share link** — mint an opaque link to expose one project's scans,
   findings, attack surface, and progress to someone with no account.
-- **Diffs** (white-box) — what changed since the last scan.
+- **SARIF export** and a project **scan history** — findings carry a stable
+  fingerprint, so you can follow a given issue as new, recurring, or resolved across
+  a project's runs.
 
 ---
 
