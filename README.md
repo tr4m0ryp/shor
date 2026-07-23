@@ -45,7 +45,8 @@ to the next stage. The phases run in this order:
 | **Pre-recon → Recon → Threat-model** | 3 | sequentially | Map the live target (and the source, in white-box mode): services, ports, endpoints, parameters, tech stack. The threat-model agent turns that map into a prioritized list of where to look. |
 | **Vulnerability analysis** | 7 | in parallel | One agent per bug class — injection, XSS, authentication, SSRF, authorization, business-logic, and web misconfiguration — each proposing candidate vulnerabilities in its domain. |
 | **Adversarial screen** | a variable jury | in parallel | Each candidate finding is judged by several independent "voter" agents, each looking through a different lens (e.g. correctness, auth-context) and **blind to the recon context** so they can't be led. A majority vote decides which candidates advance. |
-| **Exploitation** | 7 | in parallel | The same seven bug-class specialists take the pre-filtered, higher-confidence queue and try to actually exploit each surviving candidate against the live target. |
+| **Exploitation** | 7 | in parallel | The same seven bug-class specialists take the pre-filtered, higher-confidence queue and try to actually exploit each surviving candidate against the live target, capturing a proof-of-concept for each. |
+| **Proof replay (oracle)** | deterministic | after exploitation | Not an agent — Shor re-executes each captured proof-of-concept itself and lets the *observed* outcome override whatever the exploit agent claimed. A PoC that doesn't reproduce gets demoted; a low-confidence positive is never silently kept. |
 | **Finalize** | 1 | sequentially | A single high-capability session runs three dependent stages — finding-refinement, then attack-surface, then report — to dedupe, demote, and write everything up. |
 
 So a typical scan runs **about 17 specialist agents in fixed roles** — 3 for
