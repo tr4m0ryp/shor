@@ -343,5 +343,16 @@ async function emitFindings(
 		hasReport: report !== undefined,
 	});
 
-	return postFindings(sink, payload, logger);
+	const posted = await postFindings(sink, payload, logger);
+
+	// RAG "remember" half (always-on, best-effort): persist the finalized findings
+	// into the project-local learning tier so the next scan of this target recalls
+	// them. Runs only on the terminal `completed` emission (not per-agent `running`
+	// posts) and AFTER the sink POST, so results reach the dashboard first. Never
+	// throws — memory writes cannot affect the scan outcome.
+	if (status === "completed" && findings.length > 0) {
+		await persistFindingsToMemory(findings, process.env, logger);
+	}
+
+	return posted;
 }
