@@ -39,7 +39,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 /** Strip the phase suffix to get the bug class (`xss-vuln` -> `xss`). */
 function categoryOf(agentName: string): string | null {
 	const m = /^(.*)-(vuln|exploit)$/.exec(agentName);
-	return m ? m[1] : null;
+	return m?.[1] ?? null;
 }
 
 /** Cap the extra context appended to the query so embedding stays cheap. */
