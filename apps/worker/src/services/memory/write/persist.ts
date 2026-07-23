@@ -108,12 +108,19 @@ export type PersistOutcome =
 
 const MAX_FP_REASON = 500;
 
-/** True when `SHOR_MEMORY_WRITE` is truthy (`1`/`true`, case-insensitive). */
+/**
+ * True unless `SHOR_MEMORY_WRITE` is EXPLICITLY disabled (`0`/`false`/`no`/
+ * `off`). The learning-memory write is ALWAYS ON by default. It still composes
+ * with the embed gate (`deps.embed.enabled`) and the mandatory fail-closed scrub,
+ * so a missing embedder or a scrub failure skips the write for that finding
+ * WITHOUT affecting the scan. Set `SHOR_MEMORY_WRITE=0` only to force it off.
+ */
 export function readMemoryWriteEnabled(
 	env: NodeJS.ProcessEnv = process.env,
 ): boolean {
 	const raw = env["SHOR_MEMORY_WRITE"]?.trim().toLowerCase();
-	return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
+	if (raw === undefined || raw === "") return true;
+	return !(raw === "0" || raw === "false" || raw === "no" || raw === "off");
 }
 
 /** First non-empty trimmed string among candidate keys, else null. */
