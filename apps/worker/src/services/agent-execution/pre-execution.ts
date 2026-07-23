@@ -23,6 +23,7 @@ import type { ConfigLoaderService } from "../config-loader.js";
 import type { Container } from "../container.js";
 import { PentestError } from "../error-handling.js";
 import { createGitCheckpoint } from "../git-manager.js";
+import { retrieveRagForAgent } from "../memory/wire/retrieve-rag.js";
 import { loadPrompt } from "../prompt-manager.js";
 import type { PromptContext } from "../prompt-manager/prompt-context.js";
 import { assembleScanPromptContext } from "../threat-model/index.js";
