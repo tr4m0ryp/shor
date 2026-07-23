@@ -38,12 +38,20 @@ import type {
 	RetrieveResult,
 } from "./types.js";
 
-/** True when `SHOR_MEMORY_RETRIEVE` is truthy (`1`/`true`/`yes`/`on`). */
+/**
+ * True unless `SHOR_MEMORY_RETRIEVE` is EXPLICITLY disabled (`0`/`false`/`no`/
+ * `off`). RAG retrieval is ALWAYS ON by default — the two-tier memory is a core
+ * part of the pipeline, not an opt-in. This still composes with the embed gate
+ * (`deps.embed.enabled`, i.e. `SHOR_EMBED_URL`) and the fail-open catch below, so
+ * a missing embedder or any recall error leaves the prompt unchanged rather than
+ * breaking the scan. Set `SHOR_MEMORY_RETRIEVE=0` only to force it off.
+ */
 export function readMemoryRetrieveEnabled(
 	env: NodeJS.ProcessEnv = process.env,
 ): boolean {
 	const raw = env["SHOR_MEMORY_RETRIEVE"]?.trim().toLowerCase();
-	return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
+	if (raw === undefined || raw === "") return true;
+	return !(raw === "0" || raw === "false" || raw === "no" || raw === "off");
 }
 
 const EMPTY: RetrieveResult = { exemplars: [], rendered: null };
