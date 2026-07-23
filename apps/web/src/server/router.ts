@@ -99,6 +99,16 @@ export async function apiRouter(
     return handleIngestProgress(scanId, body, cookieHeader, authHeader);
   }
 
+  // POST /scans/:id/memory/:op — the worker's two-tier RAG store seam (op =
+  // `nearest` for recall, `embeddings` for the learning write). Same service-
+  // token auth as the findings sink; tenant/project derived from the scan.
+  if (resource === 'scans' && segments[2] === 'memory' && method === 'POST') {
+    const scanId = segments[1];
+    const op = segments[3];
+    if (!scanId || !op) return NOT_FOUND;
+    return handleMemoryRequest(scanId, op, body, cookieHeader, authHeader);
+  }
+
   // GET /export/sarif?scan=<scanId> — SARIF 2.1.0 export view (ADR-033).
   if (resource === 'export' && action === 'sarif') {
     if (method !== 'GET') return METHOD_NOT_ALLOWED;
