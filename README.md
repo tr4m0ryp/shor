@@ -111,19 +111,22 @@ is worse than useless. Three mechanisms keep the final list honest:
 
 ---
 
-## Memory (RAG)
+## Memory (RAG) — opt-in
 
-Shor learns across scans through a two-tier retrieval memory:
+Shor ships a two-tier retrieval-memory layer so the engine can learn across scans.
+It's an **opt-in capability** (feature-flagged, off by default), not an always-on
+step, but the design is:
 
 - A **per-project tier** remembers what's already been found in a given target, so
   repeat scans build on prior work instead of starting blank.
 - A shared **knowledge tier** is pre-seeded with distilled attack-technique research
   (MITRE CAPEC plus recent web-security write-ups).
 
-This memory feeds the agents **ideas to try**, not verdicts to trust — it broadens
-what the explorer thinks to attempt. The prove-it verification stays the sole arbiter
-of what's real, and third-party research is treated as untrusted input to guard
-against retrieval poisoning.
+When enabled, this memory feeds the agents **ideas to try**, not verdicts to trust —
+it broadens what the explorer thinks to attempt. The prove-it verification stays the
+sole arbiter of what's real, and third-party research is treated as untrusted input
+to guard against retrieval poisoning. Promotion of a finding into the shared,
+cross-tenant tier is gated behind consent and mandatory secret/PII scrubbing.
 
 ---
 
