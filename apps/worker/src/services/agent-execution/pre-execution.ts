@@ -159,6 +159,17 @@ export async function runPreExecution(
 		webUrl,
 	);
 
+	// 1c. Two-tier RAG recall (always-on, fail-open): inject the top past-
+	// vulnerability exemplars into {{RAG_EXEMPLARS}} for the vuln/exploit category
+	// agents. Any failure (no embedder, store error) leaves the slot as "(none)".
+	const ragExemplars = await retrieveRagForAgent(
+		agentName,
+		promptContext,
+		process.env,
+		logger,
+	);
+	if (ragExemplars) promptContext.ragExemplars = ragExemplars;
+
 	// 2. Load prompt
 	const promptResult = await loadAgentPrompt(
 		agentName,
