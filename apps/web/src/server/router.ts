@@ -18,6 +18,7 @@
 import { blockedResponse, handleGate, isGateExempt, isUnlocked } from '../auth/gate.js';
 import { handleLogout, handleMe, handleSessionLogin } from '../auth/routes.js';
 import { handleIngestFindings, handleSarifExport } from '../findings/index.js';
+import { handleMemoryRequest } from '../memory/index.js';
 import { handleIngestProgress } from '../scan-progress/index.js';
 import { routeDashboard } from './dashboard/index.js';
 import { getGithubConfig, githubOauthCallback, startGithubOauth } from './dashboard/settings.js';
