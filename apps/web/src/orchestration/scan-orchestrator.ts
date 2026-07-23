@@ -104,6 +104,11 @@ export async function startScan(
     { name: 'SHOR_REPO_PATH', value: REPO_PATH },
     { name: 'SHOR_FINDINGS_SINK_URL', value: cfg.publicUrl },
     { name: 'SHOR_SINK_TOKEN', value: cfg.sinkToken },
+    // Scope hints for the two-tier RAG memory wire. The memory sink re-derives
+    // tenant/project from the scan server-side (never trusting these), so they
+    // are advisory only — they let the worker build a real RetrievalScope.
+    { name: 'SHOR_TENANT_ID', value: manifest.tenantId },
+    { name: 'SHOR_PROJECT_ID', value: project.id },
   ];
 
   // White-box only: point the worker at the staged repo. Use the version's
