@@ -21,6 +21,7 @@ import { clusterFindings } from "../../services/dedup-judge/index.js";
 // fp-panel/index imports collectFindings, but the router imports neither.
 import { applyFpRefuteVerdicts } from "../../services/fp-panel/router.js";
 import { gradeFindings } from "../../services/grader/index.js";
+import { persistFindingsToMemory } from "../../services/memory/wire/persist-rag.js";
 import { applyOracleDispositions } from "../../services/oracle/index.js";
 import { applyScreenVerdicts } from "../../services/screen-verdicts/index.js";
 import type { ActivityLogger } from "../../types/activity-logger.js";
