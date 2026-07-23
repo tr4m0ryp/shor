@@ -7,13 +7,23 @@
 # CPU embed/rerank image with the 3 models BAKED IN, for a scale-to-zero Cloud
 # Run service: cold start loads weights from the image (no 5GB runtime download),
 # so pay-per-use serving stays fast. All models Apache-2.0 / MIT.
+#
+# Text embedder = BAAI/bge-m3 (MIT), NOT gte-large-en-v1.5. gte pulls its custom
+# architecture code from a SEPARATE hub repo (Alibaba-NLP/new-impl) at load time
+# via trust_remote_code, so even a baked image hits huggingface.co on every cold
+# start and 429-rate-limits into a 500. bge-m3 is a native sentence-transformers
+# model (no remote code), same 1024-dim output, so the whole server can run fully
+# offline once baked.
 FROM python:3.11-slim
 
+# Build downloads weights (HF_HUB_OFFLINE=0); the runtime override below flips the
+# server to fully offline so a cold start never touches huggingface.co.
 ENV PYTHONUNBUFFERED=1 \
     HF_HOME=/models \
     HF_HUB_OFFLINE=0 \
     EMBED_DEVICE=cpu \
-    EMBED_FP16=0
+    EMBED_FP16=0 \
+    EMBED_TEXT_MODEL=BAAI/bge-m3
 
 WORKDIR /app
 
@@ -29,7 +39,13 @@ COPY server ./server
 # snapshot_download (writes files to disk) NOT SentenceTransformer(...) — the
 # latter LOADS the models into RAM and OOM-kills an 8GB build machine.
 RUN python -c "from huggingface_hub import snapshot_download as d; \
-[d(r) for r in ('codesage/codesage-large-v2', 'Alibaba-NLP/gte-large-en-v1.5', 'BAAI/bge-reranker-v2-m3')]"
+[d(r) for r in ('codesage/codesage-large-v2', 'BAAI/bge-m3', 'BAAI/bge-reranker-v2-m3')]"
+
+# Everything is now on local disk: forbid all runtime hub access so a cold start
+# loads purely from /models and can never 429. (Set AFTER the download RUN so the
+# build could still fetch weights.)
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
 
 EXPOSE 8080
 CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
