@@ -104,11 +104,14 @@ function candidate(key: string, tier: "local" | "global"): ExemplarCandidate {
 // ── env flag ─────────────────────────────────────────────────────────────────
 
 describe("readMemoryRetrieveEnabled", () => {
-	it("is off unless SHOR_MEMORY_RETRIEVE is truthy", () => {
-		expect(readMemoryRetrieveEnabled({})).toBe(false);
-		expect(readMemoryRetrieveEnabled({ SHOR_MEMORY_RETRIEVE: "false" })).toBe(false);
+	it("is ON by default and only OFF when explicitly disabled", () => {
+		expect(readMemoryRetrieveEnabled({})).toBe(true);
+		expect(readMemoryRetrieveEnabled({ SHOR_MEMORY_RETRIEVE: "" })).toBe(true);
 		expect(readMemoryRetrieveEnabled({ SHOR_MEMORY_RETRIEVE: "1" })).toBe(true);
 		expect(readMemoryRetrieveEnabled({ SHOR_MEMORY_RETRIEVE: "TRUE" })).toBe(true);
+		expect(readMemoryRetrieveEnabled({ SHOR_MEMORY_RETRIEVE: "false" })).toBe(false);
+		expect(readMemoryRetrieveEnabled({ SHOR_MEMORY_RETRIEVE: "0" })).toBe(false);
+		expect(readMemoryRetrieveEnabled({ SHOR_MEMORY_RETRIEVE: "off" })).toBe(false);
 	});
 });
 
