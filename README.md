@@ -1,5 +1,9 @@
 # Shor
 
+<p align="center">
+  <a href="https://x.com/tr4m0ryp"><img alt="Follow on X" src="https://img.shields.io/badge/X-@tr4m0ryp-000000?logo=x&logoColor=white"></a>
+</p>
+
 Shor is an autonomous offensive-security engine for web applications. You point it
 at a target — a live URL, and optionally the source code behind it — and a team of
 AI agents does what a human penetration tester would: map the app, reason about
